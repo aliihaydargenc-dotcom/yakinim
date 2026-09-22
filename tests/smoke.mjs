@@ -69,6 +69,7 @@ assert.match(index, /id="focusShowAll"/);
 assert.match(index, /id="focusMap"/);
 assert.match(index, /id="exploreMapButton"/);
 assert.match(index, /id="fullResultsPanel"/);
+assert.match(index, /id="listViewButton"/);
 assert.match(index, /maplibre-gl@5/);
 assert.match(index, /OpenFreeMap/);
 
