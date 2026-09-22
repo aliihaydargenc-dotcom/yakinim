@@ -534,3 +534,132 @@ body[data-view=map] .discovery-hub{display:none}
   .discovery-cards::-webkit-scrollbar{display:none}
   .discovery-card{flex:0 0 min(78vw,260px);scroll-snap-align:start;min-height:94px}
 }
+
+
+/* v2.2 explore -> focus -> full results */
+:where(.category-focus,.focus-icon,.focus-place){--cat:#227363;--cat-soft:#e8f3ef}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="cafe"]{--cat:#9a633c;--cat-soft:#fff1e6}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="food"]{--cat:#c24f45;--cat-soft:#fff0ee}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="market"]{--cat:#276f9a;--cat-soft:#eaf5fb}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="shopping"]{--cat:#7656a7;--cat-soft:#f3effb}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="park"]{--cat:#43834f;--cat-soft:#edf7ee}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="pharmacy"],
+:where(.category-focus,.focus-icon,.focus-place)[data-category="hospital"],
+:where(.category-focus,.focus-icon,.focus-place)[data-category="duty"]{--cat:#b84955;--cat-soft:#fff0f2}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="bakery"]{--cat:#a66a22;--cat-soft:#fff5e6}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="greengrocer"]{--cat:#5d8239;--cat-soft:#f1f7e9}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="atm"]{--cat:#3e6e89;--cat-soft:#edf5f8}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="fuel"]{--cat:#526577;--cat-soft:#eef2f5}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="parking"]{--cat:#42627f;--cat-soft:#edf3f8}
+:where(.category-focus,.focus-icon,.focus-place)[data-category="favorites"]{--cat:#a17424;--cat-soft:#fff8e7}
+
+.category-focus{
+  max-height:0;
+  opacity:0;
+  overflow:hidden;
+  pointer-events:none;
+  transform:translateY(-10px) scale(.985);
+  margin:0;
+  padding:0 18px;
+  border:1px solid transparent;
+  border-radius:22px;
+  background:#fff;
+  transition:max-height .38s cubic-bezier(.22,.72,.18,1),opacity .24s ease,transform .34s cubic-bezier(.22,.72,.18,1),margin .34s ease,padding .34s ease,border-color .28s ease,box-shadow .28s ease;
+}
+body[data-experience="focus"] .category-focus,
+body[data-experience="full"] .category-focus{
+  max-height:560px;
+  opacity:1;
+  pointer-events:auto;
+  transform:none;
+  margin:6px 0 20px;
+  padding:18px;
+  border-color:color-mix(in srgb,var(--cat) 20%,#e5eaee);
+  box-shadow:0 14px 34px #1f393312;
+}
+.focus-head{display:grid;grid-template-columns:36px 46px minmax(0,1fr);align-items:center;gap:11px}
+.focus-close{width:36px;height:36px;border:1px solid var(--line);border-radius:11px;background:#f8fafb;font-size:25px;line-height:1;color:var(--ink);transition:transform .16s ease,background .16s ease}
+.focus-close:active{transform:scale(.92)}
+.focus-icon{display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:var(--cat-soft);color:var(--cat);transition:transform .28s cubic-bezier(.2,.8,.2,1),background .24s ease,color .24s ease}
+body[data-experience="focus"] .focus-icon,
+body[data-experience="full"] .focus-icon{animation:focusIconPop .34s cubic-bezier(.2,.8,.2,1) both}
+.focus-heading{min-width:0}
+.focus-heading .eyebrow{font-size:9px;letter-spacing:1.5px;color:var(--cat);font-weight:800;margin-bottom:2px}
+.focus-heading h3{font-size:20px;letter-spacing:-.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.focus-summary{font-size:11px;color:var(--muted);margin-top:2px}
+.focus-preview{display:grid;gap:8px;margin-top:14px}
+.focus-place{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) 18px;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:66px;
+  padding:10px 11px;
+  border:1px solid #e9edef;
+  border-radius:14px;
+  background:#fbfcfc;
+  text-align:left;
+  opacity:0;
+  transform:translateY(8px);
+  animation:focusPlaceIn .3s cubic-bezier(.2,.75,.2,1) forwards;
+  animation-delay:var(--preview-delay,0ms);
+  transition:transform .16s ease,border-color .18s ease,background .18s ease;
+}
+.focus-place:active{transform:scale(.985)}
+.focus-place-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:var(--cat-soft);color:var(--cat)}
+.focus-place-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.focus-place-copy strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.focus-place-copy small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.focus-place-arrow{font-size:22px;color:#96a2aa}
+.focus-actions{display:grid;grid-template-columns:1fr 1.2fr;gap:9px;margin-top:13px}
+.focus-actions button{min-height:44px;border-radius:12px;font-size:12px;font-weight:700}
+.focus-map{border:1px solid color-mix(in srgb,var(--cat) 22%,var(--line));background:var(--cat-soft);color:var(--cat)}
+.focus-show-all{border:0;background:var(--cat);color:#fff}
+.focus-show-all:disabled{opacity:.45}
+.focus-skeleton{height:58px;border-radius:14px;background:linear-gradient(90deg,#f0f3f4 25%,#f8fafb 42%,#f0f3f4 65%);background-size:280% 100%;animation:discoverySkeleton 1.2s ease infinite}
+.focus-empty{padding:18px;border-radius:14px;background:#f7f9fa;color:var(--muted);text-align:center;font-size:11px}
+
+.discovery-head-actions{display:flex;align-items:flex-end;gap:10px}
+.explore-map-button{flex:0 0 auto;min-height:38px;padding:0 12px;border:1px solid #dfe7e5;border-radius:11px;background:#fff;color:var(--accent);font-size:11px;font-weight:700}
+body[data-experience="focus"] .discovery-hub{opacity:.58;transform:scale(.992)}
+body[data-experience="full"] .discovery-hub{opacity:.34;transform:scale(.988)}
+.discovery-hub{transition:opacity .28s ease,transform .28s ease}
+
+.full-results-panel{opacity:0;transform:translateY(20px);transition:opacity .28s ease,transform .34s cubic-bezier(.2,.75,.2,1)}
+.full-results-panel.is-open{opacity:1;transform:none}
+
+#map{opacity:0;transition:opacity .28s ease}
+body[data-view=map] #map{opacity:1}
+body[data-view=map] .sheet{animation:mapSheetIn .32s cubic-bezier(.2,.75,.2,1) both}
+
+.place-marker{animation:markerIn .3s cubic-bezier(.16,.8,.2,1) both;animation-delay:var(--marker-delay,0ms);transform-origin:center}
+.place-marker.is-leaving{animation:markerOut .16s ease forwards}
+
+@keyframes focusIconPop{0%{transform:scale(.82) rotate(-4deg)}70%{transform:scale(1.07)}100%{transform:none}}
+@keyframes focusPlaceIn{to{opacity:1;transform:none}}
+@keyframes markerIn{0%{opacity:0;transform:translateY(6px) scale(.72)}70%{opacity:1;transform:translateY(-1px) scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes markerOut{to{opacity:0;transform:scale(.68)}}
+@keyframes mapSheetIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+@media(max-width:759px){
+  body[data-experience="focus"] .category-focus,
+  body[data-experience="full"] .category-focus{margin:4px 0 16px;padding:15px}
+  .focus-head{grid-template-columns:34px 42px minmax(0,1fr);gap:9px}
+  .focus-close{width:34px;height:34px}
+  .focus-icon{width:42px;height:42px}
+  .focus-heading h3{font-size:18px}
+  .focus-preview{margin-top:12px}
+  .focus-place{min-height:62px}
+  .focus-actions{position:sticky;bottom:0;padding-top:9px;background:linear-gradient(180deg,#fff0,#fff 35%)}
+  .discovery-head-actions{width:100%;align-items:center;justify-content:space-between}
+  .discovery-summary{text-align:left}
+  .explore-map-button{min-height:36px}
+  body[data-view=map] .category-focus{margin:0;padding:10px 12px;max-height:150px}
+  body[data-view=map] .focus-preview{display:none}
+  body[data-view=map] .focus-actions{grid-template-columns:1fr}
+  body[data-view=map] .focus-show-all{display:none}
+  body[data-view=map] .focus-head{grid-template-columns:32px 38px minmax(0,1fr)}
+  body[data-view=map] .focus-icon{width:38px;height:38px}
+  body[data-view=map] .focus-heading .eyebrow{display:none}
+}
