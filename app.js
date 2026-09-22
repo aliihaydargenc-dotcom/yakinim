@@ -1,4 +1,4 @@
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
@@ -53,6 +53,8 @@ const sourceText = document.querySelector("#sourceText");
 const resultSummary = document.querySelector("#resultSummary");
 const sheet = document.querySelector(".sheet");
 const sheetToggle = document.querySelector("#sheetToggle");
+const nearestAction = document.querySelector("#nearestAction");
+const nearestActionMeta = document.querySelector("#nearestActionMeta");
 const resultTemplate = document.querySelector("#resultTemplate");
 
 radiusSelect.value = String(prefs.radius);
@@ -61,7 +63,19 @@ renderCategoryButtons();
 showState("loading", "Konum izni bekleniyor…");
 
 locateButton.addEventListener("click", locateUser);
-sheetToggle.addEventListener("click", cycleSheetState);
+let sheetGestureStartY = null;
+let sheetGestureConsumed = false;
+
+sheetToggle.addEventListener("pointerdown", startSheetGesture);
+sheetToggle.addEventListener("pointerup", endSheetGesture);
+sheetToggle.addEventListener("pointercancel", cancelSheetGesture);
+sheetToggle.addEventListener("click", () => {
+  if (sheetGestureConsumed) {
+    sheetGestureConsumed = false;
+    return;
+  }
+  cycleSheetState();
+});
 radiusSelect.addEventListener("change", () => {
   prefs.radius = Number(radiusSelect.value);
   persistPrefs();
@@ -373,6 +387,7 @@ function loadFavorites() {
 function renderPlaces(places, category) {
   clearPlaceMarkers();
   results.replaceChildren();
+  updateNearestAction(places);
 
   if (!places.length) {
     showState("empty", category.type === "favorites" ? "Bir yeri yıldızlayınca burada görünecek." : "Bu yarıçapta sonuç bulunamadı. 5 km seçip tekrar deneyebilirsin.");
@@ -419,7 +434,7 @@ function createResultCard(place, icon, isNearest = false) {
   main.addEventListener("click", () => focusPlace(place));
   favoriteButton.addEventListener("click", () => toggleFavorite(place));
 
-  directionsLink.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${place.lat},${place.lng}`)}`;
+  directionsLink.href = buildDirectionsUrl(place);
 
   if (place.phone) {
     phoneLink.hidden = false;
@@ -522,6 +537,8 @@ function persistPrefs() {
 
 function showState(kind, message) {
   resultSummary.textContent = kind === "loading" ? "Aranıyor…" : "Henüz sonuç yok";
+  nearestAction.hidden = true;
+  nearestAction.removeAttribute("href");
   results.innerHTML = `<div class="${kind}-state">${escapeHtml(message)}</div>`;
 }
 
@@ -548,12 +565,58 @@ function applySheetState(state) {
     expanded: "Paneli küçült",
   };
   sheetToggle.setAttribute("aria-label", labels[nextState]);
+  sheetToggle.setAttribute("aria-expanded", String(nextState !== "peek"));
 }
 
 function cycleSheetState() {
   const currentIndex = SHEET_STATES.indexOf(sheet.dataset.state || "half");
   const nextState = SHEET_STATES[(currentIndex + 1) % SHEET_STATES.length];
   applySheetState(nextState);
+}
+
+function startSheetGesture(event) {
+  sheetGestureStartY = event.clientY;
+  sheetGestureConsumed = false;
+  sheetToggle.setPointerCapture?.(event.pointerId);
+}
+
+function endSheetGesture(event) {
+  if (sheetGestureStartY === null) return;
+
+  const deltaY = event.clientY - sheetGestureStartY;
+  sheetGestureStartY = null;
+
+  if (Math.abs(deltaY) < 36) return;
+
+  const currentIndex = SHEET_STATES.indexOf(sheet.dataset.state || "half");
+  const direction = deltaY < 0 ? 1 : -1;
+  const nextIndex = Math.min(SHEET_STATES.length - 1, Math.max(0, currentIndex + direction));
+
+  sheetGestureConsumed = true;
+  applySheetState(SHEET_STATES[nextIndex]);
+}
+
+function cancelSheetGesture() {
+  sheetGestureStartY = null;
+  sheetGestureConsumed = false;
+}
+
+function updateNearestAction(places) {
+  const nearest = places.find((place) => Number.isFinite(place.distanceKm));
+  if (!nearest) {
+    nearestAction.hidden = true;
+    nearestAction.removeAttribute("href");
+    nearestActionMeta.textContent = "";
+    return;
+  }
+
+  nearestAction.href = buildDirectionsUrl(nearest);
+  nearestActionMeta.textContent = `${nearest.name} · ${formatDistance(nearest.distanceKm)}`;
+  nearestAction.hidden = false;
+}
+
+function buildDirectionsUrl(place) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${place.lat},${place.lng}`)}`;
 }
 
 function distanceBetween(lat1, lon1, lat2, lon2) {
