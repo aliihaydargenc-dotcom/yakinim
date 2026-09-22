@@ -1,4 +1,4 @@
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
@@ -7,6 +7,7 @@ const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
 const CACHE_PREFIX = "yakinimda:cache:v2:";
 const PREFETCH_RADIUS = 5000;
+const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 const SHEET_STATES = ["peek", "half", "expanded"];
 
 const categories = [
@@ -16,6 +17,10 @@ const categories = [
   { id: "bakery", label: "Fırın", icon: "◇", type: "osm", filter: "[shop=bakery]", ttl: 6 * 60 * 60 * 1000 },
   { id: "pharmacy", label: "Eczane", icon: "+", type: "osm", filter: "[amenity=pharmacy]", ttl: 6 * 60 * 60 * 1000 },
   { id: "atm", label: "ATM", icon: "₺", type: "osm", filter: "[amenity=atm]", ttl: 6 * 60 * 60 * 1000 },
+  { id: "hospital", label: "Sağlık", icon: "✚", type: "osm", filter: '[amenity~"^(hospital|clinic|doctors)$"]', ttl: 6 * 60 * 60 * 1000 },
+  { id: "fuel", label: "Akaryakıt", icon: "⛽", type: "osm", filter: "[amenity=fuel]", ttl: 6 * 60 * 60 * 1000 },
+  { id: "parking", label: "Otopark", icon: "P", type: "osm", filter: "[amenity=parking]", ttl: 6 * 60 * 60 * 1000 },
+  { id: "food", label: "Kafe / Yemek", icon: "☕", type: "osm", filter: '[amenity~"^(cafe|restaurant|fast_food)$"]', ttl: 6 * 60 * 60 * 1000 },
   { id: "favorites", label: "Favoriler", icon: "★", type: "favorites", ttl: 0 },
 ];
 const osmCategories = categories.filter((category) => category.type === "osm");
@@ -28,17 +33,21 @@ let activeCategory = categories.find((item) => item.id === prefs.category) || ca
 let activePlaces = [];
 let markers = [];
 let userMarker = null;
+let userAccuracyCircle = null;
 let requestSerial = 0;
+let locationAttemptSerial = 0;
+let manualLocationMode = false;
 let osmBundleRequest = null;
 
 const map = L.map("map", {
   zoomControl: false,
   attributionControl: false,
+  preferCanvas: true,
+  zoomSnap: 0.5,
 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+L.maplibreGL({
+  style: MAP_STYLE_URL,
 }).addTo(map);
 
 L.control.zoom({ position: "topright" }).addTo(map);
@@ -49,6 +58,7 @@ const resultTitle = document.querySelector("#resultTitle");
 const statusText = document.querySelector("#statusText");
 const radiusSelect = document.querySelector("#radiusSelect");
 const locateButton = document.querySelector("#locateButton");
+const manualLocationButton = document.querySelector("#manualLocationButton");
 const sourceText = document.querySelector("#sourceText");
 const resultSummary = document.querySelector("#resultSummary");
 const sheet = document.querySelector(".sheet");
@@ -62,7 +72,9 @@ applySheetState(prefs.sheetState || "half");
 renderCategoryButtons();
 showState("loading", "Konum izni bekleniyor…");
 
-locateButton.addEventListener("click", locateUser);
+locateButton.addEventListener("click", () => locateUser({ forceFresh: true }));
+manualLocationButton.addEventListener("click", enableManualLocationMode);
+map.on("click", handleManualMapClick);
 let sheetGestureStartY = null;
 let sheetGestureConsumed = false;
 
@@ -86,7 +98,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
 }
 
-locateUser();
+locateUser({ forceFresh: false });
 
 function renderCategoryButtons() {
   categoryStrip.replaceChildren();
@@ -124,57 +136,184 @@ function selectCategory(category) {
   loadCategory(category);
 }
 
-function locateUser() {
+async function locateUser({ forceFresh = false } = {}) {
   if (!navigator.geolocation) {
-    statusText.textContent = "Bu tarayıcı konum özelliğini desteklemiyor.";
-    showState("error", "Konum alınamadı. Mobil tarayıcıda konum iznini kontrol et.");
+    showLocationFailure("Bu tarayıcı konum özelliğini desteklemiyor.");
     return;
   }
 
+  const serial = ++locationAttemptSerial;
+  manualLocationMode = false;
+  document.body.classList.remove("is-selecting-location");
   locateButton.disabled = true;
-  statusText.textContent = "Konum alınıyor…";
+  locateButton.classList.add("is-loading");
+  manualLocationButton.hidden = true;
+  statusText.textContent = "Konum aranıyor…";
+  showState("loading", "GPS konumu alınıyor…");
 
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      locateButton.disabled = false;
-      userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      };
-      drawUserLocation();
-      map.setView([userLocation.lat, userLocation.lng], 14, { animate: mapShouldAnimate });
-      statusText.textContent = position.coords.accuracy
-        ? `Konum doğruluğu yaklaşık ${Math.round(position.coords.accuracy)} m.`
-        : "Konum bulundu.";
-      if (activeCategory.type === "favorites") loadFavorites();
-      else {
-        loadCategory(activeCategory);
-        warmNearbyData(activeCategory.id);
-      }
-    },
-    (error) => {
-      locateButton.disabled = false;
-      statusText.textContent = "Konum izni verilmedi veya konum alınamadı.";
-      showState("empty", error.code === 1 ? "Konum iznini açıp ‘Konumum’ düğmesine dokun." : "Konum alınamadı. Biraz sonra yeniden dene.");
-    },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
-  );
+  const permissionState = await getGeolocationPermissionState();
+  if (serial !== locationAttemptSerial) return;
+
+  if (permissionState === "denied") {
+    locateButton.disabled = false;
+    locateButton.classList.remove("is-loading");
+    showLocationFailure("Konum izni kapalı. Tarayıcı iznini açabilir veya haritadan konum seçebilirsin.");
+    return;
+  }
+
+  const attempts = [
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: forceFresh ? 0 : 60 * 1000 },
+    { enableHighAccuracy: false, timeout: 12000, maximumAge: 10 * 60 * 1000 },
+  ];
+
+  let lastError = null;
+  for (const options of attempts) {
+    try {
+      const position = await getCurrentPosition(options);
+      if (serial !== locationAttemptSerial) return;
+      applyUserPosition(position);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (error?.code === 1) break;
+    }
+  }
+
+  if (serial !== locationAttemptSerial) return;
+  locateButton.disabled = false;
+  locateButton.classList.remove("is-loading");
+  showLocationFailure(locationErrorMessage(lastError));
+}
+
+function getCurrentPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
+async function getGeolocationPermissionState() {
+  if (!navigator.permissions?.query) return "prompt";
+
+  try {
+    const permission = await navigator.permissions.query({ name: "geolocation" });
+    return permission.state;
+  } catch {
+    return "prompt";
+  }
+}
+
+function applyUserPosition(position) {
+  locateButton.disabled = false;
+  locateButton.classList.remove("is-loading");
+  manualLocationButton.hidden = true;
+
+  userLocation = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    accuracy: position.coords.accuracy,
+    source: "gps",
+  };
+
+  drawUserLocation();
+  map.flyTo([userLocation.lat, userLocation.lng], 15, {
+    animate: mapShouldAnimate,
+    duration: 0.7,
+  });
+
+  statusText.textContent = Number.isFinite(userLocation.accuracy)
+    ? `Konum bulundu · yaklaşık ${Math.round(userLocation.accuracy)} m doğruluk`
+    : "Konum bulundu.";
+
+  if (activeCategory.type === "favorites") loadFavorites();
+  else {
+    loadCategory(activeCategory);
+    warmNearbyData(activeCategory.id);
+  }
+}
+
+function showLocationFailure(message) {
+  statusText.textContent = message;
+  manualLocationButton.hidden = false;
+  showState("empty", "Konum bulunamadı. Yeniden deneyebilir veya haritada bulunduğun noktayı seçebilirsin.");
+}
+
+function locationErrorMessage(error) {
+  if (error?.code === 1) return "Konum izni verilmedi.";
+  if (error?.code === 2) return "Telefon şu an GPS konumu üretemedi.";
+  if (error?.code === 3) return "GPS yanıtı zaman aşımına uğradı.";
+  return "Konum alınamadı.";
+}
+
+function enableManualLocationMode() {
+  locationAttemptSerial += 1;
+  manualLocationMode = true;
+  locateButton.disabled = false;
+  locateButton.classList.remove("is-loading");
+  manualLocationButton.hidden = false;
+  manualLocationButton.querySelector("span:last-child").textContent = "Haritaya dokun";
+  document.body.classList.add("is-selecting-location");
+  statusText.textContent = "Haritada bulunduğun noktaya dokun.";
+  applySheetState("peek");
+}
+
+function handleManualMapClick(event) {
+  if (!manualLocationMode) return;
+
+  manualLocationMode = false;
+  document.body.classList.remove("is-selecting-location");
+  manualLocationButton.hidden = true;
+  manualLocationButton.querySelector("span:last-child").textContent = "Haritadan seç";
+
+  userLocation = {
+    lat: event.latlng.lat,
+    lng: event.latlng.lng,
+    accuracy: null,
+    source: "manual",
+  };
+
+  drawUserLocation();
+  map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), {
+    animate: mapShouldAnimate,
+    duration: 0.6,
+  });
+  statusText.textContent = "Konum haritadan seçildi.";
+
+  if (activeCategory.type === "favorites") loadFavorites();
+  else {
+    loadCategory(activeCategory);
+    warmNearbyData(activeCategory.id);
+  }
 }
 
 function drawUserLocation() {
   if (!userLocation) return;
 
-  if (userMarker) userMarker.remove();
-  userMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
-    radius: 8,
-    color: "#ffffff",
-    weight: 3,
-    fillColor: "#176b52",
-    fillOpacity: 1,
-  })
-    .bindTooltip("Buradasın", { direction: "top" })
-    .addTo(map);
+  userMarker?.remove();
+  userAccuracyCircle?.remove();
+
+  if (Number.isFinite(userLocation.accuracy) && userLocation.accuracy > 0) {
+    userAccuracyCircle = L.circle([userLocation.lat, userLocation.lng], {
+      radius: Math.min(userLocation.accuracy, 500),
+      color: "#176b52",
+      weight: 1,
+      fillColor: "#58b99a",
+      fillOpacity: 0.08,
+      interactive: false,
+    }).addTo(map);
+  } else {
+    userAccuracyCircle = null;
+  }
+
+  userMarker = L.marker([userLocation.lat, userLocation.lng], {
+    interactive: false,
+    zIndexOffset: 1000,
+    icon: L.divIcon({
+      className: "",
+      html: '<div class="user-location-dot"><span></span></div>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    }),
+  }).addTo(map);
 }
 
 async function loadCategory(category) {
@@ -310,6 +449,10 @@ function categoryForOsmElement(element) {
   const tags = element.tags || {};
   if (tags.amenity === "pharmacy") return categories.find((category) => category.id === "pharmacy");
   if (tags.amenity === "atm") return categories.find((category) => category.id === "atm");
+  if (["hospital", "clinic", "doctors"].includes(tags.amenity)) return categories.find((category) => category.id === "hospital");
+  if (tags.amenity === "fuel") return categories.find((category) => category.id === "fuel");
+  if (tags.amenity === "parking") return categories.find((category) => category.id === "parking");
+  if (["cafe", "restaurant", "fast_food"].includes(tags.amenity)) return categories.find((category) => category.id === "food");
   if (tags.shop === "greengrocer") return categories.find((category) => category.id === "greengrocer");
   if (tags.shop === "bakery") return categories.find((category) => category.id === "bakery");
   if (tags.shop === "supermarket" || tags.shop === "convenience") return categories.find((category) => category.id === "market");
@@ -400,11 +543,12 @@ function renderPlaces(places, category) {
 
   places.forEach((place, index) => {
     const icon = category.type === "favorites" ? iconForCategory(place.category) : category.icon;
-    addPlaceMarker(place, icon);
+    addPlaceMarker(place, icon, index === 0);
     resultFragment.append(createResultCard(place, icon, index === 0));
   });
 
   results.append(resultFragment);
+  fitResultsOnMap(places);
 }
 
 function createResultCard(place, icon, isNearest = false) {
@@ -452,13 +596,14 @@ function buildMeta(place) {
   return parts.join(" · ");
 }
 
-function addPlaceMarker(place, icon) {
+function addPlaceMarker(place, icon, isNearest = false) {
+  const markerSize = isNearest ? 42 : 34;
   const marker = L.marker([place.lat, place.lng], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="place-marker">${escapeHtml(icon)}</div>`,
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
+      html: `<div class="place-marker${isNearest ? " is-nearest" : ""}"><span>${escapeHtml(icon)}</span></div>`,
+      iconSize: [markerSize, markerSize],
+      iconAnchor: [markerSize / 2, markerSize / 2],
     }),
   })
     .bindTooltip(escapeHtml(place.name), { direction: "top", offset: [0, -14] })
@@ -466,6 +611,26 @@ function addPlaceMarker(place, icon) {
 
   marker.on("click", () => scrollToResult(place.id));
   markers.push(marker);
+}
+
+function fitResultsOnMap(places) {
+  if (!userLocation || !places.length || manualLocationMode) return;
+
+  const points = [
+    [userLocation.lat, userLocation.lng],
+    ...places.slice(0, 8).map((place) => [place.lat, place.lng]),
+  ];
+  const bounds = L.latLngBounds(points);
+  const mobileBottomPadding = window.matchMedia("(max-width: 759px)").matches
+    ? Math.min(270, Math.round(window.innerHeight * 0.32))
+    : 40;
+
+  map.fitBounds(bounds, {
+    paddingTopLeft: [24, 84],
+    paddingBottomRight: [24, mobileBottomPadding],
+    maxZoom: 15.5,
+    animate: mapShouldAnimate,
+  });
 }
 
 function focusPlace(place) {
