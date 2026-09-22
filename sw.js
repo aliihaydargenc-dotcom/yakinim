@@ -1,4 +1,4 @@
-const CACHE_NAME = "yakinimda-shell-v7";
+const CACHE_NAME = "yakinimda-shell-v8";
 const RUNTIME_CACHE = "yakinimda-runtime-v1";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 const LEAFLET_ORIGIN = "https://unpkg.com";
@@ -28,45 +28,34 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  if (event.request.mode === "navigate" && url.origin === self.location.origin) {
-    event.respondWith(networkFirst(event.request, "./index.html"));
-    return;
-  }
-
   if (url.origin === self.location.origin) {
-    event.respondWith(staleWhileRevalidate(event.request, CACHE_NAME));
+    const fallback = event.request.mode === "navigate" ? "./index.html" : null;
+    event.respondWith(networkFirst(event.request, fallback));
     return;
   }
 
-  if (url.origin === LEAFLET_ORIGIN && url.pathname.includes("/leaflet@1.9.4/")) {
+  if (url.origin === LEAFLET_ORIGIN && (
+    url.pathname.includes("/leaflet@1.9.4/") ||
+    url.pathname.includes("/maplibre-gl@5/") ||
+    url.pathname.includes("/@maplibre/maplibre-gl-leaflet/")
+  )) {
     event.respondWith(cacheFirst(event.request, RUNTIME_CACHE));
   }
 });
 
-async function networkFirst(request, fallbackPath) {
+async function networkFirst(request, fallbackPath = null) {
+  const cache = await caches.open(CACHE_NAME);
+
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-    }
+    const response = await fetch(request, { cache: "no-store" });
+    if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch {
-    return (await caches.match(request)) || caches.match(fallbackPath);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (fallbackPath) return caches.match(fallbackPath);
+    return Response.error();
   }
-}
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const network = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => null);
-
-  return cached || network || Response.error();
 }
 
 async function cacheFirst(request, cacheName) {
