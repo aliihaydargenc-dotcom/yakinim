@@ -208,6 +208,7 @@ function selectCategory(category) {
 }
 
 function showFocusLoading(category) {
+  categoryFocus.dataset.category = category.id;
   focusIcon.innerHTML = categorySvg(category.id);
   focusIcon.dataset.category = category.id;
   focusTitle.textContent = category.label;
