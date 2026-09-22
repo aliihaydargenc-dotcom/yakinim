@@ -1,4 +1,4 @@
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -6,6 +6,7 @@ const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
 const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
 const DISCOVERY_CARD_LIMIT = 6;
+const FOCUS_PREVIEW_LIMIT = 3;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
@@ -32,13 +33,13 @@ const categories = [
 const categoryOrder = ["all", "cafe", "food", "market", "shopping", "park", "duty", "bakery", "greengrocer", "pharmacy", "atm", "hospital", "fuel", "parking", "favorites"];
 categories.sort((a,b) => categoryOrder.indexOf(a.id) - categoryOrder.indexOf(b.id));
 const osmCategories = categories.filter((category) => category.type === "osm");
-const mapShouldAnimate = !window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)").matches;
+const mapShouldAnimate = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
 let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, lastCategory: null });
 let userLocation = null;
-let activeCategory = categories.find((category) => category.id === prefs.category) || categories[0];
+let activeCategory = categories[0];
 let searchTerm = "";
 let activePlaces = [];
 let markers = [];
@@ -50,6 +51,7 @@ let manualLocationMode = false;
 let osmBundleRequest = null;
 let lastDiscoveryBundle = null;
 let discoveryRequestSerial = 0;
+let experienceMode = "explore";
 
 const map = L.map("map", {
   zoomControl: false,
@@ -81,14 +83,29 @@ const resultTemplate = document.querySelector("#resultTemplate");
 const discoveryHub = document.querySelector("#discoveryHub");
 const discoveryCards = document.querySelector("#discoveryCards");
 const discoverySummary = document.querySelector("#discoverySummary");
+const categoryFocus = document.querySelector("#categoryFocus");
+const focusClose = document.querySelector("#focusClose");
+const focusIcon = document.querySelector("#focusIcon");
+const focusTitle = document.querySelector("#focusTitle");
+const focusSummary = document.querySelector("#focusSummary");
+const focusPreview = document.querySelector("#focusPreview");
+const focusMap = document.querySelector("#focusMap");
+const focusShowAll = document.querySelector("#focusShowAll");
+const exploreMapButton = document.querySelector("#exploreMapButton");
+const fullResultsPanel = document.querySelector("#fullResultsPanel");
 
 radiusSelect.value = String(prefs.radius);
+document.body.dataset.experience = "explore";
 applySheetState("expanded");
 renderCategoryButtons();
 showState("empty", "Çevrendeki yerleri görmek için konumunu kullan veya haritadan bir nokta seç.");
 
 locateButton.addEventListener("click", () => locateUser({ forceFresh: true }));
 manualLocationButton.addEventListener("click", enableManualLocationMode);
+focusClose.addEventListener("click", exitCategoryFocus);
+focusMap.addEventListener("click", () => setView("map"));
+focusShowAll.addEventListener("click", openFullResults);
+exploreMapButton.addEventListener("click", () => setView("map"));
 map.on("click", handleManualMapClick);
 let sheetGestureStartY = null;
 let sheetGestureConsumed = false;
@@ -124,7 +141,8 @@ document.querySelector("#startLocation").addEventListener("click", () => locateU
 document.querySelector("#pickLocation").addEventListener("click", enableManualLocationMode);
 document.querySelector("#placeSearch").addEventListener("input", (event) => {
   searchTerm = event.target.value.trim().toLocaleLowerCase("tr");
-  renderPlaces(activePlaces, activeCategory);
+  if (searchTerm && experienceMode !== "full") openFullResults({ scroll: false });
+  if (experienceMode === "full") renderPlaces(activePlaces, activeCategory);
 });
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
 setView("list");
@@ -143,41 +161,146 @@ function renderCategoryButtons() {
     button.type = "button";
     button.className = "category-button";
     button.dataset.category = category.id;
-    
-    button.setAttribute("aria-pressed", String(category.id === activeCategory.id));
+    button.setAttribute("aria-pressed", "false");
     button.innerHTML = `<span aria-hidden="true">${categorySvg(category.id)}</span><span>${escapeHtml(category.label)}</span>`;
     button.addEventListener("click", () => selectCategory(category));
     categoryStrip.append(button);
   });
+
+  updateCategoryButtonsState();
+}
+
+function updateCategoryButtonsState() {
+  categoryStrip.querySelectorAll(".category-button").forEach((button) => {
+    const selected = experienceMode !== "explore" && button.dataset.category === activeCategory.id;
+    button.setAttribute("aria-pressed", String(selected));
+    button.classList.toggle("is-active", selected);
+  });
 }
 
 function selectCategory(category) {
-  requestSerial += 1;
+  if (category.id === "all") {
+    exitCategoryFocus();
+    return;
+  }
+
   activeCategory = category;
+  experienceMode = "focus";
+  document.body.dataset.experience = "focus";
   recordCategorySignal(category);
-  if (lastDiscoveryBundle) renderDiscoveryHub(lastDiscoveryBundle);
   searchTerm = "";
   document.querySelector("#placeSearch").value = "";
-  resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
-  activePlaces = [];
-  clearPlaceMarkers();
-  if (sheet.dataset.state === "peek") applySheetState("half");
   prefs.category = category.id;
   persistPrefs();
-  renderCategoryButtons();
-
-  if (category.type === "favorites") {
-    loadFavorites();
-    return;
-  }
+  updateCategoryButtonsState();
+  hideFullResults();
+  showFocusLoading(category);
 
   if (!userLocation) {
-    showState("empty", "Yakındaki yerleri görmek için konumunu aç.");
+    focusSummary.textContent = "Yakındaki yerleri görmek için önce konumunu kullan.";
+    focusPreview.replaceChildren();
+    focusShowAll.disabled = true;
     return;
   }
 
-  loadCategory(category);
+  if (category.type === "favorites") loadFavorites();
+  else loadCategory(category);
 }
+
+function showFocusLoading(category) {
+  focusIcon.innerHTML = categorySvg(category.id);
+  focusIcon.dataset.category = category.id;
+  focusTitle.textContent = category.label;
+  focusSummary.textContent = category.label + " seçenekleri hazırlanıyor…";
+  focusPreview.innerHTML = '<div class="focus-skeleton"></div><div class="focus-skeleton"></div><div class="focus-skeleton"></div>';
+  focusShowAll.textContent = "Tüm sonuçları gör";
+  focusShowAll.disabled = true;
+}
+
+function renderFocusPreview(places, category) {
+  categoryFocus.dataset.category = category.id;
+  focusIcon.innerHTML = categorySvg(category.id);
+  focusIcon.dataset.category = category.id;
+  focusTitle.textContent = category.label;
+
+  if (!places.length) {
+    focusSummary.textContent = "Bu yarıçapta sonuç bulunamadı.";
+    focusPreview.innerHTML = '<div class="focus-empty">5 km seçip tekrar deneyebilirsin.</div>';
+    focusShowAll.disabled = true;
+    clearPlaceMarkers({ animated: true });
+    return;
+  }
+
+  const nearest = places[0];
+  focusSummary.textContent = places.length + " yer · en yakın " + formatDistance(nearest.distanceKm);
+  focusShowAll.textContent = "Tüm " + places.length + " sonucu gör";
+  focusShowAll.disabled = false;
+  focusPreview.replaceChildren();
+
+  places.slice(0, FOCUS_PREVIEW_LIMIT).forEach((place, index) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "focus-place";
+    card.dataset.category = place.category;
+    card.style.setProperty("--preview-delay", (index * 55) + "ms");
+    card.innerHTML =
+      '<span class="focus-place-icon">' + categorySvg(place.category) + '</span>' +
+      '<span class="focus-place-copy"><strong>' + escapeHtml(place.name) + '</strong>' +
+      '<small>' + escapeHtml(formatDistance(place.distanceKm)) + (place.address ? " · " + escapeHtml(place.address) : "") + '</small></span>' +
+      '<span class="focus-place-arrow" aria-hidden="true">›</span>';
+    card.addEventListener("click", () => focusPlace(place));
+    focusPreview.append(card);
+  });
+
+  transitionPlaceMarkers(places);
+}
+
+function openFullResults({ scroll = true } = {}) {
+  if (!activePlaces.length && activeCategory.type !== "favorites") return;
+  experienceMode = "full";
+  document.body.dataset.experience = "full";
+  updateCategoryButtonsState();
+  fullResultsPanel.hidden = false;
+  requestAnimationFrame(() => fullResultsPanel.classList.add("is-open"));
+  renderPlaces(activePlaces, activeCategory);
+  if (scroll) {
+    requestAnimationFrame(() => fullResultsPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+}
+
+function hideFullResults() {
+  fullResultsPanel.classList.remove("is-open");
+  fullResultsPanel.hidden = true;
+}
+
+function exitCategoryFocus() {
+  requestSerial += 1;
+  experienceMode = "explore";
+  document.body.dataset.experience = "explore";
+  activeCategory = categories[0];
+  searchTerm = "";
+  document.querySelector("#placeSearch").value = "";
+  hideFullResults();
+  updateCategoryButtonsState();
+  if (userLocation) loadCategory(activeCategory);
+}
+
+function presentCategoryPlaces(places, category) {
+  activePlaces = places;
+
+  if (experienceMode === "focus") {
+    renderFocusPreview(places, category);
+    return;
+  }
+
+  if (experienceMode === "full") {
+    renderPlaces(places, category);
+    return;
+  }
+
+  transitionPlaceMarkers(places);
+}
+
 
 async function locateUser({ forceFresh = false } = {}) {
   if (!navigator.geolocation) {
