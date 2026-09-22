@@ -1,4 +1,4 @@
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
@@ -7,7 +7,7 @@ const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
 const CACHE_PREFIX = "yakinimda:cache:v2:";
 const PREFETCH_RADIUS = 5000;
-const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
+const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const SHEET_STATES = ["peek", "half", "expanded"];
 
 const categories = [
@@ -68,7 +68,7 @@ const nearestActionMeta = document.querySelector("#nearestActionMeta");
 const resultTemplate = document.querySelector("#resultTemplate");
 
 radiusSelect.value = String(prefs.radius);
-applySheetState(prefs.sheetState || "half");
+applySheetState(window.matchMedia("(max-width: 759px)").matches ? "peek" : (prefs.sheetState || "half"));
 renderCategoryButtons();
 showState("loading", "Konum izni bekleniyor…");
 
@@ -95,7 +95,14 @@ radiusSelect.addEventListener("change", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" });
+      await registration.update();
+    } catch {
+      // PWA update failures must never block the map.
+    }
+  });
 }
 
 locateUser({ forceFresh: false });

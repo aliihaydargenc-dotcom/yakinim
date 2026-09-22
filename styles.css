@@ -696,3 +696,234 @@ body.is-selecting-location .sheet {
     margin-bottom: 0 !important;
   }
 }
+
+
+/* v1.4 mobile shell reset */
+html {
+  color-scheme: light !important;
+  background: #edf3ef;
+}
+
+body,
+button,
+select,
+input,
+textarea {
+  color-scheme: light !important;
+}
+
+.sheet-toggle,
+.category-strip,
+.sheet-row,
+.nearest-action,
+.sheet-footer {
+  flex: 0 0 auto;
+}
+
+.results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 759px), (pointer: coarse) {
+  .topbar {
+    align-items: center;
+    padding: max(8px, env(safe-area-inset-top)) 8px 0;
+  }
+
+  .brand-card {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 13px;
+    border-radius: 14px;
+    background: #fffffc;
+  }
+
+  .brand-card h1 {
+    font-size: 18px;
+  }
+
+  .location-button {
+    width: 48px;
+    min-width: 48px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 14px;
+    background: #fffffc;
+  }
+
+  .location-button span:last-child {
+    display: none;
+  }
+
+  .manual-location-button {
+    width: 48px;
+    min-width: 48px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sheet {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: 40dvh;
+    padding: 6px 10px calc(10px + env(safe-area-inset-bottom));
+    border: 1px solid rgba(223, 229, 223, 0.95);
+    border-radius: 22px;
+    background: #fffffc;
+    box-shadow: 0 14px 38px rgba(31, 42, 36, 0.18);
+    backdrop-filter: none;
+  }
+
+  .sheet[data-state="peek"] {
+    max-height: 190px;
+  }
+
+  .sheet[data-state="half"] {
+    max-height: 40dvh;
+  }
+
+  .sheet[data-state="expanded"] {
+    max-height: 82dvh;
+  }
+
+  .sheet[data-state="peek"] .category-strip,
+  .sheet[data-state="peek"] .radius-control,
+  .sheet[data-state="peek"] .status-text,
+  .sheet[data-state="peek"] .results,
+  .sheet[data-state="peek"] .sheet-footer {
+    display: none;
+  }
+
+  .sheet-toggle {
+    min-height: 28px;
+    margin: -2px auto 2px;
+  }
+
+  .sheet-handle {
+    width: 42px;
+    height: 5px;
+    background: #bac6bf;
+  }
+
+  .category-strip {
+    min-height: 48px;
+    margin: 0 -10px 8px;
+    padding: 2px 10px;
+    align-items: center;
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+  }
+
+  .category-button {
+    min-height: 42px;
+    padding: 0 12px;
+    background: #f7faf7;
+  }
+
+  .sheet-row {
+    align-items: center;
+    padding: 0 2px 8px;
+  }
+
+  .result-title {
+    font-size: 15px;
+  }
+
+  .result-summary {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+
+  .status-text {
+    font-size: 10px;
+  }
+
+  .radius-control span {
+    display: none;
+  }
+
+  .radius-control select {
+    min-height: 40px;
+    border-radius: 12px;
+    background: #f5f7f5;
+  }
+
+  .nearest-action {
+    min-height: 46px;
+    margin-bottom: 8px;
+    border-radius: 13px;
+    box-shadow: none;
+  }
+
+  .nearest-action-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+
+  .results {
+    gap: 7px;
+    padding: 0 1px 2px;
+  }
+
+  .result-card {
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .result-main {
+    min-height: 56px;
+    padding: 10px;
+  }
+
+  .result-icon {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+    border-radius: 10px;
+  }
+
+  .result-name {
+    font-size: 13px;
+  }
+
+  .result-meta,
+  .result-address {
+    font-size: 11px;
+  }
+
+  .result-actions {
+    padding: 0 9px 9px;
+  }
+
+  .sheet-footer {
+    display: none;
+  }
+
+  .sheet[data-state="expanded"] .sheet-footer {
+    display: flex;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  html,
+  body {
+    background: #edf3ef !important;
+    color: #1f2a24 !important;
+  }
+
+  .sheet,
+  .brand-card,
+  .location-button,
+  .manual-location-button,
+  .result-card,
+  .category-button,
+  .radius-control select {
+    background-color: #fffffc !important;
+    color: #1f2a24 !important;
+  }
+}
