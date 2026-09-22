@@ -1,9 +1,11 @@
-const APP_VERSION = "2.0.2";
+const APP_VERSION = "2.1.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
 const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
+const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
+const DISCOVERY_CARD_LIMIT = 6;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
@@ -34,8 +36,9 @@ const mapShouldAnimate = !window.matchMedia("(pointer: coarse), (prefers-reduced
 
 const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
+let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, lastCategory: null });
 let userLocation = null;
-let activeCategory = categories[0];
+let activeCategory = categories.find((category) => category.id === prefs.category) || categories[0];
 let searchTerm = "";
 let activePlaces = [];
 let markers = [];
@@ -45,6 +48,8 @@ let requestSerial = 0;
 let locationAttemptSerial = 0;
 let manualLocationMode = false;
 let osmBundleRequest = null;
+let lastDiscoveryBundle = null;
+let discoveryRequestSerial = 0;
 
 const map = L.map("map", {
   zoomControl: false,
@@ -73,6 +78,9 @@ const sheetToggle = document.querySelector("#sheetToggle");
 const nearestAction = document.querySelector("#nearestAction");
 const nearestActionMeta = document.querySelector("#nearestActionMeta");
 const resultTemplate = document.querySelector("#resultTemplate");
+const discoveryHub = document.querySelector("#discoveryHub");
+const discoveryCards = document.querySelector("#discoveryCards");
+const discoverySummary = document.querySelector("#discoverySummary");
 
 radiusSelect.value = String(prefs.radius);
 applySheetState("expanded");
@@ -146,6 +154,8 @@ function renderCategoryButtons() {
 function selectCategory(category) {
   requestSerial += 1;
   activeCategory = category;
+  recordCategorySignal(category);
+  if (lastDiscoveryBundle) renderDiscoveryHub(lastDiscoveryBundle);
   searchTerm = "";
   document.querySelector("#placeSearch").value = "";
   resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
@@ -261,8 +271,8 @@ function applyUserPosition(position) {
   if (activeCategory.type === "favorites") loadFavorites();
   else {
     loadCategory(activeCategory);
-
   }
+  refreshDiscoveryHub();
 }
 
 function showLocationFailure(message) {
@@ -317,8 +327,8 @@ function handleManualMapClick(event) {
   if (activeCategory.type === "favorites") loadFavorites();
   else {
     loadCategory(activeCategory);
-
   }
+  refreshDiscoveryHub();
 }
 
 function drawUserLocation() {
@@ -352,6 +362,123 @@ function drawUserLocation() {
   }).addTo(map);
 }
 
+
+async function refreshDiscoveryHub() {
+  if (!userLocation) {
+    discoveryHub.hidden = true;
+    return;
+  }
+
+  const serial = ++discoveryRequestSerial;
+  const location = { lat: userLocation.lat, lng: userLocation.lng };
+  discoveryHub.hidden = false;
+  discoverySummary.textContent = "Çevren taranıyor…";
+  discoveryCards.innerHTML = '<div class="discovery-skeleton" aria-hidden="true"></div><div class="discovery-skeleton" aria-hidden="true"></div><div class="discovery-skeleton" aria-hidden="true"></div>';
+
+  try {
+    const bundle = await fetchOsmBundle(location);
+    if (serial !== discoveryRequestSerial || !userLocation) return;
+    if (Math.abs(userLocation.lat - location.lat) > 0.000001 || Math.abs(userLocation.lng - location.lng) > 0.000001) return;
+    lastDiscoveryBundle = bundle;
+    renderDiscoveryHub(bundle);
+  } catch (error) {
+    if (serial !== discoveryRequestSerial) return;
+    console.warn("Discovery hub unavailable", error);
+    discoverySummary.textContent = "Keşif özeti şu an hazırlanamadı.";
+    discoveryCards.replaceChildren();
+  }
+}
+
+function rankDiscoveryCategories(bundle, signals = { categoryViews: {}, lastCategory: null }, favoriteRows = []) {
+  const fallbackOrder = ["food", "cafe", "market", "park", "pharmacy", "bakery", "atm", "fuel", "shopping", "hospital", "parking", "greengrocer"];
+  const fallbackScore = new Map(fallbackOrder.map((id, index) => [id, fallbackOrder.length - index]));
+  const favoriteCounts = favoriteRows.reduce((counts, place) => {
+    counts[place.category] = (counts[place.category] || 0) + 1;
+    return counts;
+  }, {});
+  const views = signals?.categoryViews || {};
+
+  return osmCategories
+    .filter((category) => (bundle?.[category.id] || []).length > 0)
+    .map((category) => ({
+      category,
+      score:
+        (fallbackScore.get(category.id) || 0) +
+        (Number(views[category.id]) || 0) * 24 +
+        (favoriteCounts[category.id] || 0) * 18 +
+        (signals?.lastCategory === category.id ? 32 : 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.category.label.localeCompare(b.category.label, "tr"))
+    .map((item) => item.category);
+}
+
+function renderDiscoveryHub(bundle) {
+  if (!userLocation || !bundle) {
+    discoveryHub.hidden = true;
+    return;
+  }
+
+  const visibleBundle = Object.fromEntries(
+    osmCategories.map((category) => [category.id, filterPlacesForRadius(bundle[category.id] || [])]),
+  );
+  const visibleCategories = rankDiscoveryCategories(visibleBundle, discoverySignals, favorites).slice(0, DISCOVERY_CARD_LIMIT);
+
+  if (!visibleCategories.length) {
+    discoveryHub.hidden = true;
+    return;
+  }
+
+  discoveryHub.hidden = false;
+  discoveryCards.replaceChildren();
+
+  const totalPlaces = Object.values(visibleBundle).reduce((total, places) => total + places.length, 0);
+  const radiusText = Number(prefs.radius) >= 1000 ? (Number(prefs.radius) / 1000) + " km" : prefs.radius + " m";
+  discoverySummary.textContent = totalPlaces + " nokta · " + visibleCategories.length + " öne çıkan kategori · " + radiusText + " çevrende";
+
+  const hasPersonalSignals =
+    Object.values(discoverySignals?.categoryViews || {}).some((count) => Number(count) > 0) ||
+    favorites.length > 0;
+
+  visibleCategories.forEach((category, index) => {
+    const places = visibleBundle[category.id] || [];
+    const nearest = places[0];
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "discovery-card";
+    card.dataset.category = category.id;
+    card.style.setProperty("--card-delay", (index * 45) + "ms");
+    card.setAttribute("aria-label", category.label + " kategorisini aç");
+
+    const personalizedBadge = index === 0 && hasPersonalSignals
+      ? '<span class="personalized-badge">Sana göre</span>'
+      : "";
+
+    card.innerHTML =
+      '<span class="discovery-icon" aria-hidden="true">' + categorySvg(category.id) + '</span>' +
+      '<span class="discovery-copy">' +
+        '<span class="discovery-card-head"><strong>' + escapeHtml(category.label) + '</strong>' + personalizedBadge + '</span>' +
+        '<span class="discovery-count">' + places.length + ' yer</span>' +
+        '<span class="discovery-nearest">' + (nearest ? escapeHtml(nearest.name) + ' · ' + formatDistance(nearest.distanceKm) : 'Yakınında sonuç var') + '</span>' +
+      '</span>' +
+      '<span class="discovery-arrow" aria-hidden="true">›</span>';
+
+    card.addEventListener("click", () => selectCategory(category));
+    discoveryCards.append(card);
+  });
+}
+
+function recordCategorySignal(category) {
+  if (!category || ["all", "favorites"].includes(category.id)) return;
+  const views = { ...(discoverySignals?.categoryViews || {}) };
+  views[category.id] = (Number(views[category.id]) || 0) + 1;
+  discoverySignals = { categoryViews: views, lastCategory: category.id };
+  try {
+    localStorage.setItem(DISCOVERY_SIGNALS_KEY, JSON.stringify(discoverySignals));
+  } catch {
+    // Personalization is optional and must never block discovery.
+  }
+}
+
 async function loadCategory(category) {
   const serial = ++requestSerial;
   const location = { lat: userLocation.lat, lng: userLocation.lng };
@@ -376,6 +503,8 @@ async function loadCategory(category) {
       statusText.textContent = "Güncel nöbetçi eczane verisi alındı.";
     } else {
       const bundle = await fetchOsmBundle(location);
+      lastDiscoveryBundle = bundle;
+      renderDiscoveryHub(bundle);
       places = filterPlacesForRadius(category.type === "all" ? Object.values(bundle).flat().sort((a, b) => a.distanceKm - b.distanceKm) : (bundle[category.id] || []));
       if (category.type === "all") writeCache(cacheKey, Object.values(bundle).flat());
       statusText.textContent = "OpenStreetMap verisi alındı.";
@@ -561,14 +690,14 @@ function renderPlaces(places, category) {
   places.forEach((place, index) => {
     const icon = ["favorites", "all"].includes(category.type) ? iconForCategory(place.category) : category.icon;
     addPlaceMarker(place, icon, index === 0);
-    resultFragment.append(createResultCard(place, icon, index === 0));
+    resultFragment.append(createResultCard(place, icon, index === 0, index));
   });
 
   results.append(resultFragment);
   fitResultsOnMap(places);
 }
 
-function createResultCard(place, icon, isNearest = false) {
+function createResultCard(place, icon, isNearest = false, index = 0) {
   const fragment = resultTemplate.content.cloneNode(true);
   const card = fragment.querySelector(".result-card");
   const main = fragment.querySelector(".result-main");
@@ -582,6 +711,8 @@ function createResultCard(place, icon, isNearest = false) {
   const phoneLink = fragment.querySelector(".phone-link");
 
   card.dataset.placeId = place.id;
+  card.dataset.category = place.category;
+  card.style.setProperty("--card-delay", (Math.min(index, 7) * 35) + "ms");
   card.classList.toggle("is-nearest", isNearest);
   nearestBadge.hidden = !isNearest;
   iconEl.innerHTML = categorySvg(place.category);
@@ -618,7 +749,7 @@ function addPlaceMarker(place, icon, isNearest = false) {
   const marker = L.marker([place.lat, place.lng], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="place-marker${isNearest ? " is-nearest" : ""}"><span>${categorySvg(place.category)}</span></div>`,
+      html: `<div class="place-marker category-${escapeHtml(place.category)}${isNearest ? " is-nearest" : ""}"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
@@ -677,6 +808,7 @@ function toggleFavorite(place) {
   else favorites = [...favorites, { ...place }];
 
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  if (lastDiscoveryBundle) renderDiscoveryHub(lastDiscoveryBundle);
 
   if (activeCategory.type === "favorites") loadFavorites();
   else renderPlaces(activePlaces, activeCategory);
