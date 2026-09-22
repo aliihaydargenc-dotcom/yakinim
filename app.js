@@ -1,11 +1,10 @@
-const APP_VERSION = "2.0.1";
+const APP_VERSION = "2.0.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
-const OVERPASS_ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
 const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
-const CACHE_PREFIX = "yakinimda:cache:v3:";
+const CACHE_PREFIX = "yakinimda:cache:v4:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SHEET_STATES = ["peek", "half", "expanded"];
@@ -453,8 +452,7 @@ async function fetchOsmBundle(location) {
   if (osmBundleRequest?.key === requestKey) return osmBundleRequest.promise;
 
   const promise = (async () => {
-    const query = buildNearbyQuery(location, radius);
-    const payload = await fetchNearbyPayload(query);
+    const payload = await fetchNearbyPayload(location, radius);
     const bundle = Object.fromEntries(osmCategories.map((category) => [category.id, []]));
 
     for (const element of payload.elements || []) {
@@ -860,30 +858,17 @@ function categorySvg(id) {
   return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
 }
 
-function buildNearbyQuery(location, radius) {
-  const area = `around:${radius},${location.lat.toFixed(6)},${location.lng.toFixed(6)}`;
-  return `[out:json][timeout:12];(nwr(${area})[amenity~"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$"];nwr(${area})[shop~"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$"];nwr(${area})[leisure=park];);out center tags;`;
-}
-
-async function fetchNearbyPayload(query) {
-  let lastError;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const url = new URL(endpoint);
-      url.searchParams.set("data", query);
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) throw new Error(`Overpass ${response.status}`);
-      const payload = await response.json();
-      // Overpass may return HTTP 200 with an error remark and incomplete elements.
-      if (!Array.isArray(payload.elements) || payload.remark) throw new Error("Incomplete Overpass response");
-      return payload;
-    } catch (error) {
-      lastError = error;
-    } finally {
-      clearTimeout(timeout);
-    }
+async function fetchNearbyPayload(location, radius) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  try {
+    const params = new URLSearchParams({ lat: location.lat.toFixed(6), lng: location.lng.toFixed(6), radius: String(radius) });
+    const response = await fetch(`/api/nearby?${params}`, { signal: controller.signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Nearby API ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload.elements)) throw new Error("Invalid nearby response");
+    return payload;
+  } finally {
+    clearTimeout(timer);
   }
-  throw lastError || new Error("Nearby services unavailable");
 }

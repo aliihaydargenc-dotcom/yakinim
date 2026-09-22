@@ -1,6 +1,6 @@
-const CACHE_NAME = "yakinimda-shell-v10";
+const CACHE_NAME = "yakinimda-shell-v11";
 const RUNTIME_CACHE = "yakinimda-runtime-v1";
-const APP_SHELL = ["./", "./index.html", "./styles.css?v=2.0.1", "./app.js?v=2.0.1", "./manifest.webmanifest", "./icon.svg"];
+const APP_SHELL = ["./", "./index.html", "./styles.css?v=2.0.2", "./app.js?v=2.0.2", "./manifest.webmanifest", "./icon.svg"];
 const LEAFLET_ORIGIN = "https://unpkg.com";
 
 self.addEventListener("install", (event) => {
@@ -27,6 +27,7 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
 
   if (url.origin === self.location.origin) {
     const fallback = event.request.mode === "navigate" ? "./index.html" : null;
