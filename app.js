@@ -262,7 +262,7 @@ function openFullResults({ scroll = true } = {}) {
   updateCategoryButtonsState();
   fullResultsPanel.hidden = false;
   requestAnimationFrame(() => fullResultsPanel.classList.add("is-open"));
-  renderPlaces(activePlaces, activeCategory);
+  renderPlaces(activePlaces, activeCategory, { syncMarkers: false });
   if (scroll) {
     requestAnimationFrame(() => fullResultsPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
@@ -607,9 +607,11 @@ async function loadCategory(category) {
   const location = { lat: userLocation.lat, lng: userLocation.lng };
   resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
   sourceText.textContent = category.type === "duty" ? "Veri: Eczane Adresi" : "Veri: OpenStreetMap";
-  activePlaces = [];
-  clearPlaceMarkers();
-  showState("loading", `${category.label === "Tümü" ? "Yakınındaki yerler" : category.label} aranıyor…`);
+  if (experienceMode === "focus") {
+    showFocusLoading(category);
+  } else if (experienceMode === "full") {
+    showState("loading", `${category.label === "Tümü" ? "Yakınındaki yerler" : category.label} aranıyor…`);
+  }
 
   try {
     const cacheKey = buildCacheKey(category.id, location);
@@ -634,28 +636,37 @@ async function loadCategory(category) {
     }
 
     if (serial !== requestSerial) return;
-    activePlaces = places;
-    renderPlaces(places, category);
+    presentCategoryPlaces(places, category);
   } catch (error) {
     if (serial !== requestSerial) return;
     console.error(error);
     const stalePlaces = readCache(buildCacheKey(category.id, location), Number.POSITIVE_INFINITY);
     if (stalePlaces) {
-      activePlaces = filterPlacesForRadius(stalePlaces);
+      const fallbackPlaces = filterPlacesForRadius(stalePlaces);
       statusText.textContent = "Bağlantı kurulamadı; son kaydedilen veri gösteriliyor.";
-      renderPlaces(activePlaces, category);
+      presentCategoryPlaces(fallbackPlaces, category);
       return;
     }
 
-    clearPlaceMarkers();
-    showState("error", "Veri kaynağına şu an ulaşılamadı. Biraz sonra tekrar dene; kayıtlı favorilerin etkilenmez.");
     statusText.textContent = "Veri servisleri şu an yanıt vermiyor.";
-    const retry = document.createElement("button");
-    retry.type = "button";
-    retry.className = "retry-button";
-    retry.textContent = "Tekrar dene";
-    retry.addEventListener("click", () => loadCategory(activeCategory));
-    results.querySelector(".error-state").append(retry);
+
+    if (experienceMode === "focus") {
+      focusSummary.textContent = "Veri kaynağına şu an ulaşılamadı.";
+      focusPreview.innerHTML = '<div class="focus-empty">Tekrar deneyebilir veya başka bir kategori seçebilirsin.</div>';
+      focusShowAll.disabled = true;
+      return;
+    }
+
+    if (experienceMode === "full") {
+      clearPlaceMarkers({ animated: true });
+      showState("error", "Veri kaynağına şu an ulaşılamadı. Biraz sonra tekrar dene; kayıtlı favorilerin etkilenmez.");
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "retry-button";
+      retry.textContent = "Tekrar dene";
+      retry.addEventListener("click", () => loadCategory(activeCategory));
+      results.querySelector(".error-state")?.append(retry);
+    }
   }
 }
 
@@ -792,12 +803,12 @@ function loadFavorites() {
   resultTitle.textContent = "Favoriler";
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
   sourceText.textContent = "Favoriler: cihaz içi kayıt";
-  renderPlaces(activePlaces, activeCategory);
+  presentCategoryPlaces(activePlaces, activeCategory);
 }
 
-function renderPlaces(places, category) {
+function renderPlaces(places, category, { syncMarkers = true } = {}) {
   if (searchTerm) places = places.filter(place => [place.name, place.address, categories.find(c => c.id === place.category)?.label].join(" ").toLocaleLowerCase("tr").includes(searchTerm));
-  clearPlaceMarkers();
+  if (syncMarkers) transitionPlaceMarkers(places);
   results.replaceChildren();
   updateNearestAction(places);
 
@@ -812,12 +823,11 @@ function renderPlaces(places, category) {
 
   places.forEach((place, index) => {
     const icon = ["favorites", "all"].includes(category.type) ? iconForCategory(place.category) : category.icon;
-    addPlaceMarker(place, icon, index === 0);
     resultFragment.append(createResultCard(place, icon, index === 0, index));
   });
 
   results.append(resultFragment);
-  fitResultsOnMap(places);
+  if (document.body.dataset.view === "map") fitResultsOnMap(places);
 }
 
 function createResultCard(place, icon, isNearest = false, index = 0) {
@@ -867,12 +877,12 @@ function buildMeta(place) {
   return parts.join(" · ");
 }
 
-function addPlaceMarker(place, icon, isNearest = false) {
+function addPlaceMarker(place, icon, isNearest = false, index = 0) {
   const markerSize = isNearest ? 42 : 34;
   const marker = L.marker([place.lat, place.lng], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="place-marker category-${escapeHtml(place.category)}${isNearest ? " is-nearest" : ""}"><span>${categorySvg(place.category)}</span></div>`,
+      html: `<div class="place-marker category-${escapeHtml(place.category)}${isNearest ? " is-nearest" : ""}" style="--marker-delay:${Math.min(index, 12) * 28}ms"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
@@ -880,7 +890,10 @@ function addPlaceMarker(place, icon, isNearest = false) {
     .bindTooltip(escapeHtml(place.name), { direction: "top", offset: [0, -14] })
     .addTo(map);
 
-  marker.on("click", () => scrollToResult(place.id));
+  marker.on("click", () => {
+    if (experienceMode === "full") scrollToResult(place.id);
+    else marker.openTooltip();
+  });
   markers.push(marker);
 }
 
@@ -921,9 +934,27 @@ function scrollToResult(placeId) {
   target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function clearPlaceMarkers() {
-  markers.forEach((marker) => marker.remove());
+function clearPlaceMarkers({ animated = false } = {}) {
+  const previousMarkers = markers;
   markers = [];
+
+  previousMarkers.forEach((marker) => {
+    const markerElement = marker.getElement?.()?.querySelector?.(".place-marker");
+    if (animated && mapShouldAnimate && markerElement) {
+      markerElement.classList.add("is-leaving");
+      window.setTimeout(() => marker.remove(), 170);
+    } else {
+      marker.remove();
+    }
+  });
+}
+
+function transitionPlaceMarkers(places) {
+  clearPlaceMarkers({ animated: true });
+  places.slice(0, 36).forEach((place, index) => {
+    addPlaceMarker(place, iconForCategory(place.category), index === 0, index);
+  });
+  if (document.body.dataset.view === "map") fitResultsOnMap(places);
 }
 
 function toggleFavorite(place) {
@@ -933,8 +964,13 @@ function toggleFavorite(place) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   if (lastDiscoveryBundle) renderDiscoveryHub(lastDiscoveryBundle);
 
-  if (activeCategory.type === "favorites") loadFavorites();
-  else renderPlaces(activePlaces, activeCategory);
+  if (activeCategory.type === "favorites") {
+    loadFavorites();
+  } else if (experienceMode === "focus") {
+    renderFocusPreview(activePlaces, activeCategory);
+  } else if (experienceMode === "full") {
+    renderPlaces(activePlaces, activeCategory);
+  }
 }
 
 function isFavorite(id) {
