@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f8f4" />
+    <meta name="description" content="Yakınındaki nöbetçi eczane, market, manav ve günlük ihtiyaç noktalarını tek haritada bul." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Yakınımda</title>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin />
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
+    <link rel="preconnect" href="https://overpass-api.de" crossorigin />
+    <link rel="preconnect" href="https://eczaneadresi.com" crossorigin />
+    <link rel="dns-prefetch" href="//unpkg.com" />
+    <link rel="dns-prefetch" href="//tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="//overpass-api.de" />
+    <link rel="dns-prefetch" href="//eczaneadresi.com" />
+    <link rel="preload" href="./app.js" as="script" />
+    <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script" crossorigin />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div id="map" aria-label="Yakındaki yerler haritası"></div>
+
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GÜNLÜK İHTİYAÇ HARİTASI</p>
+          <h1>Yakınımda</h1>
+        </div>
+        <button id="locateButton" class="location-button" type="button" aria-label="Konumumu yenile">
+          <span aria-hidden="true">⌖</span>
+          <span>Konumum</span>
+        </button>
+      </header>
+
+      <section class="sheet" aria-label="Yakındaki yerler">
+        <div class="sheet-handle" aria-hidden="true"></div>
+
+        <div class="category-strip" id="categoryStrip" role="list" aria-label="Kategoriler"></div>
+
+        <div class="sheet-row">
+          <div>
+            <p id="resultTitle" class="result-title">Konumunu bulalım</p>
+            <p id="statusText" class="status-text">Konum bilgisi yalnız bu cihazda kullanılır.</p>
+          </div>
+          <label class="radius-control">
+            <span>Yarıçap</span>
+            <select id="radiusSelect" aria-label="Arama yarıçapı">
+              <option value="1000">1 km</option>
+              <option value="3000" selected>3 km</option>
+              <option value="5000">5 km</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="results" class="results" aria-live="polite"></div>
+
+        <footer class="sheet-footer">
+          <span id="sourceText">Harita: © OpenStreetMap contributors</span>
+          <span>Tercihler ve favoriler cihazında saklanır.</span>
+        </footer>
+      </section>
+    </main>
+
+    <template id="resultTemplate">
+      <article class="result-card">
+        <button class="result-main" type="button">
+          <span class="result-icon" aria-hidden="true"></span>
+          <span class="result-copy">
+            <strong class="result-name"></strong>
+            <span class="result-meta"></span>
+            <span class="result-address"></span>
+          </span>
+        </button>
+        <div class="result-actions">
+          <button class="favorite-button" type="button" aria-label="Favoriye ekle">☆</button>
+          <a class="directions-link" target="_blank" rel="noopener noreferrer">Yol tarifi</a>
+          <a class="phone-link" hidden>Telefon</a>
+        </div>
+      </article>
+    </template>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

@@ -77,11 +77,11 @@ CI; JavaScript sözdizimini, PWA manifestini, temel kategori sözleşmesini, kay
 
 ## Cloudflare Workers Static Assets
 
-Üretim hattı GitHub → Cloudflare Workers Builds → Workers Static Assets olarak yapılandırılmıştır. Repository kökündeki `wrangler.jsonc`, Worker adını `yakinim` olarak sabitler ve statik asset dizinini `./dist` olarak tanımlar. `npm run build` deploy edilecek dosyaları temiz bir `dist/` klasörüne kopyalar; geliştirme/CI dosyaları böylece public asset paketine hiç girmez.
+Üretim hattı GitHub → Cloudflare Workers Builds → Workers Static Assets olarak yapılandırılmıştır. Repository kökündeki `wrangler.jsonc`, Worker adını `yakinim` olarak sabitler ve statik asset dizinini `./public` olarak tanımlar. `npm run build` deploy edilecek dosyaları temiz bir `public/` klasörüne kopyalar; geliştirme/CI dosyaları böylece public asset paketine hiç girmez.
 
 Cloudflare Git entegrasyonunda varsayılan deploy komutu `npx wrangler deploy` ile bu yapılandırmayı doğrudan yayınlayabilir. `main` production, feature branch'leri ise preview doğrulaması için kullanılabilir.
 
 
 ### Statik build sözleşmesi
 
-`package.json` içindeki `build` komutu framework bundle'ı üretmez; deploy-ready statik dosyaları `dist/` içine hazırlar. Bu yaklaşım Cloudflare Workers Builds'in project root'u doğrudan asset dizini olarak işlemesine gerek bırakmaz.
+`package.json` içindeki `build` komutu framework bundle'ı üretmez; deploy-ready statik dosyaları `public/` içine senkronize eder. `public/` repository'de commitli tutulduğu için Cloudflare tarafında Build command boş olsa bile deploy çalışır; Build command `npm run build` ise klasör güvenli biçimde yeniden senkronize edilir.

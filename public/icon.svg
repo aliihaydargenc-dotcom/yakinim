@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Yakınımda">
+  <rect width="512" height="512" rx="120" fill="#f7f8f4"/>
+  <path d="M256 70c-84 0-152 68-152 152 0 111 132 214 143 222a15 15 0 0 0 18 0c11-8 143-111 143-222 0-84-68-152-152-152Z" fill="#176b52"/>
+  <circle cx="256" cy="218" r="68" fill="#fffffc"/>
+  <path d="M256 174v88M212 218h88" stroke="#176b52" stroke-width="26" stroke-linecap="round"/>
+</svg>

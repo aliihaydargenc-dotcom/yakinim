@@ -8,9 +8,9 @@ const [app, index, sw, manifestText, headers, wranglerText, builtIndex, builtApp
   readFile("manifest.webmanifest", "utf8"),
   readFile("_headers", "utf8"),
   readFile("wrangler.jsonc", "utf8"),
-  readFile("dist/index.html", "utf8"),
-  readFile("dist/app.js", "utf8"),
-  readFile("dist/_headers", "utf8"),
+  readFile("public/index.html", "utf8"),
+  readFile("public/app.js", "utf8"),
+  readFile("public/_headers", "utf8"),
 ]);
 
 const wrangler = JSON.parse(wranglerText);
@@ -47,7 +47,7 @@ assert.match(headers, /Permissions-Policy: geolocation=\(self\)/);
 assert.match(headers, /X-Content-Type-Options: nosniff/);
 
 assert.equal(wrangler.name, "yakinim");
-assert.equal(wrangler.assets.directory, "./dist");
+assert.equal(wrangler.assets.directory, "./public");
 assert.equal(wrangler.compatibility_date, "2026-09-22");
 
 assert.equal(builtIndex, index);
