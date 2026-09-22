@@ -663,3 +663,12 @@ body[data-view=map] .sheet{animation:mapSheetIn .32s cubic-bezier(.2,.75,.2,1) b
   body[data-view=map] .focus-icon{width:38px;height:38px}
   body[data-view=map] .focus-heading .eyebrow{display:none}
 }
+
+.list-view-button{display:none;align-items:center;justify-content:center;gap:5px;min-height:44px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:0 11px;font-size:12px;font-weight:700}
+.list-view-button span:first-child{font-size:22px;line-height:1}
+body[data-view=map] .list-view-button{display:flex}
+@media(max-width:759px){
+  body[data-view=map][data-experience="focus"] .category-focus,
+  body[data-view=map][data-experience="full"] .category-focus{margin:0;padding:10px 12px;max-height:150px}
+  body[data-view=map][data-experience="explore"] .category-focus{max-height:0;margin:0;padding:0;border:0}
+}
