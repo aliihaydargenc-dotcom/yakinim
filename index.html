@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f8f4" />
+    <meta name="color-scheme" content="only light" />
     <meta name="description" content="Yakınındaki nöbetçi eczane, market, manav ve günlük ihtiyaç noktalarını tek haritada bul." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -45,13 +46,16 @@
       </header>
 
       <section class="sheet" aria-label="Yakındaki yerler">
-        <div class="sheet-handle" aria-hidden="true"></div>
+        <button id="sheetToggle" class="sheet-toggle" type="button" aria-label="Paneli genişlet">
+          <span class="sheet-handle" aria-hidden="true"></span>
+        </button>
 
         <div class="category-strip" id="categoryStrip" role="list" aria-label="Kategoriler"></div>
 
         <div class="sheet-row">
           <div>
             <p id="resultTitle" class="result-title">Konumunu bulalım</p>
+            <p id="resultSummary" class="result-summary">Henüz sonuç yok</p>
             <p id="statusText" class="status-text">Konum bilgisi yalnız bu cihazda kullanılır.</p>
           </div>
           <label class="radius-control">
@@ -67,8 +71,9 @@
         <div id="results" class="results" aria-live="polite"></div>
 
         <footer class="sheet-footer">
-          <span id="sourceText">Harita: © OpenStreetMap contributors</span>
-          <span>Tercihler ve favoriler cihazında saklanır.</span>
+          <span id="sourceText">Veri kaynağı hazırlanıyor</span>
+          <a class="osm-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">Harita: © OpenStreetMap contributors</a>
+          <span>Favoriler cihazında saklanır.</span>
         </footer>
       </section>
     </main>
@@ -78,7 +83,10 @@
         <button class="result-main" type="button">
           <span class="result-icon" aria-hidden="true"></span>
           <span class="result-copy">
-            <strong class="result-name"></strong>
+            <span class="result-heading">
+              <strong class="result-name"></strong>
+              <span class="nearest-badge" hidden>En yakın</span>
+            </span>
             <span class="result-meta"></span>
             <span class="result-address"></span>
           </span>

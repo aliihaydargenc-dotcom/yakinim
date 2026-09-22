@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
@@ -7,6 +7,7 @@ const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
 const CACHE_PREFIX = "yakinimda:cache:v2:";
 const PREFETCH_RADIUS = 5000;
+const SHEET_STATES = ["peek", "half", "expanded"];
 
 const categories = [
   { id: "duty", label: "Nöbetçi Eczane", icon: "+", type: "duty", ttl: 15 * 60 * 1000 },
@@ -32,7 +33,7 @@ let osmBundleRequest = null;
 
 const map = L.map("map", {
   zoomControl: false,
-  attributionControl: true,
+  attributionControl: false,
 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -49,13 +50,18 @@ const statusText = document.querySelector("#statusText");
 const radiusSelect = document.querySelector("#radiusSelect");
 const locateButton = document.querySelector("#locateButton");
 const sourceText = document.querySelector("#sourceText");
+const resultSummary = document.querySelector("#resultSummary");
+const sheet = document.querySelector(".sheet");
+const sheetToggle = document.querySelector("#sheetToggle");
 const resultTemplate = document.querySelector("#resultTemplate");
 
 radiusSelect.value = String(prefs.radius);
+applySheetState(prefs.sheetState || "half");
 renderCategoryButtons();
 showState("loading", "Konum izni bekleniyor…");
 
 locateButton.addEventListener("click", locateUser);
+sheetToggle.addEventListener("click", cycleSheetState);
 radiusSelect.addEventListener("change", () => {
   prefs.radius = Number(radiusSelect.value);
   persistPrefs();
@@ -86,6 +92,7 @@ function renderCategoryButtons() {
 
 function selectCategory(category) {
   activeCategory = category;
+  if (sheet.dataset.state === "peek") applySheetState("half");
   prefs.category = category.id;
   persistPrefs();
   renderCategoryButtons();
@@ -160,7 +167,7 @@ async function loadCategory(category) {
   const serial = ++requestSerial;
   const location = { lat: userLocation.lat, lng: userLocation.lng };
   resultTitle.textContent = category.label;
-  sourceText.textContent = category.type === "duty" ? "Veri: Eczane Adresi · Harita: © OpenStreetMap contributors" : "Veri ve harita: © OpenStreetMap contributors";
+  sourceText.textContent = category.type === "duty" ? "Veri: Eczane Adresi" : "Veri: OpenStreetMap";
   showState("loading", `${category.label} aranıyor…`);
 
   try {
@@ -359,7 +366,7 @@ function loadFavorites() {
 
   resultTitle.textContent = "Favoriler";
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
-  sourceText.textContent = "Favoriler: cihaz içi kayıt · Harita: © OpenStreetMap contributors";
+  sourceText.textContent = "Favoriler: cihaz içi kayıt";
   renderPlaces(activePlaces, activeCategory);
 }
 
@@ -372,23 +379,26 @@ function renderPlaces(places, category) {
     return;
   }
 
+  updateResultSummary(places);
+
   const resultFragment = document.createDocumentFragment();
 
-  places.forEach((place) => {
+  places.forEach((place, index) => {
     const icon = category.type === "favorites" ? iconForCategory(place.category) : category.icon;
     addPlaceMarker(place, icon);
-    resultFragment.append(createResultCard(place, icon));
+    resultFragment.append(createResultCard(place, icon, index === 0));
   });
 
   results.append(resultFragment);
 }
 
-function createResultCard(place, icon) {
+function createResultCard(place, icon, isNearest = false) {
   const fragment = resultTemplate.content.cloneNode(true);
   const card = fragment.querySelector(".result-card");
   const main = fragment.querySelector(".result-main");
   const iconEl = fragment.querySelector(".result-icon");
   const nameEl = fragment.querySelector(".result-name");
+  const nearestBadge = fragment.querySelector(".nearest-badge");
   const metaEl = fragment.querySelector(".result-meta");
   const addressEl = fragment.querySelector(".result-address");
   const favoriteButton = fragment.querySelector(".favorite-button");
@@ -396,6 +406,8 @@ function createResultCard(place, icon) {
   const phoneLink = fragment.querySelector(".phone-link");
 
   card.dataset.placeId = place.id;
+  card.classList.toggle("is-nearest", isNearest);
+  nearestBadge.hidden = !isNearest;
   iconEl.textContent = icon;
   nameEl.textContent = place.name;
   metaEl.textContent = buildMeta(place);
@@ -442,6 +454,7 @@ function addPlaceMarker(place, icon) {
 }
 
 function focusPlace(place) {
+  applySheetState("peek");
   map.setView([place.lat, place.lng], Math.max(map.getZoom(), 16), { animate: mapShouldAnimate });
   const marker = markers.find((item) => {
     const point = item.getLatLng();
@@ -451,6 +464,7 @@ function focusPlace(place) {
 }
 
 function scrollToResult(placeId) {
+  if (sheet.dataset.state === "peek") applySheetState("half");
   const target = [...results.querySelectorAll(".result-card")].find((card) => card.dataset.placeId === placeId);
   target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -507,7 +521,39 @@ function persistPrefs() {
 }
 
 function showState(kind, message) {
+  resultSummary.textContent = kind === "loading" ? "Aranıyor…" : "Henüz sonuç yok";
   results.innerHTML = `<div class="${kind}-state">${escapeHtml(message)}</div>`;
+}
+
+function updateResultSummary(places) {
+  if (!places.length) {
+    resultSummary.textContent = "Bu yarıçapta sonuç yok";
+    return;
+  }
+
+  const nearest = places.find((place) => Number.isFinite(place.distanceKm));
+  const nearestText = nearest ? ` · en yakın ${formatDistance(nearest.distanceKm)}` : "";
+  resultSummary.textContent = `${places.length} sonuç${nearestText}`;
+}
+
+function applySheetState(state) {
+  const nextState = SHEET_STATES.includes(state) ? state : "half";
+  sheet.dataset.state = nextState;
+  prefs.sheetState = nextState;
+  persistPrefs();
+
+  const labels = {
+    peek: "Paneli aç",
+    half: "Paneli genişlet",
+    expanded: "Paneli küçült",
+  };
+  sheetToggle.setAttribute("aria-label", labels[nextState]);
+}
+
+function cycleSheetState() {
+  const currentIndex = SHEET_STATES.indexOf(sheet.dataset.state || "half");
+  const nextState = SHEET_STATES[(currentIndex + 1) % SHEET_STATES.length];
+  applySheetState(nextState);
 }
 
 function distanceBetween(lat1, lon1, lat2, lon2) {
