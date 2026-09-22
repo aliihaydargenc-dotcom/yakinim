@@ -21,5 +21,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/nearby.js": {
+      "maxDuration": 60
+    }
+  }
 }

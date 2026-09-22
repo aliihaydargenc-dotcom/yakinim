@@ -1,8 +1,8 @@
 # Yakınımda
 
-**Sürüm:** 2.0.1
+**Sürüm:** 2.0.2
 
-Mobil öncelikli, kurulabilir (PWA) yakın çevre keşif uygulaması. Sunucu, hesap veya ücretli API anahtarı gerektirmez.
+Mobil öncelikli, kurulabilir (PWA) yakın çevre keşif uygulaması. Hesap veya ücretli API anahtarı gerektirmez. OSM sorguları aynı alan adındaki Vercel Function üzerinden yürütülür.
 
 ## Özellikler
 
@@ -78,3 +78,7 @@ Bu yaklaşım gereksiz preview/deployment üretimini azaltmak için küçük de�
 ## 2.0.1 veri erişimi
 
 OSM sorgusu seçilen yarıçapla sınırlanır. Ana Overpass sunucusu HTTP/ağ/zaman aşımı hatası veya eksik yanıt döndürürse ikinci sunucu denenir. Her deneme 15 saniye ile sınırlıdır. Her ikisi başarısızsa mevcut önbellek kullanılır; önbellek yoksa yeniden deneme düğmesi gösterilir.
+
+## 2.0.2 aynı alan adından veri erişimi
+
+Tarayıcı `/api/nearby` çağırır. Sunucu yalnız doğrulanmış koordinat ve 1/3/5 km yarıçap kabul eder; sorguyu kendisi oluşturur. Güncel Private.coffee ve FOSSGIS sunucuları sıralı olarak denenir. Service worker API yanıtlarını önbelleğe almaz. Yerel tam uygulama testi Vercel dev gerektirir; basit statik sunucu API yolunu çalıştırmaz.
