@@ -455,3 +455,82 @@ body[data-view=map]{overflow:hidden}
 
 
 .retry-button { min-height:44px; margin-top:14px; border:0; border-radius:10px; padding:0 20px; color:#fff; background:var(--accent); font-weight:650; }
+
+
+/* v2.1 personalized discovery */
+:where(.category-button,.result-card,.discovery-card){--cat:#227363;--cat-soft:#e8f3ef}
+:where(.category-button,.result-card,.discovery-card)[data-category="cafe"]{--cat:#9a633c;--cat-soft:#fff1e6}
+:where(.category-button,.result-card,.discovery-card)[data-category="food"]{--cat:#c24f45;--cat-soft:#fff0ee}
+:where(.category-button,.result-card,.discovery-card)[data-category="market"]{--cat:#276f9a;--cat-soft:#eaf5fb}
+:where(.category-button,.result-card,.discovery-card)[data-category="shopping"]{--cat:#7656a7;--cat-soft:#f3effb}
+:where(.category-button,.result-card,.discovery-card)[data-category="park"]{--cat:#43834f;--cat-soft:#edf7ee}
+:where(.category-button,.result-card,.discovery-card)[data-category="pharmacy"],
+:where(.category-button,.result-card,.discovery-card)[data-category="hospital"]{--cat:#b84955;--cat-soft:#fff0f2}
+:where(.category-button,.result-card,.discovery-card)[data-category="bakery"]{--cat:#a66a22;--cat-soft:#fff5e6}
+:where(.category-button,.result-card,.discovery-card)[data-category="greengrocer"]{--cat:#5d8239;--cat-soft:#f1f7e9}
+:where(.category-button,.result-card,.discovery-card)[data-category="atm"]{--cat:#3e6e89;--cat-soft:#edf5f8}
+:where(.category-button,.result-card,.discovery-card)[data-category="fuel"]{--cat:#526577;--cat-soft:#eef2f5}
+:where(.category-button,.result-card,.discovery-card)[data-category="parking"]{--cat:#42627f;--cat-soft:#edf3f8}
+:where(.category-button,.result-card,.discovery-card)[data-category="duty"]{--cat:#a9404e;--cat-soft:#fff0f2}
+:where(.category-button,.result-card,.discovery-card)[data-category="favorites"]{--cat:#a17424;--cat-soft:#fff8e7}
+
+.category-button{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease;color:var(--ink)}
+.category-button>span:first-child{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:var(--cat-soft);color:var(--cat);transition:background .18s ease,color .18s ease,transform .18s ease}
+.category-button>span:first-child svg{width:17px;height:17px}
+.category-button:active{transform:scale(.97)}
+.category-button[aria-pressed=true]{background:var(--cat);border-color:var(--cat);color:#fff;box-shadow:0 7px 18px color-mix(in srgb,var(--cat) 24%,transparent)}
+.category-button[aria-pressed=true]>span:first-child{background:#ffffff24;color:#fff;transform:scale(1.04)}
+
+.discovery-hub{margin:6px 0 24px;padding:20px;border:1px solid #e2e8eb;border-radius:22px;background:linear-gradient(145deg,#fff 0%,#f7faf9 100%);box-shadow:0 10px 30px #213c3710}
+.discovery-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:15px}
+.discovery-head .eyebrow{font-size:10px;letter-spacing:1.7px;color:var(--accent);font-weight:780;margin-bottom:5px}
+.discovery-head h3{font-size:20px;letter-spacing:-.5px}
+.discovery-summary{max-width:360px;text-align:right;color:var(--muted);font-size:11px;line-height:1.45}
+.discovery-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.discovery-card{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr) 18px;align-items:center;gap:11px;min-width:0;min-height:96px;padding:14px;border:1px solid #e7ecef;border-radius:17px;background:#fff;text-align:left;box-shadow:0 4px 14px #1d38320a;animation:discoveryIn .34s cubic-bezier(.2,.75,.25,1) both;animation-delay:var(--card-delay,0ms);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.discovery-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--cat) 28%,#e7ecef);box-shadow:0 10px 24px #1d383212}
+.discovery-card:active{transform:scale(.985)}
+.discovery-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--cat-soft);color:var(--cat)}
+.discovery-icon svg{width:20px;height:20px}
+.discovery-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.discovery-card-head{display:flex;align-items:center;gap:6px;min-width:0}
+.discovery-card-head strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.discovery-count{font-size:11px;color:var(--cat);font-weight:700}
+.discovery-nearest{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.discovery-arrow{font-size:24px;color:#93a0a8;line-height:1}
+.personalized-badge{flex:0 0 auto;padding:2px 5px;border-radius:999px;background:var(--cat-soft);color:var(--cat);font-size:8px;font-weight:800;letter-spacing:.2px}
+.discovery-skeleton{height:96px;border-radius:17px;background:linear-gradient(90deg,#f1f4f5 25%,#f8fafb 42%,#f1f4f5 65%);background-size:300% 100%;animation:discoverySkeleton 1.3s ease infinite}
+
+.result-card{animation:resultIn .28s ease both;animation-delay:var(--card-delay,0ms);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.result-card:hover{border-color:color-mix(in srgb,var(--cat) 22%,var(--line));box-shadow:0 8px 22px #203b3610}
+.result-icon{background:var(--cat-soft);color:var(--cat)}
+.result-meta{color:var(--cat)}
+
+.place-marker[class*="category-"]{color:var(--accent)}
+.place-marker.category-cafe{color:#9a633c}
+.place-marker.category-food{color:#c24f45}
+.place-marker.category-market{color:#276f9a}
+.place-marker.category-shopping{color:#7656a7}
+.place-marker.category-park{color:#43834f}
+.place-marker.category-pharmacy,.place-marker.category-hospital,.place-marker.category-duty{color:#b84955}
+.place-marker.category-bakery{color:#a66a22}
+.place-marker.category-atm{color:#3e6e89}
+.place-marker.category-fuel{color:#526577}
+.place-marker.category-parking{color:#42627f}
+.place-marker.is-nearest{color:#fff}
+
+@keyframes discoveryIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes resultIn{from{opacity:.45;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes discoverySkeleton{0%{background-position:100% 0}100%{background-position:0 0}}
+body[data-view=map] .discovery-hub{display:none}
+
+@media(max-width:759px){
+  .category-button{min-height:48px;padding:0 12px;border-radius:14px}
+  .category-button>span:first-child{width:30px;height:30px}
+  .discovery-hub{margin:6px 0 20px;padding:17px 16px 16px}
+  .discovery-head{align-items:flex-start;flex-direction:column;gap:5px;margin-bottom:13px}
+  .discovery-summary{text-align:left;max-width:none}
+  .discovery-cards{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin-right:-16px;padding-right:16px;padding-bottom:2px;scrollbar-width:none}
+  .discovery-cards::-webkit-scrollbar{display:none}
+  .discovery-card{flex:0 0 min(78vw,260px);scroll-snap-align:start;min-height:94px}
+}
