@@ -1,4 +1,4 @@
-const CACHE_NAME = "yakinimda-shell-v5";
+const CACHE_NAME = "yakinimda-shell-v6";
 const RUNTIME_CACHE = "yakinimda-runtime-v1";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 const LEAFLET_ORIGIN = "https://unpkg.com";

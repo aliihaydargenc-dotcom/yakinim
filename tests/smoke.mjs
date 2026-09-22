@@ -12,7 +12,7 @@ const [app, index, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "1\.1\.0"/);
+assert.match(app, /APP_VERSION = "1\.2\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -23,6 +23,10 @@ assert.doesNotMatch(app, /radiusKm = Number\(prefs\.radius\) \/ 1000 \+ 0\.25/);
 assert.match(app, /SHEET_STATES = \["peek", "half", "expanded"\]/);
 assert.match(app, /updateResultSummary/);
 assert.match(app, /nearestBadge\.hidden/);
+assert.match(app, /startSheetGesture/);
+assert.match(app, /endSheetGesture/);
+assert.match(app, /updateNearestAction/);
+assert.match(app, /buildDirectionsUrl/);
 assert.match(app, /son kaydedilen veri gösteriliyor/);
 assert.match(app, /Veri: Eczane Adresi/);
 assert.match(index, /OpenStreetMap contributors/);
@@ -34,6 +38,8 @@ assert.match(index, /id="results"/);
 assert.match(index, /id="sheetToggle"/);
 assert.match(index, /id="resultSummary"/);
 assert.match(index, /nearest-badge/);
+assert.match(index, /id="nearestAction"/);
+assert.match(index, /id="nearestActionMeta"/);
 
 assert.equal(manifest.name, "Yakınımda");
 assert.equal(manifest.display, "standalone");
@@ -42,7 +48,7 @@ assert.equal(manifest.start_url, "./");
 assert.match(sw, /networkFirst/);
 assert.match(sw, /staleWhileRevalidate/);
 assert.match(sw, /LEAFLET_ORIGIN/);
-assert.match(sw, /yakinimda-shell-v5/);
+assert.match(sw, /yakinimda-shell-v6/);
 assert.doesNotMatch(sw, /tile\.openstreetmap\.org/);
 
 assert.ok(Array.isArray(vercel.headers));

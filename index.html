@@ -68,6 +68,14 @@
           </label>
         </div>
 
+        <a id="nearestAction" class="nearest-action" target="_blank" rel="noopener noreferrer" hidden>
+          <span class="nearest-action-icon" aria-hidden="true">↗</span>
+          <span class="nearest-action-copy">
+            <strong>En yakına git</strong>
+            <small id="nearestActionMeta"></small>
+          </span>
+        </a>
+
         <div id="results" class="results" aria-live="polite"></div>
 
         <footer class="sheet-footer">
@@ -93,8 +101,8 @@
         </button>
         <div class="result-actions">
           <button class="favorite-button" type="button" aria-label="Favoriye ekle">☆</button>
-          <a class="directions-link" target="_blank" rel="noopener noreferrer">Yol tarifi</a>
-          <a class="phone-link" hidden>Telefon</a>
+          <a class="directions-link" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span> Yol tarifi</a>
+          <a class="phone-link" hidden><span aria-hidden="true">☎</span> Ara</a>
         </div>
       </article>
     </template>
