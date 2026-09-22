@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: only light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f7f8f4;
   color: #1f2a24;
@@ -132,6 +132,7 @@ button {
   display: flex;
   flex-direction: column;
   max-height: min(52dvh, 520px);
+  transition: max-height 180ms ease, transform 180ms ease;
   padding: 10px 12px 12px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.9);
@@ -140,12 +141,36 @@ button {
   box-shadow: var(--shadow);
 }
 
+.sheet-toggle {
+  display: grid;
+  width: 72px;
+  min-height: 24px;
+  margin: -4px auto 4px;
+  padding: 8px 18px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+}
+
 .sheet-handle {
+  display: block;
   width: 36px;
   height: 4px;
-  margin: 0 auto 10px;
   border-radius: 99px;
   background: #c8d0ca;
+}
+
+.sheet[data-state="peek"] {
+  max-height: min(29dvh, 300px);
+}
+
+.sheet[data-state="expanded"] {
+  max-height: min(78dvh, 760px);
+}
+
+.sheet[data-state="peek"] .result-card:not(:first-child),
+.sheet[data-state="peek"] .sheet-footer {
+  display: none;
 }
 
 .category-strip {
@@ -155,6 +180,9 @@ button {
   padding: 2px;
   overflow-x: auto;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 26px), transparent 100%);
 }
 
 .category-strip::-webkit-scrollbar {
@@ -174,6 +202,7 @@ button {
   font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 
 .category-button[aria-pressed="true"] {
@@ -196,10 +225,17 @@ button {
   letter-spacing: -0.02em;
 }
 
-.status-text {
-  margin-top: 3px;
-  color: var(--muted);
+.result-summary {
+  margin: 3px 0 0;
+  color: var(--accent);
   font-size: 12px;
+  font-weight: 800;
+}
+
+.status-text {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .radius-control {
@@ -288,11 +324,35 @@ button {
   gap: 2px;
 }
 
+.result-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
 .result-name {
+  min-width: 0;
   overflow: hidden;
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nearest-badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.result-card.is-nearest {
+  border-color: #a9cfbf;
 }
 
 .result-meta,
@@ -349,7 +409,15 @@ button {
   gap: 10px;
   padding: 10px 2px 0;
   color: #7d8981;
-  font-size: 9px;
+  font-size: 10px;
+  line-height: 1.35;
+  flex-wrap: wrap;
+}
+
+.osm-attribution {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .place-marker {
@@ -367,8 +435,13 @@ button {
 }
 
 .leaflet-control-attribution {
-  margin-bottom: 214px !important;
-  font-size: 9px !important;
+  display: none !important;
+}
+
+@media (max-width: 759px), (pointer: coarse) {
+  .leaflet-control-zoom {
+    display: none !important;
+  }
 }
 
 @media (min-width: 760px) {
