@@ -1,9 +1,9 @@
 {
   "name": "yakinim",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Mobil öncelikli günlük ihtiyaç haritası",
   "scripts": {
-    "test": "node tests/smoke.mjs"
+    "test": "node tests/smoke.mjs && node tests/discovery.mjs"
   }
 }

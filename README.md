@@ -1,12 +1,15 @@
 # Yakınımda
 
-**Sürüm:** 1.0.0
+**Sürüm:** 2.0.0
 
-Mobil öncelikli, kurulabilir (PWA) günlük ihtiyaç haritası. Sunucu, hesap veya ücretli API anahtarı gerektirmez.
+Mobil öncelikli, kurulabilir (PWA) yakın çevre keşif uygulaması. Sunucu, hesap veya ücretli API anahtarı gerektirmez.
 
 ## Özellikler
 
-- GPS ile kullanıcı konumu
+- Açık temalı keşif ekranı, Tümü varsayılanı, yer adı/kategori araması
+- Ayrı liste ve harita görünümleri; mobilde tam boy sonuç kartları
+- Kafe, yemek, alışveriş, park ve günlük ihtiyaç kategorileri
+- Kullanıcının isteğiyle GPS veya haritadan konum seçimi
 - Nöbetçi eczane: Eczane Adresi public API
 - Market / bakkal: OpenStreetMap `shop=supermarket|convenience`
 - Manav: OpenStreetMap `shop=greengrocer`
@@ -39,7 +42,7 @@ OSM tile politikası: https://operations.osmfoundation.org/policies/tiles/
 
 ## Gizlilik
 
-GPS koordinatı hesap oluşturulmadan tarayıcıda kullanılır. Favoriler ve tercihler `localStorage` içinde kalır.
+GPS koordinatı hesap oluşturulmadan yakın yerleri sorgulamak için ilgili veri sağlayıcısına (Overpass veya Eczane Adresi) iletilir. Favoriler ve tercihler `localStorage` içinde kalır.
 
 ## Yerel çalıştırma
 
@@ -70,3 +73,4 @@ Proje framework gerektirmeyen statik bir sitedir. GitHub repository Vercel'e ba�
 `feature branch → GitHub CI → main merge → Vercel production deploy`
 
 Bu yaklaşım gereksiz preview/deployment üretimini azaltmak için küçük değişiklikleri toplu geliştirme turunda birleştirmeyi hedefler.
+
