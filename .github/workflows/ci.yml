@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: JavaScript syntax
+        run: |
+          node --check app.js
+          node --check sw.js
+
+      - name: Static build contract
+        run: npm run build
+
+      - name: Smoke tests
+        run: npm test
+
+      - name: Cloudflare Wrangler dry run
+        run: npx --yes wrangler@latest deploy --dry-run --outdir .wrangler-dry-run

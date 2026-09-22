@@ -1,4 +1,4 @@
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "1.0.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
@@ -188,6 +188,14 @@ async function loadCategory(category) {
   } catch (error) {
     if (serial !== requestSerial) return;
     console.error(error);
+    const stalePlaces = readCache(buildCacheKey(category.id, location), Number.POSITIVE_INFINITY);
+    if (stalePlaces) {
+      activePlaces = filterPlacesForRadius(stalePlaces);
+      statusText.textContent = "Bağlantı kurulamadı; son kaydedilen veri gösteriliyor.";
+      renderPlaces(activePlaces, category);
+      return;
+    }
+
     clearPlaceMarkers();
     showState("error", "Veri kaynağına şu an ulaşılamadı. Biraz sonra tekrar dene; kayıtlı favorilerin etkilenmez.");
     statusText.textContent = "Geçici bağlantı sorunu.";
@@ -329,7 +337,7 @@ async function warmNearbyData(activeCategoryId) {
 }
 
 function filterPlacesForRadius(places) {
-  const radiusKm = Number(prefs.radius) / 1000 + 0.25;
+  const radiusKm = Number(prefs.radius) / 1000;
   return places.filter((place) => place.distanceKm <= radiusKm).slice(0, 60);
 }
 
