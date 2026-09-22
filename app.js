@@ -73,6 +73,7 @@ const statusText = document.querySelector("#statusText");
 const radiusSelect = document.querySelector("#radiusSelect");
 const locateButton = document.querySelector("#locateButton");
 const manualLocationButton = document.querySelector("#manualLocationButton");
+const listViewButton = document.querySelector("#listViewButton");
 const sourceText = document.querySelector("#sourceText");
 const resultSummary = document.querySelector("#resultSummary");
 const sheet = document.querySelector(".sheet");
@@ -102,6 +103,7 @@ showState("empty", "Çevrendeki yerleri görmek için konumunu kullan veya harit
 
 locateButton.addEventListener("click", () => locateUser({ forceFresh: true }));
 manualLocationButton.addEventListener("click", enableManualLocationMode);
+listViewButton.addEventListener("click", () => setView("list"));
 focusClose.addEventListener("click", exitCategoryFocus);
 focusMap.addEventListener("click", () => setView("map"));
 focusShowAll.addEventListener("click", openFullResults);
