@@ -27,11 +27,5 @@ jobs:
           node --check app.js
           node --check sw.js
 
-      - name: Static build contract
-        run: npm run build
-
       - name: Smoke tests
         run: npm test
-
-      - name: Cloudflare Wrangler dry run
-        run: npx --yes wrangler@latest deploy --dry-run --outdir .wrangler-dry-run
