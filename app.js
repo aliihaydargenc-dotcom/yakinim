@@ -1,16 +1,21 @@
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "2.0.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
 const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
-const CACHE_PREFIX = "yakinimda:cache:v2:";
+const CACHE_PREFIX = "yakinimda:cache:v3:";
 const PREFETCH_RADIUS = 5000;
-const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SHEET_STATES = ["peek", "half", "expanded"];
 
 const categories = [
+  { id: "cafe", label: "Kafe", icon: "☕", type: "osm", filter: '[amenity=cafe]', ttl: 6 * 60 * 60 * 1000 },
+  { id: "park", label: "Park", icon: "♧", type: "osm", filter: '[leisure=park]', ttl: 6 * 60 * 60 * 1000 },
+  { id: "shopping", label: "Alışveriş", icon: "▱", type: "osm", filter: '[shop~"^(mall|department_store|clothes)$"]', ttl: 6 * 60 * 60 * 1000 },
+
+  { id: "all", label: "Tümü", icon: "◈", type: "all", ttl: 6 * 60 * 60 * 1000 },
   { id: "duty", label: "Nöbetçi Eczane", icon: "+", type: "duty", ttl: 15 * 60 * 1000 },
   { id: "market", label: "Market", icon: "🛒", type: "osm", filter: '[shop~"^(supermarket|convenience)$"]', ttl: 6 * 60 * 60 * 1000 },
   { id: "greengrocer", label: "Manav", icon: "●", type: "osm", filter: "[shop=greengrocer]", ttl: 6 * 60 * 60 * 1000 },
@@ -20,16 +25,19 @@ const categories = [
   { id: "hospital", label: "Sağlık", icon: "✚", type: "osm", filter: '[amenity~"^(hospital|clinic|doctors)$"]', ttl: 6 * 60 * 60 * 1000 },
   { id: "fuel", label: "Akaryakıt", icon: "⛽", type: "osm", filter: "[amenity=fuel]", ttl: 6 * 60 * 60 * 1000 },
   { id: "parking", label: "Otopark", icon: "P", type: "osm", filter: "[amenity=parking]", ttl: 6 * 60 * 60 * 1000 },
-  { id: "food", label: "Kafe / Yemek", icon: "☕", type: "osm", filter: '[amenity~"^(cafe|restaurant|fast_food)$"]', ttl: 6 * 60 * 60 * 1000 },
+  { id: "food", label: "Yemek", icon: "☕", type: "osm", filter: '[amenity~"^(restaurant|fast_food)$"]', ttl: 6 * 60 * 60 * 1000 },
   { id: "favorites", label: "Favoriler", icon: "★", type: "favorites", ttl: 0 },
 ];
+const categoryOrder = ["all", "cafe", "food", "market", "shopping", "park", "duty", "bakery", "greengrocer", "pharmacy", "atm", "hospital", "fuel", "parking", "favorites"];
+categories.sort((a,b) => categoryOrder.indexOf(a.id) - categoryOrder.indexOf(b.id));
 const osmCategories = categories.filter((category) => category.type === "osm");
 const mapShouldAnimate = !window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)").matches;
 
-const prefs = readJson(PREFS_KEY, { radius: 3000, category: "duty" });
+const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
 let userLocation = null;
-let activeCategory = categories.find((item) => item.id === prefs.category) || categories[0];
+let activeCategory = categories[0];
+let searchTerm = "";
 let activePlaces = [];
 let markers = [];
 let userMarker = null;
@@ -68,9 +76,9 @@ const nearestActionMeta = document.querySelector("#nearestActionMeta");
 const resultTemplate = document.querySelector("#resultTemplate");
 
 radiusSelect.value = String(prefs.radius);
-applySheetState(window.matchMedia("(max-width: 759px)").matches ? "peek" : (prefs.sheetState || "half"));
+applySheetState("expanded");
 renderCategoryButtons();
-showState("loading", "Konum izni bekleniyor…");
+showState("empty", "Çevrendeki yerleri görmek için konumunu kullan veya haritadan bir nokta seç.");
 
 locateButton.addEventListener("click", () => locateUser({ forceFresh: true }));
 manualLocationButton.addEventListener("click", enableManualLocationMode);
@@ -105,7 +113,20 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-locateUser({ forceFresh: false });
+document.querySelector("#startLocation").addEventListener("click", () => locateUser({ forceFresh: false }));
+document.querySelector("#pickLocation").addEventListener("click", enableManualLocationMode);
+document.querySelector("#placeSearch").addEventListener("input", (event) => {
+  searchTerm = event.target.value.trim().toLocaleLowerCase("tr");
+  renderPlaces(activePlaces, activeCategory);
+});
+document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
+setView("list");
+function setView(view) {
+  document.body.dataset.view = view;
+  if (view === "map") window.scrollTo(0, 0);
+  document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
+  requestAnimationFrame(() => { map.invalidateSize(); if (view === "map") fitResultsOnMap(activePlaces); });
+}
 
 function renderCategoryButtons() {
   categoryStrip.replaceChildren();
@@ -115,16 +136,22 @@ function renderCategoryButtons() {
     button.type = "button";
     button.className = "category-button";
     button.dataset.category = category.id;
-    button.setAttribute("role", "listitem");
+    
     button.setAttribute("aria-pressed", String(category.id === activeCategory.id));
-    button.innerHTML = `<span aria-hidden="true">${escapeHtml(category.icon)}</span><span>${escapeHtml(category.label)}</span>`;
+    button.innerHTML = `<span aria-hidden="true">${categorySvg(category.id)}</span><span>${escapeHtml(category.label)}</span>`;
     button.addEventListener("click", () => selectCategory(category));
     categoryStrip.append(button);
   });
 }
 
 function selectCategory(category) {
+  requestSerial += 1;
   activeCategory = category;
+  searchTerm = "";
+  document.querySelector("#placeSearch").value = "";
+  resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
+  activePlaces = [];
+  clearPlaceMarkers();
   if (sheet.dataset.state === "peek") applySheetState("half");
   prefs.category = category.id;
   persistPrefs();
@@ -221,6 +248,7 @@ function applyUserPosition(position) {
     source: "gps",
   };
 
+  document.querySelector("#welcome").hidden = true;
   drawUserLocation();
   map.flyTo([userLocation.lat, userLocation.lng], 15, {
     animate: mapShouldAnimate,
@@ -254,6 +282,7 @@ function locationErrorMessage(error) {
 function enableManualLocationMode() {
   locationAttemptSerial += 1;
   manualLocationMode = true;
+  setView("map");
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
   manualLocationButton.hidden = false;
@@ -278,6 +307,7 @@ function handleManualMapClick(event) {
     source: "manual",
   };
 
+  document.querySelector("#welcome").hidden = true;
   drawUserLocation();
   map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), {
     animate: mapShouldAnimate,
@@ -326,9 +356,11 @@ function drawUserLocation() {
 async function loadCategory(category) {
   const serial = ++requestSerial;
   const location = { lat: userLocation.lat, lng: userLocation.lng };
-  resultTitle.textContent = category.label;
+  resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
   sourceText.textContent = category.type === "duty" ? "Veri: Eczane Adresi" : "Veri: OpenStreetMap";
-  showState("loading", `${category.label} aranıyor…`);
+  activePlaces = [];
+  clearPlaceMarkers();
+  showState("loading", `${category.label === "Tümü" ? "Yakınındaki yerler" : category.label} aranıyor…`);
 
   try {
     const cacheKey = buildCacheKey(category.id, location);
@@ -345,7 +377,8 @@ async function loadCategory(category) {
       statusText.textContent = "Güncel nöbetçi eczane verisi alındı.";
     } else {
       const bundle = await fetchOsmBundle(location);
-      places = filterPlacesForRadius(bundle[category.id] || []);
+      places = filterPlacesForRadius(category.type === "all" ? Object.values(bundle).flat().sort((a, b) => a.distanceKm - b.distanceKm) : (bundle[category.id] || []));
+      if (category.type === "all") writeCache(cacheKey, Object.values(bundle).flat());
       statusText.textContent = "OpenStreetMap verisi alındı.";
     }
 
@@ -459,7 +492,10 @@ function categoryForOsmElement(element) {
   if (["hospital", "clinic", "doctors"].includes(tags.amenity)) return categories.find((category) => category.id === "hospital");
   if (tags.amenity === "fuel") return categories.find((category) => category.id === "fuel");
   if (tags.amenity === "parking") return categories.find((category) => category.id === "parking");
-  if (["cafe", "restaurant", "fast_food"].includes(tags.amenity)) return categories.find((category) => category.id === "food");
+  if (tags.amenity === "cafe") return categories.find(c => c.id === "cafe");
+  if (tags.leisure === "park") return categories.find(c => c.id === "park");
+  if (["mall", "department_store", "clothes"].includes(tags.shop)) return categories.find(c => c.id === "shopping");
+  if (["restaurant", "fast_food"].includes(tags.amenity)) return categories.find((category) => category.id === "food");
   if (tags.shop === "greengrocer") return categories.find((category) => category.id === "greengrocer");
   if (tags.shop === "bakery") return categories.find((category) => category.id === "bakery");
   if (tags.shop === "supermarket" || tags.shop === "convenience") return categories.find((category) => category.id === "market");
@@ -491,14 +527,6 @@ async function warmNearbyData(activeCategoryId) {
   const location = { lat: userLocation.lat, lng: userLocation.lng };
   const jobs = [];
 
-  const dutyCategory = categories.find((category) => category.id === "duty");
-  const dutyCacheKey = buildCacheKey("duty", location);
-  if (activeCategoryId !== "duty" && !readCache(dutyCacheKey, dutyCategory.ttl)) {
-    jobs.push(
-      fetchDutyPharmacies(location, PREFETCH_RADIUS).then((places) => writeCache(dutyCacheKey, places)),
-    );
-  }
-
   const needsOsmPrefetch = osmCategories.some(
     (category) => !readCache(buildCacheKey(category.id, location), category.ttl),
   );
@@ -509,7 +537,7 @@ async function warmNearbyData(activeCategoryId) {
 
 function filterPlacesForRadius(places) {
   const radiusKm = Number(prefs.radius) / 1000;
-  return places.filter((place) => place.distanceKm <= radiusKm).slice(0, 60);
+  return places.map(place => ({ ...place, distanceKm: userLocation ? distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng) : place.distanceKm })).filter((place) => place.distanceKm <= radiusKm).sort((a,b) => a.distanceKm - b.distanceKm).slice(0, 60);
 }
 
 function loadFavorites() {
@@ -535,12 +563,13 @@ function loadFavorites() {
 }
 
 function renderPlaces(places, category) {
+  if (searchTerm) places = places.filter(place => [place.name, place.address, categories.find(c => c.id === place.category)?.label].join(" ").toLocaleLowerCase("tr").includes(searchTerm));
   clearPlaceMarkers();
   results.replaceChildren();
   updateNearestAction(places);
 
   if (!places.length) {
-    showState("empty", category.type === "favorites" ? "Bir yeri yıldızlayınca burada görünecek." : "Bu yarıçapta sonuç bulunamadı. 5 km seçip tekrar deneyebilirsin.");
+    showState("empty", category.type === "favorites" ? "Bir yeri yıldızlayınca burada görünecek." : searchTerm ? "Aramana uyan yer bulunamadı. Farklı bir isim dene." : "Bu yarıçapta sonuç bulunamadı. 5 km seçip tekrar deneyebilirsin.");
     return;
   }
 
@@ -549,7 +578,7 @@ function renderPlaces(places, category) {
   const resultFragment = document.createDocumentFragment();
 
   places.forEach((place, index) => {
-    const icon = category.type === "favorites" ? iconForCategory(place.category) : category.icon;
+    const icon = ["favorites", "all"].includes(category.type) ? iconForCategory(place.category) : category.icon;
     addPlaceMarker(place, icon, index === 0);
     resultFragment.append(createResultCard(place, icon, index === 0));
   });
@@ -574,7 +603,7 @@ function createResultCard(place, icon, isNearest = false) {
   card.dataset.placeId = place.id;
   card.classList.toggle("is-nearest", isNearest);
   nearestBadge.hidden = !isNearest;
-  iconEl.textContent = icon;
+  iconEl.innerHTML = categorySvg(place.category);
   nameEl.textContent = place.name;
   metaEl.textContent = buildMeta(place);
   addressEl.textContent = place.address || "Adres bilgisi yok";
@@ -596,7 +625,7 @@ function createResultCard(place, icon, isNearest = false) {
 }
 
 function buildMeta(place) {
-  const parts = [];
+  const parts = [categories.find(c => c.id === place.category)?.label].filter(Boolean);
   if (Number.isFinite(place.distanceKm)) parts.push(formatDistance(place.distanceKm));
   if (place.openingHours) parts.push(place.openingHours);
   if (place.category === "duty") parts.push("Nöbetçi");
@@ -608,7 +637,7 @@ function addPlaceMarker(place, icon, isNearest = false) {
   const marker = L.marker([place.lat, place.lng], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="place-marker${isNearest ? " is-nearest" : ""}"><span>${escapeHtml(icon)}</span></div>`,
+      html: `<div class="place-marker${isNearest ? " is-nearest" : ""}"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
@@ -633,7 +662,7 @@ function fitResultsOnMap(places) {
     : 40;
 
   map.fitBounds(bounds, {
-    paddingTopLeft: [24, 84],
+    paddingTopLeft: [window.matchMedia("(min-width: 760px)").matches && document.body.dataset.view === "map" ? 450 : 24, 100],
     paddingBottomRight: [24, mobileBottomPadding],
     maxZoom: 15.5,
     animate: mapShouldAnimate,
@@ -641,6 +670,7 @@ function fitResultsOnMap(places) {
 }
 
 function focusPlace(place) {
+  setView("map");
   applySheetState("peek");
   map.setView([place.lat, place.lng], Math.max(map.getZoom(), 16), { animate: mapShouldAnimate });
   const marker = markers.find((item) => {
@@ -651,7 +681,7 @@ function focusPlace(place) {
 }
 
 function scrollToResult(placeId) {
-  if (sheet.dataset.state === "peek") applySheetState("half");
+  setView("list");
   const target = [...results.querySelectorAll(".result-card")].find((card) => card.dataset.placeId === placeId);
   target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -824,3 +854,25 @@ function escapeHtml(value) {
 }
 
 console.info(`Yakınımda v${APP_VERSION}`);
+
+
+function categorySvg(id) {
+  const paths = {
+    all: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+    cafe: '<path d="M4 8h12v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM16 8h2a3 3 0 1 1 0 6h-2M3 22h16M7 2v3M12 2v3"/>',
+    food: '<path d="M5 3v6a3 3 0 0 0 6 0V3M8 3v19M19 3c-4 4-4 9 0 9v10M19 3v9"/>',
+    market: '<path d="M3 3h2l3 12h11l2-9H6M9 20h.01M18 20h.01"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>',
+    shopping: '<path d="M5 7h14l2 14H3zM9 7V5a3 3 0 0 1 6 0v2"/>',
+    park: '<path d="M12 3 6 10h3l-5 7h16l-5-7h3zM12 17v5"/>',
+    duty: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+    pharmacy: '<path d="m8 16 8-8M5 19a5 5 0 0 1 0-7l7-7a5 5 0 0 1 7 7l-7 7a5 5 0 0 1-7 0z"/>',
+    bakery: '<path d="M5 11a4 4 0 0 1 0-8h14a4 4 0 0 1 0 8v9H5zM9 8v5M15 8v5"/>',
+    greengrocer: '<path d="M12 7c-9-5-12 8-5 13 2 2 3 0 5 0s3 2 5 0c7-5 4-18-5-13M12 7c0-4 2-5 5-5"/>',
+    atm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 15h3M15 14h2v3h-2z"/>',
+    hospital: '<path d="M5 22V4h14v18M2 22h20M9 22v-6h6v6M12 7v6M9 10h6"/>',
+    fuel: '<path d="M4 21V3h10v18M2 21h14M7 6h4v5H7zM14 12h2v5a2 2 0 0 0 4 0V8l-3-3"/>',
+    parking: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
+    favorites: '<path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>'
+  };
+  return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
+}

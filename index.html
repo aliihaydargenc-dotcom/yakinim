@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f7f8f4" />
+    <meta name="theme-color" content="#f8fafc" />
     <meta name="color-scheme" content="light only" />
-    <meta name="description" content="Yakınındaki nöbetçi eczane, market, manav ve günlük ihtiyaç noktalarını tek haritada bul." />
+    <meta name="description" content="Yakınındaki kafeleri, yemek yerlerini, mağazaları, parkları ve günlük ihtiyaç noktalarını keşfet." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js" as="script" />
+    <link rel="preload" href="./app.js?v=2.0.0" as="script" />
     <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script" crossorigin />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -29,16 +29,16 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=2.0.0" />
   </head>
-  <body>
+  <body data-view="list">
     <main class="app-shell">
       <div id="map" aria-label="Yakındaki yerler haritası"></div>
 
       <header class="topbar">
         <div class="brand-card">
-          <p class="eyebrow">GÜNLÜK İHTİYAÇ HARİTASI</p>
-          <h1>Yakınımda</h1>
+          <span class="brand-mark" aria-hidden="true">y.</span>
+          <div><h1>Yakınımda</h1><p class="brand-subtitle">Şehrin, elinin altında.</p></div>
         </div>
         <div class="top-actions">
           <button id="manualLocationButton" class="manual-location-button" type="button" hidden>
@@ -53,17 +53,24 @@
       </header>
 
       <section class="sheet" aria-label="Yakındaki yerler">
+        <div class="explore-heading"><p class="eyebrow">ÇEVRENE BİR BAK</p><h2>Bugün ne arıyorsun?</h2></div>
+        <label class="search-box"><span aria-hidden="true">⌕</span><input id="placeSearch" type="search" placeholder="Yer adı veya kategori ara" aria-label="Yakındaki sonuçlarda ara" autocomplete="off" /></label>
         <button id="sheetToggle" class="sheet-toggle" type="button" aria-label="Paneli genişlet">
           <span class="sheet-handle" aria-hidden="true"></span>
         </button>
 
-        <div class="category-strip" id="categoryStrip" role="list" aria-label="Kategoriler"></div>
+        <div class="category-strip" id="categoryStrip" aria-label="Kategoriler"></div>
 
+        <section id="welcome" class="welcome">
+          <span class="welcome-symbol" aria-hidden="true">⌖</span><div><h3>Güzel şeyler yakında.</h3><p>Bir kahve molası, yeni bir lezzet veya günlük ihtiyaçların.</p></div>
+          <div class="welcome-actions"><button id="startLocation" type="button">Konumumu kullan <span aria-hidden="true">↗</span></button><button id="pickLocation" type="button">Haritadan seç</button></div>
+        </section>
+        <div class="section-toolbar"><span>ÇEVRENDE KEŞFET</span><div class="view-switch" aria-label="Görünüm"><button type="button" data-view="list" aria-pressed="true">Liste</button><button type="button" data-view="map" aria-pressed="false">Harita</button></div></div>
         <div class="sheet-row">
           <div>
-            <p id="resultTitle" class="result-title">Konumunu bulalım</p>
+            <p id="resultTitle" class="result-title">Yakınındaki yerler</p>
             <p id="resultSummary" class="result-summary">Henüz sonuç yok</p>
-            <p id="statusText" class="status-text">Konum bilgisi yalnız bu cihazda kullanılır.</p>
+            <p id="statusText" class="status-text">Yerleri bulmak için konumun veri sağlayıcısına iletilir.</p>
           </div>
           <label class="radius-control">
             <span>Yarıçap</span>
@@ -121,6 +128,7 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js" defer></script>
+    <script src="./app.js?v=2.0.0" defer></script>
   </body>
 </html>
+
