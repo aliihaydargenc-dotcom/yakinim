@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=2.0.2" as="script" />
+    <link rel="preload" href="./app.js?v=2.1.0" as="script" />
     <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script" crossorigin />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -29,7 +29,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=2.0.2" />
+    <link rel="stylesheet" href="./styles.css?v=2.1.0" />
   </head>
   <body data-view="list">
     <main class="app-shell">
@@ -65,6 +65,17 @@
           <span class="welcome-symbol" aria-hidden="true">⌖</span><div><h3>Güzel şeyler yakında.</h3><p>Bir kahve molası, yeni bir lezzet veya günlük ihtiyaçların.</p></div>
           <div class="welcome-actions"><button id="startLocation" type="button">Konumumu kullan <span aria-hidden="true">↗</span></button><button id="pickLocation" type="button">Haritadan seç</button></div>
         </section>
+        <section id="discoveryHub" class="discovery-hub" aria-label="Konuma göre keşif" hidden>
+          <div class="discovery-head">
+            <div>
+              <p class="eyebrow">YAKININDA ŞİMDİ</p>
+              <h3>Çevrende ne var?</h3>
+            </div>
+            <p id="discoverySummary" class="discovery-summary"></p>
+          </div>
+          <div id="discoveryCards" class="discovery-cards"></div>
+        </section>
+
         <div class="section-toolbar"><span>ÇEVRENDE KEŞFET</span><div class="view-switch" aria-label="Görünüm"><button type="button" data-view="list" aria-pressed="true">Liste</button><button type="button" data-view="map" aria-pressed="false">Harita</button></div></div>
         <div class="sheet-row">
           <div>
@@ -128,7 +139,7 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=2.0.2" defer></script>
+    <script src="./app.js?v=2.1.0" defer></script>
   </body>
 </html>
 
