@@ -11,11 +11,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Yakınımda</title>
     <link rel="preconnect" href="https://unpkg.com" crossorigin />
-    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
+    <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
     <link rel="preconnect" href="https://overpass-api.de" crossorigin />
     <link rel="preconnect" href="https://eczaneadresi.com" crossorigin />
     <link rel="dns-prefetch" href="//unpkg.com" />
-    <link rel="dns-prefetch" href="//tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
     <link rel="preload" href="./app.js" as="script" />
@@ -28,6 +28,7 @@
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""
     />
+    <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -35,14 +36,20 @@
       <div id="map" aria-label="Yakındaki yerler haritası"></div>
 
       <header class="topbar">
-        <div>
+        <div class="brand-card">
           <p class="eyebrow">GÜNLÜK İHTİYAÇ HARİTASI</p>
           <h1>Yakınımda</h1>
         </div>
-        <button id="locateButton" class="location-button" type="button" aria-label="Konumumu yenile">
-          <span aria-hidden="true">⌖</span>
-          <span>Konumum</span>
-        </button>
+        <div class="top-actions">
+          <button id="manualLocationButton" class="manual-location-button" type="button" hidden>
+            <span aria-hidden="true">⌖</span>
+            <span>Haritadan seç</span>
+          </button>
+          <button id="locateButton" class="location-button" type="button" aria-label="Konumumu yenile">
+            <span aria-hidden="true">◎</span>
+            <span>Konumum</span>
+          </button>
+        </div>
       </header>
 
       <section class="sheet" aria-label="Yakındaki yerler">
@@ -80,7 +87,7 @@
 
         <footer class="sheet-footer">
           <span id="sourceText">Veri kaynağı hazırlanıyor</span>
-          <a class="osm-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">Harita: © OpenStreetMap contributors</a>
+          <a class="osm-attribution" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">Harita: OpenFreeMap · OpenMapTiles · © OpenStreetMap</a>
           <span>Favoriler cihazında saklanır.</span>
         </footer>
       </section>
@@ -112,6 +119,8 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
+    <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

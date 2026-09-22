@@ -76,12 +76,23 @@ button {
   pointer-events: auto;
 }
 
-.topbar > div {
+.brand-card {
   padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 18px;
-  background: var(--surface);
+  background: rgba(255, 255, 252, 0.94);
   box-shadow: 0 8px 24px rgba(31, 42, 36, 0.1);
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-actions[hidden],
+.manual-location-button[hidden] {
+  display: none;
 }
 
 .eyebrow,
@@ -105,7 +116,8 @@ button {
   letter-spacing: -0.03em;
 }
 
-.location-button {
+.location-button,
+.manual-location-button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -118,9 +130,29 @@ button {
   font-weight: 800;
 }
 
-.location-button span:first-child {
+.location-button span:first-child,
+.manual-location-button span:first-child {
   color: var(--accent);
   font-size: 20px;
+}
+
+.manual-location-button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
+  background: var(--surface-solid);
+  box-shadow: 0 8px 24px rgba(31, 42, 36, 0.1);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.location-button.is-loading span:first-child {
+  animation: locate-spin 900ms linear infinite;
+}
+
+@keyframes locate-spin {
+  to { transform: rotate(360deg); }
 }
 
 .sheet {
@@ -504,13 +536,67 @@ button {
   width: 34px;
   height: 34px;
   place-items: center;
-  border: 3px solid #fff;
-  border-radius: 12px;
-  background: #176b52;
-  box-shadow: 0 6px 14px rgba(31, 42, 36, 0.24);
-  color: #fff;
-  font-size: 15px;
+  border: 3px solid rgba(255, 255, 255, 0.96);
+  border-radius: 50% 50% 50% 14px;
+  background: #fffffc;
+  box-shadow: 0 6px 18px rgba(31, 42, 36, 0.22);
+  color: var(--accent);
+  font-size: 14px;
   font-weight: 900;
+  transform: rotate(-45deg);
+}
+
+.place-marker span {
+  transform: rotate(45deg);
+}
+
+.place-marker.is-nearest {
+  width: 42px;
+  height: 42px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 5px rgba(23, 107, 82, 0.16), 0 8px 22px rgba(31, 42, 36, 0.26);
+}
+
+.user-location-dot {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+}
+
+.user-location-dot::before {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(23, 107, 82, 0.18);
+  content: "";
+  animation: user-pulse 1.8s ease-out infinite;
+}
+
+.user-location-dot span {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 8px rgba(31, 42, 36, 0.28);
+}
+
+@keyframes user-pulse {
+  0% { transform: scale(0.5); opacity: 0.85; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+body.is-selecting-location #map {
+  cursor: crosshair;
+}
+
+body.is-selecting-location .sheet {
+  box-shadow: 0 0 0 2px rgba(23, 107, 82, 0.24), var(--shadow);
 }
 
 .leaflet-control-attribution {
@@ -526,7 +612,7 @@ button {
     padding: max(10px, env(safe-area-inset-top)) 10px 0;
   }
 
-  .topbar > div {
+  .brand-card {
     padding: 8px 11px;
     border-radius: 15px;
   }
@@ -540,11 +626,16 @@ button {
     font-size: 19px;
   }
 
-  .location-button {
+  .location-button,
+  .manual-location-button {
     min-width: 48px;
     min-height: 48px;
     padding: 0 12px;
     border-radius: 15px;
+  }
+
+  .manual-location-button span:last-child {
+    display: none;
   }
 
   .sheet {

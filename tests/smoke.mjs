@@ -12,8 +12,8 @@ const [app, index, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "1\.2\.0"/);
-for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "favorites"]) {
+assert.match(app, /APP_VERSION = "1\.3\.0"/);
+for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
 
@@ -27,9 +27,17 @@ assert.match(app, /startSheetGesture/);
 assert.match(app, /endSheetGesture/);
 assert.match(app, /updateNearestAction/);
 assert.match(app, /buildDirectionsUrl/);
+assert.match(app, /MAP_STYLE_URL = "https:\/\/tiles\.openfreemap\.org\/styles\/bright"/);
+assert.match(app, /getCurrentPosition/);
+assert.match(app, /getGeolocationPermissionState/);
+assert.match(app, /enableManualLocationMode/);
+assert.match(app, /handleManualMapClick/);
+assert.match(app, /fitResultsOnMap/);
 assert.match(app, /son kaydedilen veri gösteriliyor/);
 assert.match(app, /Veri: Eczane Adresi/);
-assert.match(index, /OpenStreetMap contributors/);
+assert.match(index, /OpenFreeMap/);
+assert.match(index, /OpenMapTiles/);
+assert.match(index, /OpenStreetMap/);
 
 assert.match(index, /rel="manifest"/);
 assert.match(index, /leaflet@1\.9\.4/);
@@ -40,6 +48,9 @@ assert.match(index, /id="resultSummary"/);
 assert.match(index, /nearest-badge/);
 assert.match(index, /id="nearestAction"/);
 assert.match(index, /id="nearestActionMeta"/);
+assert.match(index, /id="manualLocationButton"/);
+assert.match(index, /maplibre-gl@5/);
+assert.match(index, /OpenFreeMap/);
 
 assert.equal(manifest.name, "Yakınımda");
 assert.equal(manifest.display, "standalone");
@@ -48,7 +59,7 @@ assert.equal(manifest.start_url, "./");
 assert.match(sw, /networkFirst/);
 assert.match(sw, /staleWhileRevalidate/);
 assert.match(sw, /LEAFLET_ORIGIN/);
-assert.match(sw, /yakinimda-shell-v6/);
+assert.match(sw, /yakinimda-shell-v7/);
 assert.doesNotMatch(sw, /tile\.openstreetmap\.org/);
 
 assert.ok(Array.isArray(vercel.headers));
