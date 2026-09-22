@@ -1,6 +1,6 @@
 # Yakınımda
 
-**Sürüm:** 2.0.0
+**Sürüm:** 2.0.1
 
 Mobil öncelikli, kurulabilir (PWA) yakın çevre keşif uygulaması. Sunucu, hesap veya ücretli API anahtarı gerektirmez.
 
@@ -74,3 +74,7 @@ Proje framework gerektirmeyen statik bir sitedir. GitHub repository Vercel'e ba�
 
 Bu yaklaşım gereksiz preview/deployment üretimini azaltmak için küçük değişiklikleri toplu geliştirme turunda birleştirmeyi hedefler.
 
+
+## 2.0.1 veri erişimi
+
+OSM sorgusu seçilen yarıçapla sınırlanır. Ana Overpass sunucusu HTTP/ağ/zaman aşımı hatası veya eksik yanıt döndürürse ikinci sunucu denenir. Her deneme 15 saniye ile sınırlıdır. Her ikisi başarısızsa mevcut önbellek kullanılır; önbellek yoksa yeniden deneme düğmesi gösterilir.

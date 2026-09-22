@@ -1,7 +1,7 @@
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.0.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
-const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+const OVERPASS_ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
 const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
@@ -262,7 +262,7 @@ function applyUserPosition(position) {
   if (activeCategory.type === "favorites") loadFavorites();
   else {
     loadCategory(activeCategory);
-    warmNearbyData(activeCategory.id);
+
   }
 }
 
@@ -318,7 +318,7 @@ function handleManualMapClick(event) {
   if (activeCategory.type === "favorites") loadFavorites();
   else {
     loadCategory(activeCategory);
-    warmNearbyData(activeCategory.id);
+
   }
 }
 
@@ -398,7 +398,13 @@ async function loadCategory(category) {
 
     clearPlaceMarkers();
     showState("error", "Veri kaynağına şu an ulaşılamadı. Biraz sonra tekrar dene; kayıtlı favorilerin etkilenmez.");
-    statusText.textContent = "Geçici bağlantı sorunu.";
+    statusText.textContent = "Veri servisleri şu an yanıt vermiyor.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "retry-button";
+    retry.textContent = "Tekrar dene";
+    retry.addEventListener("click", () => loadCategory(activeCategory));
+    results.querySelector(".error-state").append(retry);
   }
 }
 
@@ -442,23 +448,13 @@ function normalizeDutyPharmacy(row, location) {
 }
 
 async function fetchOsmBundle(location) {
-  const requestKey = `${location.lat.toFixed(3)}:${location.lng.toFixed(3)}`;
+  const radius = Number(prefs.radius);
+  const requestKey = `${location.lat.toFixed(3)}:${location.lng.toFixed(3)}:${radius}`;
   if (osmBundleRequest?.key === requestKey) return osmBundleRequest.promise;
 
   const promise = (async () => {
-    const clauses = osmCategories
-      .map((category) => `nwr(around:${PREFETCH_RADIUS},${location.lat.toFixed(6)},${location.lng.toFixed(6)})${category.filter};`)
-      .join("");
-    const query = `[out:json][timeout:18];(${clauses});out center tags;`;
-    const body = new URLSearchParams({ data: query });
-    const response = await fetch(OVERPASS_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body,
-    });
-
-    if (!response.ok) throw new Error(`Overpass ${response.status}`);
-    const payload = await response.json();
+    const query = buildNearbyQuery(location, radius);
+    const payload = await fetchNearbyPayload(query);
     const bundle = Object.fromEntries(osmCategories.map((category) => [category.id, []]));
 
     for (const element of payload.elements || []) {
@@ -470,7 +466,7 @@ async function fetchOsmBundle(location) {
 
     for (const category of osmCategories) {
       bundle[category.id].sort((a, b) => a.distanceKm - b.distanceKm);
-      writeCache(buildCacheKey(category.id, location), bundle[category.id]);
+      writeCache(buildCacheKey(category.id, location, radius), bundle[category.id]);
     }
 
     return bundle;
@@ -520,19 +516,6 @@ function normalizeOsmElement(element, category, location) {
     lng,
     distanceKm: distanceBetween(location.lat, location.lng, lat, lng),
   };
-}
-
-async function warmNearbyData(activeCategoryId) {
-  if (!userLocation) return;
-  const location = { lat: userLocation.lat, lng: userLocation.lng };
-  const jobs = [];
-
-  const needsOsmPrefetch = osmCategories.some(
-    (category) => !readCache(buildCacheKey(category.id, location), category.ttl),
-  );
-  if (needsOsmPrefetch) jobs.push(fetchOsmBundle(location));
-
-  await Promise.allSettled(jobs);
 }
 
 function filterPlacesForRadius(places) {
@@ -709,10 +692,10 @@ function iconForCategory(categoryId) {
   return categories.find((item) => item.id === categoryId)?.icon || "•";
 }
 
-function buildCacheKey(categoryId, location = userLocation) {
+function buildCacheKey(categoryId, location = userLocation, radius = Number(prefs.radius)) {
   const roundedLat = location.lat.toFixed(3);
   const roundedLng = location.lng.toFixed(3);
-  return `${CACHE_PREFIX}${categoryId}:${roundedLat}:${roundedLng}:${PREFETCH_RADIUS}`;
+  return `${CACHE_PREFIX}${categoryId}:${roundedLat}:${roundedLng}:${radius}`;
 }
 
 function readCache(key, ttl) {
@@ -875,4 +858,32 @@ function categorySvg(id) {
     favorites: '<path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>'
   };
   return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
+}
+
+function buildNearbyQuery(location, radius) {
+  const area = `around:${radius},${location.lat.toFixed(6)},${location.lng.toFixed(6)}`;
+  return `[out:json][timeout:12];(nwr(${area})[amenity~"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$"];nwr(${area})[shop~"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$"];nwr(${area})[leisure=park];);out center tags;`;
+}
+
+async function fetchNearbyPayload(query) {
+  let lastError;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const url = new URL(endpoint);
+      url.searchParams.set("data", query);
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Overpass ${response.status}`);
+      const payload = await response.json();
+      // Overpass may return HTTP 200 with an error remark and incomplete elements.
+      if (!Array.isArray(payload.elements) || payload.remark) throw new Error("Incomplete Overpass response");
+      return payload;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error("Nearby services unavailable");
 }
