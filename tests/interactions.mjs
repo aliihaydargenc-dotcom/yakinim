@@ -51,6 +51,7 @@ const context = vm.createContext({
 vm.runInContext(extract("placeHasSpecificName"), context);
 vm.runInContext(extract("placeDisplayPriority"), context);
 vm.runInContext(extract("applyNearestMarkerState"), context);
+context.document = { body: { dataset: { view: "list" } } };
 vm.runInContext(extract("addPlaceMarker"), context);
 context.place = { id: "one", name: "Test cafe", category: "cafe", lat: 36, lng: 30, distanceKm: .2 };
 vm.runInContext('createdMarker = addPlaceMarker(place,"",false,0)', context);
@@ -93,7 +94,13 @@ const params = new URL(url).searchParams;
 assert.equal(params.get("destination"), "36.92,30.72");
 
 let collapsed = 0;
-const mapClickContext = vm.createContext({ manualLocationMode: false, document: { body: { dataset: { view: "map" } } }, collapseMapPanel: () => collapsed++ });
+const mapClickContext = vm.createContext({
+  manualLocationMode: false,
+  mapQuickCard: { hidden: true },
+  document: { body: { dataset: { view: "map" } } },
+  closeMapQuickCard: () => {},
+  collapseMapPanel: () => collapsed++,
+});
 vm.runInContext(extract("handleManualMapClick"), mapClickContext);
 vm.runInContext("handleManualMapClick({})", mapClickContext);
 assert.equal(collapsed, 1);
