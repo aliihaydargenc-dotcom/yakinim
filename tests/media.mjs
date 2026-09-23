@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 const { NEWS_FEEDS, parseRss, queryNews } = require("../lib/news.cjs");
-const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
+const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeArtworkUrl, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
 
 assert.ok(NEWS_FEEDS.gundem.url.includes("trthaber.com"));
 assert.ok(NEWS_FEEDS.teknoloji.url.includes("bilim_teknoloji"));
@@ -44,6 +44,9 @@ assert.equal(goodStation.countryCode, "TR");
 assert.equal(goodStation.language, "turkish");
 assert.equal(goodStation.hls, true);
 assert.equal(cleanProviderText("UNKNOWN"), "");
+const slowTurkProxy = "https://www.slowturk.com.tr/_next/image?url=https%3A%2F%2Fassets.blupoint.io%2Fimg%2F85%2F330x175%2F6410d8c4310c17000763c62b&w=256&q=75";
+assert.equal(normalizeArtworkUrl(slowTurkProxy), "https://assets.blupoint.io/img/85/330x175/6410d8c4310c17000763c62b");
+assert.equal(normalizeArtworkUrl("javascript:alert(1)"), "");
 assert.equal(normalizeStation({ ...goodStation, stationuuid: "x", url_resolved: "http://insecure", lastcheckok: 1 }), null);
 assert.equal(uniqueStations([
   { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },

@@ -71,6 +71,8 @@ assert.match(app, /loadNews/);
 assert.match(app, /loadRadio/);
 assert.doesNotMatch(index, /data-radio-scope=/);
 assert.match(app, /toggleRadioFavorite/);
+assert.match(app, /normalizeRadioArtworkUrl/);
+assert.match(app, /failedRadioArtwork/);
 assert.match(app, /navigator\.mediaSession/);
 assert.match(app, /rememberRadioRecent/);
 assert.match(app, /toggleRadioPlayerExpanded/);

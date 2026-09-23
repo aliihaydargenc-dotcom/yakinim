@@ -1,4 +1,4 @@
-const APP_VERSION = "3.1.2";
+const APP_VERSION = "3.1.3";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -116,6 +116,7 @@ const savedRadioVolume = Number(localStorage.getItem(RADIO_VOLUME_KEY));
 let radioVolumeLevel = Number.isFinite(savedRadioVolume) ? Math.min(1, Math.max(0, savedRadioVolume)) : .8;
 const newsClientCache = new Map();
 const radioClientCache = new Map();
+const failedRadioArtwork = new Set();
 let listScrollY = 0;
 let mapHasFramedResults = false;
 let toastTimer;
@@ -586,6 +587,28 @@ function radioInitials(name) {
   return (words[0][0] + words[1][0]).toLocaleUpperCase("tr");
 }
 
+function normalizeRadioArtworkUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^https:\/\//i.test(raw)) return "";
+  try {
+    const url = new URL(raw);
+    if (url.pathname.includes("/_next/image")) {
+      const nested = url.searchParams.get("url");
+      if (nested && /^https:\/\//i.test(nested)) return nested;
+      return "";
+    }
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function radioArtworkUrl(station) {
+  const normalized = normalizeRadioArtworkUrl(station?.favicon);
+  if (!normalized || failedRadioArtwork.has(normalized)) return "";
+  return normalized;
+}
+
 function createRadioAvatar(station, className = "radio-avatar") {
   const avatar = document.createElement("span");
   avatar.className = className;
@@ -594,15 +617,19 @@ function createRadioAvatar(station, className = "radio-avatar") {
   fallback.textContent = radioInitials(station?.name);
   avatar.append(fallback);
 
-  if (station?.favicon) {
+  const artwork = radioArtworkUrl(station);
+  if (artwork) {
     const image = document.createElement("img");
     image.alt = "";
     image.loading = "lazy";
     image.referrerPolicy = "no-referrer";
     image.decoding = "async";
     image.addEventListener("load", () => image.classList.add("is-loaded"), { once: true });
-    image.addEventListener("error", () => image.remove(), { once: true });
-    image.src = station.favicon;
+    image.addEventListener("error", () => {
+      failedRadioArtwork.add(artwork);
+      image.remove();
+    }, { once: true });
+    image.src = artwork;
     avatar.append(image);
   }
   return avatar;
@@ -629,7 +656,7 @@ function radioStationForStorage(station) {
     name: station.name,
     streamUrl: station.streamUrl,
     homepage: station.homepage || "",
-    favicon: station.favicon || "",
+    favicon: normalizeRadioArtworkUrl(station.favicon),
     tags: Array.isArray(station.tags) ? station.tags.slice(0, 6) : [],
     codec: station.codec || "",
     bitrate: Number(station.bitrate) || 0,
@@ -818,7 +845,8 @@ function configureRadioMediaSession() {
 
 function updateRadioMediaSession(station) {
   if (!("mediaSession" in navigator) || typeof MediaMetadata !== "function" || !station) return;
-  const artwork = station.favicon ? [{ src: station.favicon }] : [];
+  const artworkUrl = radioArtworkUrl(station);
+  const artwork = artworkUrl ? [{ src: artworkUrl }] : [];
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: station.name,
@@ -843,7 +871,7 @@ async function loadRadio(scope = "turkiye", { force = false } = {}) {
   radioStatus.textContent = "İstasyonlar yükleniyor…";
   radioList.innerHTML = '<div class="module-loading">Canlı yayınlar aranıyor…</div>';
   try {
-    const response = await fetch("/api/radio?scope=turkiye", { headers: { Accept: "application/json" } });
+    const response = await fetch(`/api/radio?scope=turkiye&v=${encodeURIComponent(APP_VERSION)}`, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("radio_" + response.status);
     const payload = await response.json();
     radioClientCache.set("turkiye", payload);
