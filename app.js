@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.2";
+const APP_VERSION = "2.2.3";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -89,6 +89,7 @@ try {
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
+map.on("zoomend", updateMapLabels);
 
 const categoryStrip = document.querySelector("#categoryStrip");
 const results = document.querySelector("#results");
@@ -733,11 +734,12 @@ function renderPlaces(places, category) {
 
   places.forEach((place, index) => {
     const icon = ["favorites", "all"].includes(category.type) ? iconForCategory(place.category) : category.icon;
-    addPlaceMarker(place, icon, index === 0);
+    addPlaceMarker(place, icon, index === 0, index);
     resultFragment.append(createResultCard(place, icon, index === 0, index));
   });
 
   results.append(resultFragment);
+  updateMapLabels();
   animateIn(results);
   if (document.body.dataset.view === "map") { fitResultsOnMap(places); mapHasFramedResults = true; }
   if (selectedPlace) {
@@ -796,7 +798,7 @@ function buildMeta(place) {
   return parts.join(" · ");
 }
 
-function addPlaceMarker(place, icon, isNearest = false) {
+function addPlaceMarker(place, icon, isNearest = false, index = 0) {
   const markerSize = 44;
   const marker = L.marker([place.lat, place.lng], {
     title: place.name,
@@ -808,12 +810,25 @@ function addPlaceMarker(place, icon, isNearest = false) {
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
   })
-    .bindTooltip(escapeHtml(place.name), { direction: "top", offset: [0, -14] })
+    .bindTooltip(escapeHtml(place.name), { direction: "right", offset: [12, 0], permanent: true, className: "place-label" })
     .addTo(map);
 
   marker.placeId = place.id;
+  marker.labelPriority = index;
+  marker.hasSpecificName = place.name !== (categories.find(category => category.id === place.category)?.label || "");
   marker.on("click", () => openPlaceDetails(place, marker.getElement()));
   markers.push(marker);
+}
+
+function updateMapLabels() {
+  const labelLimit = map.getZoom() >= 15 ? 16 : map.getZoom() >= 13 ? 10 : 5;
+  let visible = 0;
+  markers.forEach(marker => {
+    const show = marker.placeId === selectedPlace?.id || (marker.hasSpecificName && visible < labelLimit);
+    if (show && marker.placeId !== selectedPlace?.id) visible++;
+    if (show) marker.openTooltip();
+    else marker.closeTooltip();
+  });
 }
 
 function fitResultsOnMap(places) {
@@ -894,6 +909,7 @@ function markSelectedPlace() {
     marker.getElement()?.classList.toggle("is-selected", selected);
     marker.setZIndexOffset(selected ? 1200 : 0);
   });
+  updateMapLabels();
 }
 
 function showToast(message) {
