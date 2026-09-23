@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.4";
+const APP_VERSION = "2.3.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -128,7 +128,9 @@ sheetToggle.addEventListener("click", () => {
     sheetGestureConsumed = false;
     return;
   }
-  cycleSheetState();
+  if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
+  else if (document.body.dataset.view === "map" && sheet.dataset.state === "expanded") collapseMapPanel();
+  else cycleSheetState();
 });
 radiusSelect.addEventListener("change", () => {
   prefs.radius = Number(radiusSelect.value);
@@ -160,12 +162,31 @@ document.querySelector("#detailRoute").addEventListener("click", () => { if (sel
 document.querySelector("#detailMap").addEventListener("click", () => { if (selectedPlace) focusPlace(selectedPlace); });
 document.querySelector("#clearRoute").addEventListener("click", () => { routeStops = []; persistRoute(); renderRoute(); showToast("Rota temizlendi"); });
 document.addEventListener("keydown", event => { if (event.key === "Escape" && selectedPlace) closePlaceDetails(); });
+history.replaceState({ ...history.state, yakinimView: "list" }, "", location.href);
+window.addEventListener("popstate", event => {
+  const state = event.state?.yakinimView;
+  closePlaceDetails(false);
+  document.body.dataset.view = state === "map-peek" || state === "map-open" ? "map" : "list";
+  applySheetState(state === "map-peek" ? "peek" : state === "map-open" ? "half" : "expanded");
+  document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === document.body.dataset.view)));
+  requestAnimationFrame(() => map.invalidateSize());
+});
 renderRoute();
 setView("list");
-function setView(view) {
+function setView(view, panelState = "half") {
+  const previousView = document.body.dataset.view;
+  if (view === "list" && previousView === "map" && history.state?.yakinimView?.startsWith("map-")) {
+    history.go(history.state.yakinimView === "map-open" ? -2 : -1);
+    return;
+  }
   if (document.body.dataset.view === "list") listScrollY = window.scrollY;
   closePlaceDetails(false);
   document.body.dataset.view = view;
+  if (view === "map" && previousView !== "map") {
+    history.pushState({ yakinimView: "map-peek" }, "", location.href);
+    if (panelState !== "peek") history.pushState({ yakinimView: "map-open" }, "", location.href);
+  }
+  applySheetState(view === "map" ? (previousView === "map" ? sheet.dataset.state : panelState) : "expanded");
   window.scrollTo(0, view === "list" ? listScrollY : 0);
   document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
   animateIn(sheet);
@@ -204,7 +225,7 @@ function selectCategory(category) {
   resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
   activePlaces = [];
   clearPlaceMarkers();
-  if (sheet.dataset.state === "peek") applySheetState("half");
+  if (sheet.dataset.state === "peek") expandMapPanel();
   prefs.category = category.id;
   persistPrefs();
   renderCategoryButtons();
@@ -334,7 +355,7 @@ function locationErrorMessage(error) {
 function enableManualLocationMode() {
   locationAttemptSerial += 1;
   manualLocationMode = true;
-  setView("map");
+  setView("map", "peek");
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
   manualLocationButton.hidden = false;
@@ -345,7 +366,10 @@ function enableManualLocationMode() {
 }
 
 function handleManualMapClick(event) {
-  if (!manualLocationMode) return;
+  if (!manualLocationMode) {
+    if (document.body.dataset.view === "map") collapseMapPanel();
+    return;
+  }
 
   manualLocationMode = false;
   document.body.classList.remove("is-selecting-location");
@@ -878,6 +902,7 @@ function scrollToResult(placeId) {
 }
 
 function openPlaceDetails(place, trigger = null) {
+  if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
   selectedPlace = place;
   detailTrigger = trigger || detailTrigger;
   const detail = document.querySelector("#placeDetail");
@@ -1066,6 +1091,20 @@ function cycleSheetState() {
   applySheetState(nextState);
 }
 
+function collapseMapPanel() {
+  if (document.body.dataset.view !== "map") return;
+  closePlaceDetails(false);
+  if (sheet.dataset.state === "peek") return;
+  if (history.state?.yakinimView === "map-open") history.back();
+  else applySheetState("peek");
+}
+
+function expandMapPanel() {
+  if (document.body.dataset.view !== "map" || sheet.dataset.state !== "peek") return;
+  if (history.state?.yakinimView === "map-peek") history.pushState({ yakinimView: "map-open" }, "", location.href);
+  applySheetState("half");
+}
+
 function startSheetGesture(event) {
   sheetGestureStartY = event.clientY;
   sheetGestureConsumed = false;
@@ -1085,7 +1124,9 @@ function endSheetGesture(event) {
   const nextIndex = Math.min(SHEET_STATES.length - 1, Math.max(0, currentIndex + direction));
 
   sheetGestureConsumed = true;
-  applySheetState(SHEET_STATES[nextIndex]);
+  if (document.body.dataset.view === "map" && SHEET_STATES[nextIndex] === "peek") collapseMapPanel();
+  else if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
+  else applySheetState(SHEET_STATES[nextIndex]);
 }
 
 function cancelSheetGesture() {

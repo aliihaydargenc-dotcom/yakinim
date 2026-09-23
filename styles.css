@@ -576,6 +576,17 @@ body[data-view=map].has-place-detail .status-text{display:none}
 .place-marker[data-category="park"]{color:#43834f}
 .place-marker[data-category="duty"],.place-marker[data-category="pharmacy"],.place-marker[data-category="hospital"]{color:#b84955}
 .leaflet-marker-icon.is-selected .place-marker{transform:scale(1.16);box-shadow:0 8px 24px #193b3860}
+body[data-view=map] .sheet{transition:max-height .25s ease,height .25s ease,bottom .25s ease}
+body[data-view=map] .sheet-toggle{display:grid;place-items:center;width:100%;height:22px;border:0;background:transparent;touch-action:none}
+body[data-view=map] .sheet-handle{display:block;width:38px;height:4px;border-radius:999px;background:#aebdb7}
+body[data-view=map] .sheet[data-state=peek]{top:auto;height:82px;max-height:82px;padding-top:5px;overflow:hidden}
+body[data-view=map] .sheet[data-state=peek] :is(.category-strip,.section-toolbar,.nearest-action,.results,.place-detail,.sheet-footer,.discovery-hub){display:none!important}
+body[data-view=map] .sheet[data-state=peek] .sheet-row{display:flex;margin:0;padding:0 4px}
+body[data-view=map] .sheet[data-state=peek] .result-title{font-size:14px;margin:0}
+body[data-view=map] .sheet[data-state=peek] .result-summary{font-size:11px;margin:3px 0 0}
+body[data-view=map] .sheet[data-state=peek] .status-text,body[data-view=map] .sheet[data-state=peek] .radius-control{display:none}
+body[data-view=map] .sheet[data-state=expanded]{max-height:65dvh}
+body[data-view=map].has-route .sheet[data-state=peek]{max-height:82px;height:82px}
 .leaflet-tooltip.place-label{max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 9px!important;border:1px solid #dce8e2!important;border-radius:9px!important;background:#fffffff2!important;color:#203b32!important;font-size:11px!important;font-weight:700!important;box-shadow:0 2px 9px #173c3226!important;pointer-events:none}
 .leaflet-tooltip-right.place-label:before{border-right-color:#fff!important}
 .leaflet-marker-icon.is-selected+.place-label{z-index:850}

@@ -23,3 +23,8 @@ const url=vm.runInContext('buildRouteUrl([{lat:36.9,lng:30.7},{lat:36.91,lng:30.
 const params=new URL(url).searchParams;
 assert.equal(params.get('destination'),'36.92,30.72');
 assert.equal(params.get('waypoints'),'36.9,30.7|36.91,30.71');
+let collapsed=0;
+const mapClickContext=vm.createContext({manualLocationMode:false,document:{body:{dataset:{view:'map'}}},collapseMapPanel:()=>collapsed++});
+vm.runInContext(extract('handleManualMapClick'),mapClickContext);
+vm.runInContext('handleManualMapClick({})',mapClickContext);
+assert.equal(collapsed,1,'Tapping unused map space should collapse the panel');
