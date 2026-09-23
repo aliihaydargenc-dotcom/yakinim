@@ -1,4 +1,4 @@
-const APP_VERSION = "3.1.3";
+const APP_VERSION = "3.1.4";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -592,11 +592,8 @@ function normalizeRadioArtworkUrl(value) {
   if (!/^https:\/\//i.test(raw)) return "";
   try {
     const url = new URL(raw);
-    if (url.pathname.includes("/_next/image")) {
-      const nested = url.searchParams.get("url");
-      if (nested && /^https:\/\//i.test(nested)) return nested;
-      return "";
-    }
+    if (url.pathname.includes("/_next/image")) return "";
+    if (url.hostname === "assets.blupoint.io") return "";
     return url.href;
   } catch {
     return "";

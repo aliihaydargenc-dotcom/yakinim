@@ -72,6 +72,7 @@ assert.match(app, /loadRadio/);
 assert.doesNotMatch(index, /data-radio-scope=/);
 assert.match(app, /toggleRadioFavorite/);
 assert.match(app, /normalizeRadioArtworkUrl/);
+assert.doesNotMatch(index, /rel="preload" href="https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js"/);
 assert.match(app, /failedRadioArtwork/);
 assert.match(app, /navigator\.mediaSession/);
 assert.match(app, /rememberRadioRecent/);
