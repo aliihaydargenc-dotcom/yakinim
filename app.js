@@ -1,4 +1,4 @@
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.8.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -1497,8 +1497,7 @@ function renderMapPlaces(places) {
       marker.labelPriority = placeDisplayPriority(place, placeIndex);
       marker.setLatLng?.([place.lat, place.lng]);
       marker.setTooltipContent?.(escapeHtml(place.name));
-      const markerEl = marker.getElement()?.querySelector?.(".place-marker");
-      markerEl?.classList.toggle("is-nearest", places[0]?.id === place.id);
+      applyNearestMarkerState(marker, places[0]?.id === place.id);
     }
   });
 
@@ -1628,14 +1627,14 @@ function buildMeta(place) {
 }
 
 function addPlaceMarker(place, icon, isNearest = false, index = 0) {
-  const markerSize = isNearest ? 40 : 36;
+  const markerSize = 36;
   const marker = L.marker([place.lat, place.lng], {
     title: place.name,
     alt: place.name,
     bubblingMouseEvents: false,
     icon: L.divIcon({
       className: "",
-      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker${isNearest ? " is-nearest" : ""}" style="--marker-delay:${Math.min(index, 10) * 18}ms"><span>${categorySvg(place.category)}</span></div>`,
+      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker" style="--marker-delay:${Math.min(index, 10) * 18}ms"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
@@ -1654,8 +1653,21 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
   marker.labelPriority = placeDisplayPriority(place, index);
   marker.hasSpecificName = placeHasSpecificName(place);
   marker.on("click", () => openPlaceDetails(marker.place, marker.getElement()));
+  applyNearestMarkerState(marker, isNearest);
   return marker;
 }
+
+function applyNearestMarkerState(marker, isNearest) {
+  marker.isNearest = Boolean(isNearest);
+  const element = marker.getElement?.();
+  const markerEl = element?.querySelector?.(".place-marker");
+  markerEl?.classList.toggle("is-nearest", marker.isNearest);
+
+  const label = marker.isNearest ? `${marker.placeName} · en yakın` : marker.placeName;
+  element?.setAttribute?.("aria-label", label);
+  element?.setAttribute?.("title", label);
+}
+
 
 function updateMapLabels() {
   const viewport = map.getSize();

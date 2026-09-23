@@ -50,6 +50,7 @@ const context = vm.createContext({
 });
 vm.runInContext(extract("placeHasSpecificName"), context);
 vm.runInContext(extract("placeDisplayPriority"), context);
+vm.runInContext(extract("applyNearestMarkerState"), context);
 vm.runInContext(extract("addPlaceMarker"), context);
 context.place = { id: "one", name: "Test cafe", category: "cafe", lat: 36, lng: 30, distanceKm: .2 };
 vm.runInContext('createdMarker = addPlaceMarker(place,"",false,0)', context);

@@ -54,6 +54,8 @@ assert.match(app, /pane: "placeLabels"/);
 assert.match(app, /direction: "top"/);
 assert.match(app, /hitsOtherPin/);
 assert.match(app, /placeMarkerById/);
+assert.match(app, /applyNearestMarkerState/);
+assert.match(app, /· en yakın/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
 assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail" \}/);
 assert.doesNotMatch(app, /pointer: coarse\), \(prefers-reduced-motion/);

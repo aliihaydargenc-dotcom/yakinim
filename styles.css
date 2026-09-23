@@ -343,8 +343,7 @@ p,h1,h2,h3{margin:0}
   font-size:17px}
 .place-marker.is-nearest{width:42px;
   height:42px;
-  background:var(--accent);
-  color:#fff}
+  background:#fff}
 .user-location-dot{width:28px;
   height:28px;
   border-radius:50%;
@@ -518,7 +517,7 @@ body[data-view=map]{overflow:hidden}
 .place-marker.category-atm{color:#3e6e89}
 .place-marker.category-fuel{color:#526577}
 .place-marker.category-parking{color:#42627f}
-.place-marker.is-nearest{color:#fff}
+.place-marker.is-nearest{background:#fff}
 
 @keyframes discoveryIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes resultIn{from{opacity:.45;transform:translateY(5px)}to{opacity:1;transform:none}}
@@ -638,7 +637,7 @@ body[data-view=map].has-route .sheet[data-state=half]{height:min(31dvh,285px)}bo
 
 /* v2.7 spatial pool + collision-aware map labels */
 .place-marker{width:36px;height:36px;border-radius:12px;box-shadow:0 5px 16px #183b3233,0 0 0 1px #ffffffd6}
-.place-marker.is-nearest{width:40px;height:40px;box-shadow:0 7px 20px #183b3242,0 0 0 4px #ffffffa8}
+.place-marker.is-nearest{width:40px;height:40px;background:#fff;box-shadow:0 7px 20px #183b3238,0 0 0 2px #4f9a82,0 0 0 5px #ffffffcf}
 .place-marker svg{width:16px;height:16px}
 .place-cluster{width:48px;height:48px;border-radius:16px;border-width:2px;box-shadow:0 7px 20px #173c3246}
 .place-cluster strong{font-size:15px}.place-cluster span{max-width:42px;font-size:7px}
@@ -680,3 +679,13 @@ body[data-view=map].has-route .sheet[data-state=half]{height:min(31dvh,285px)}bo
 .map-raster .leaflet-tile-container{will-change:auto!important}
 .map-base-loading #map{background:#e7ebea}
 .map-tile-degraded #map:after{content:"Harita altlığı yeniden yükleniyor…";position:absolute;left:50%;top:50%;z-index:350;transform:translate(-50%,-50%);padding:8px 12px;border:1px solid #d9e3df;border-radius:12px;background:#fffffff2;color:#536a61;font-size:11px;font-weight:700;box-shadow:0 5px 18px #173c3220;pointer-events:none}
+
+
+/* v2.8.1 final map state semantics */
+.place-marker.is-nearest{background:#fff}
+.leaflet-marker-icon:not(.is-selected) .place-marker.is-nearest{box-shadow:0 6px 18px #183b3230,0 0 0 2px #4f9a82,0 0 0 5px #ffffffcf}
+.leaflet-marker-icon.is-selected .place-marker{background:#fff;outline:2px solid #173c32;outline-offset:2px;box-shadow:0 11px 28px #173c3257,0 0 0 6px #ffffffd9}
+@media(max-width:759px){
+  .place-marker.is-nearest{width:36px;height:36px}
+  .leaflet-marker-icon:not(.is-selected) .place-marker.is-nearest{box-shadow:0 5px 15px #183b322d,0 0 0 2px #4f9a82,0 0 0 4px #ffffffd6}
+}
