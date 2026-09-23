@@ -1,4 +1,4 @@
-const APP_VERSION = "3.2.1";
+const APP_VERSION = "3.2.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -112,6 +112,7 @@ let currentRadioStation = null;
 let currentRadioStreamIndex = 0;
 let radioRecoveryInProgress = false;
 let radioPlaybackSerial = 0;
+let radioStallTimer = 0;
 let lastRenderedRadioStations = [];
 let radioFavoriteStations = readJson(RADIO_FAVORITES_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 60);
 let radioRecentStations = readJson(RADIO_RECENTS_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 20);
@@ -413,12 +414,23 @@ radioNext?.addEventListener("click", () => stepRadioStation(1));
 radioVolume?.addEventListener("input", event => setRadioVolume(Number(event.target.value) / 100));
 radioPlayerClose?.addEventListener("click", closeRadioPlayer);
 radioAudio?.addEventListener("play", syncRadioPlayerState);
-radioAudio?.addEventListener("pause", syncRadioPlayerState);
+radioAudio?.addEventListener("playing", () => {
+  clearRadioStallTimer();
+  syncRadioPlayerState();
+});
+radioAudio?.addEventListener("pause", () => {
+  clearRadioStallTimer();
+  syncRadioPlayerState();
+});
+radioAudio?.addEventListener("waiting", () => scheduleRadioRecovery("waiting"));
+radioAudio?.addEventListener("stalled", () => scheduleRadioRecovery("stalled"));
 radioAudio?.addEventListener("ended", () => {
+  clearRadioStallTimer();
   syncRadioPlayerState();
   if (currentRadioStation) recoverRadioStream("ended");
 });
 radioAudio?.addEventListener("error", () => {
+  clearRadioStallTimer();
   syncRadioPlayerState();
   if (currentRadioStation) recoverRadioStream("error");
 });
@@ -889,7 +901,10 @@ function configureRadioMediaSession() {
   const safeHandler = (action, handler) => {
     try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
   };
-  safeHandler("play", () => radioAudio?.play().catch(() => {}));
+  safeHandler("play", () => {
+    if (!currentRadioStation) return;
+    startRadioCandidate(currentRadioStreamIndex).catch(() => {});
+  });
   safeHandler("pause", () => radioAudio?.pause());
   safeHandler("stop", closeRadioPlayer);
   safeHandler("previoustrack", () => stepRadioStation(-1));
@@ -910,6 +925,69 @@ function updateRadioMediaSession(station) {
   } catch {}
 }
 
+function clearRadioStallTimer() {
+  if (!radioStallTimer) return;
+  clearTimeout(radioStallTimer);
+  radioStallTimer = 0;
+}
+
+function scheduleRadioRecovery(reason = "waiting") {
+  if (!currentRadioStation || !radioAudio || radioRecoveryInProgress || radioAudio.paused) return;
+  clearRadioStallTimer();
+  radioStallTimer = setTimeout(() => {
+    radioStallTimer = 0;
+    if (!currentRadioStation || !radioAudio || radioRecoveryInProgress || radioAudio.paused) return;
+    recoverRadioStream(reason);
+  }, 9000);
+}
+
+function radioCandidateNativePlayable(candidate) {
+  if (!candidate || !radioAudio) return false;
+  const url = String(candidate.url || "").trim();
+  if (!/^https:\/\//i.test(url)) return false;
+  const isHls = Boolean(candidate.hls) || /\.m3u8(?:$|\?)/i.test(url);
+  if (!isHls) return true;
+  const hlsSupport = radioAudio.canPlayType?.("application/vnd.apple.mpegurl")
+    || radioAudio.canPlayType?.("application/x-mpegURL")
+    || "";
+  return Boolean(hlsSupport);
+}
+
+function attemptRadioCandidate(candidate, serial, timeoutMs = 8000) {
+  return new Promise(resolve => {
+    if (!radioAudio || !candidate?.url || serial !== radioPlaybackSerial) return resolve({ ok: false, reason: "stale" });
+    let settled = false;
+    let timer = 0;
+    const finish = (ok, reason = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      radioAudio.removeEventListener("playing", onPlaying);
+      radioAudio.removeEventListener("error", onError);
+      radioAudio.removeEventListener("abort", onAbort);
+      resolve({ ok, reason });
+    };
+    const onPlaying = () => finish(true, "playing");
+    const onError = () => finish(false, "media_error");
+    const onAbort = () => finish(false, "aborted");
+
+    radioAudio.addEventListener("playing", onPlaying);
+    radioAudio.addEventListener("error", onError);
+    radioAudio.addEventListener("abort", onAbort);
+    timer = setTimeout(() => finish(false, "timeout"), timeoutMs);
+
+    radioAudio.muted = false;
+    radioAudio.src = candidate.url;
+    radioAudio.load();
+    try {
+      const playPromise = radioAudio.play();
+      if (playPromise?.catch) playPromise.catch(error => finish(false, error?.name || "play_rejected"));
+    } catch (error) {
+      finish(false, error?.name || "play_rejected");
+    }
+  });
+}
+
 function stationStreamCandidates(station) {
   const candidates = Array.isArray(station?.streamCandidates) ? station.streamCandidates : [];
   const rows = candidates.length ? candidates : [{ id: station?.id, url: station?.streamUrl, codec: station?.codec, bitrate: station?.bitrate, hls: station?.hls }];
@@ -918,7 +996,7 @@ function stationStreamCandidates(station) {
     const url = String(candidate?.url || "").trim();
     if (!/^https:\/\//i.test(url) || seen.has(url)) return false;
     seen.add(url);
-    return true;
+    return radioCandidateNativePlayable({ ...candidate, url });
   });
 }
 
@@ -933,19 +1011,29 @@ function reportRadioFailure(streamUrl) {
 
 async function startRadioCandidate(startIndex = 0, { countClick = false } = {}) {
   if (!currentRadioStation || !radioAudio) return false;
+  clearRadioStallTimer();
   const serial = ++radioPlaybackSerial;
   const candidates = stationStreamCandidates(currentRadioStation);
   radioRecoveryInProgress = true;
+
   for (let index = Math.max(0, startIndex); index < candidates.length; index += 1) {
+    if (serial !== radioPlaybackSerial) {
+      radioRecoveryInProgress = false;
+      return false;
+    }
+
     const candidate = candidates[index];
     currentRadioStreamIndex = index;
     radioPlayer.classList.remove("has-error");
     radioPlayerMeta.textContent = index > 0 ? "Yedek canlı yayın deneniyor…" : "Canlı yayına bağlanıyor…";
-    radioAudio.src = candidate.url;
-    radioAudio.load();
-    try {
-      await radioAudio.play();
-      if (serial !== radioPlaybackSerial) return false;
+
+    const result = await attemptRadioCandidate(candidate, serial, 8000);
+    if (serial !== radioPlaybackSerial) {
+      radioRecoveryInProgress = false;
+      return false;
+    }
+
+    if (result.ok) {
       const rank = currentRadioStation.measuredRank ? `#${currentRadioStation.measuredRank} RİAK` : "";
       radioPlayerMeta.textContent = [rank, ...radioStationMeta({ ...currentRadioStation, codec: candidate.codec || currentRadioStation.codec, bitrate: candidate.bitrate || currentRadioStation.bitrate })].filter(Boolean).join(" · ") || "Canlı yayın";
       if (countClick) {
@@ -957,24 +1045,44 @@ async function startRadioCandidate(startIndex = 0, { countClick = false } = {}) 
       }
       radioRecoveryInProgress = false;
       return true;
-    } catch {
-      reportRadioFailure(candidate.url);
+    }
+
+    const browserBlocked = result.reason === "NotAllowedError";
+    if (!browserBlocked) reportRadioFailure(candidate.url);
+    try {
+      radioAudio.pause();
+      radioAudio.removeAttribute("src");
+      radioAudio.load();
+    } catch {}
+
+    if (browserBlocked) {
+      radioRecoveryInProgress = false;
+      radioPlayerMeta.textContent = "Oynatmak için ▶ düğmesine tekrar dokun";
+      radioPlayer.classList.add("has-error");
+      return false;
     }
   }
+
   radioRecoveryInProgress = false;
-  radioPlayerMeta.textContent = "Bu istasyonun çalışan canlı yayını bulunamadı";
+  radioPlayerMeta.textContent = candidates.length
+    ? "Çalışan yayın bulunamadı · başka istasyon deneyebilirsin"
+    : "Bu yayın biçimi tarayıcında desteklenmiyor";
   radioPlayer.classList.add("has-error");
+  syncRadioPlayerState();
   return false;
 }
 
 async function recoverRadioStream(reason = "error") {
   if (!currentRadioStation || radioRecoveryInProgress) return;
+  clearRadioStallTimer();
   const candidates = stationStreamCandidates(currentRadioStation);
   const failed = candidates[currentRadioStreamIndex];
-  if (failed?.url) reportRadioFailure(failed.url);
-  const nextIndex = currentRadioStreamIndex + 1;
+  if (failed?.url && reason !== "resume") reportRadioFailure(failed.url);
+  const nextIndex = reason === "resume" ? currentRadioStreamIndex : currentRadioStreamIndex + 1;
   if (nextIndex >= candidates.length) {
-    radioPlayerMeta.textContent = reason === "ended" ? "Yayın sona erdi; çalışan yedek bulunamadı" : "Yayın kesildi; çalışan yedek bulunamadı";
+    radioPlayerMeta.textContent = reason === "ended"
+      ? "Yayın sona erdi; çalışan yedek bulunamadı"
+      : "Yayın kesildi; çalışan yedek bulunamadı";
     radioPlayer.classList.add("has-error");
     return;
   }
@@ -1106,16 +1214,12 @@ async function playRadioStation(station) {
       radioAudio.pause();
       return;
     }
-    try {
-      await radioAudio.play();
-      return;
-    } catch {
-      await recoverRadioStream("resume");
-      return;
-    }
+    await startRadioCandidate(currentRadioStreamIndex);
+    return;
   }
 
   ++radioPlaybackSerial;
+  clearRadioStallTimer();
   radioRecoveryInProgress = false;
   currentRadioStation = station;
   currentRadioStreamIndex = 0;
@@ -1130,7 +1234,7 @@ async function playRadioStation(station) {
 function toggleRadioPlayback() {
   if (!radioAudio || !currentRadioStation) return;
   if (radioAudio.paused) {
-    radioAudio.play().catch(() => recoverRadioStream("resume"));
+    startRadioCandidate(currentRadioStreamIndex).catch(() => {});
   } else {
     radioAudio.pause();
   }
@@ -1150,6 +1254,7 @@ function syncRadioPlayerState() {
 
 function closeRadioPlayer() {
   ++radioPlaybackSerial;
+  clearRadioStallTimer();
   radioRecoveryInProgress = false;
   currentRadioStation = null;
   currentRadioStreamIndex = 0;

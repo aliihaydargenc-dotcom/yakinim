@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.2\.1"/);
+assert.match(app, /APP_VERSION = "3\.2\.2"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -63,6 +63,11 @@ assert.match(app, /rememberRadioRecent/);
 assert.match(app, /toggleRadioPlayerExpanded/);
 assert.match(app, /stationStreamCandidates/);
 assert.match(app, /recoverRadioStream/);
+assert.match(app, /attemptRadioCandidate/);
+assert.match(app, /radioCandidateNativePlayable/);
+assert.match(app, /scheduleRadioRecovery/);
+assert.match(app, /addEventListener\("waiting"/);
+assert.match(app, /addEventListener\("stalled"/);
 assert.match(app, /reportRadioFailure/);
 assert.match(app, /showSectionTransition/);
 assert.match(app, /hideSectionTransition/);
@@ -118,7 +123,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v43/);
+assert.match(sw, /yakinimda-shell-v44/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

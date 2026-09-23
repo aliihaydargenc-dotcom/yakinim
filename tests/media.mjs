@@ -88,6 +88,8 @@ assert.equal(grouped[0].measuredRank, 1);
 const liveHeaders = new Map([["content-type", "audio/mpeg"], ["content-length", "0"], ["icy-name", "Test"]]);
 const liveFetch = async () => ({ ok: true, headers: { get: key => liveHeaders.get(key.toLowerCase()) || null }, body: { cancel: async () => {} } });
 assert.equal(await probeStreamCandidate({ url: "https://radio.example/live", hls: false }, liveFetch, 100), true);
+const redirectedHttpFetch = async () => ({ ok: true, url: "http://radio.example/live", headers: { get: key => liveHeaders.get(key.toLowerCase()) || null }, body: { cancel: async () => {} } });
+assert.equal(await probeStreamCandidate({ url: "https://radio.example/live", hls: false }, redirectedHttpFetch, 100), false);
 
 const staticHeaders = new Map([["content-type", "audio/mpeg"], ["content-length", "5000000"]]);
 const staticFetch = async () => ({ ok: true, headers: { get: key => staticHeaders.get(key.toLowerCase()) || null }, body: { cancel: async () => {} } });
