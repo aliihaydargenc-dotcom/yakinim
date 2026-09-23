@@ -23,6 +23,7 @@ button:disabled{opacity:.55;
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #64b8a7;
   outline-offset:3px}
 [hidden]{display:none!important}
+.map-raster .leaflet-control-attribution{display:block!important;background:#ffffffd9!important;font-size:10px!important}
 p,h1,h2,h3{margin:0}
 .app-shell{max-width:1160px;
   margin:auto}
@@ -575,3 +576,15 @@ body[data-view=map].has-place-detail .status-text{display:none}
 .place-marker[data-category="park"]{color:#43834f}
 .place-marker[data-category="duty"],.place-marker[data-category="pharmacy"],.place-marker[data-category="hospital"]{color:#b84955}
 .leaflet-marker-icon.is-selected .place-marker{transform:scale(1.16);box-shadow:0 8px 24px #193b3860}
+.route-button{border:1px solid #cbded4;border-radius:10px;background:#f4faf6;color:#1c6b4e;min-height:39px;padding:0 12px;font-size:12px;font-weight:700}
+.route-tray{position:fixed;z-index:800;left:50%;bottom:max(12px,env(safe-area-inset-bottom));width:min(520px,calc(100vw - 24px));transform:translateX(-50%);padding:15px;border:1px solid #cfe2d7;border-radius:20px;background:#fff;box-shadow:0 12px 36px #173c3233}
+.route-tray-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.route-tray-head strong{font-size:14px}
+.route-tray-head button{border:0;background:none;color:var(--muted);font-size:12px;min-height:30px}
+.route-stops{margin:5px 0 11px;color:var(--muted);font-size:11px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#openRoute{display:block;text-align:center;padding:11px;border-radius:12px;background:var(--accent);color:#fff;text-decoration:none;font-size:13px;font-weight:700}
+body[data-view=list].has-route .sheet{padding-bottom:170px}
+body[data-view=list].has-route .place-detail{bottom:150px}
+body[data-view=map].has-route .route-tray{bottom:max(18px,env(safe-area-inset-bottom));width:min(360px,calc(100vw - 44px))}
+body[data-view=map].has-route .sheet{bottom:156px;max-height:40dvh}
+@media(max-width:759px){body[data-view=map].has-route .sheet{max-height:37dvh}body[data-view=map].has-route .route-tray{width:calc(100vw - 24px);bottom:max(10px,env(safe-area-inset-bottom))}}
