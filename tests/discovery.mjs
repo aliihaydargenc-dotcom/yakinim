@@ -89,7 +89,8 @@ context.discoverySignals = { categoryViews: { cafe: 6 }, placeViews: { c1: 2 }, 
 context.result = vm.runInContext("rankDiscoveryPlaces(bundle, discoverySignals, favorites, fixedNow, 3)", context);
 const cafe = context.result.find(item => item.place.id === "c1");
 assert.equal(cafe.personalized, true);
-assert.match(cafe.reason, /İlgilendiğin|Açık/);
+assert.equal(cafe.reason, "Şu an açık");
+assert.doesNotMatch(cafe.reason, /dk yürüme/);
 
 assert.equal(vm.runInContext('hasUsefulAddress({address:"Adres OpenStreetMap’te belirtilmemiş"})', context), false);
 assert.ok(vm.runInContext('placeDataQualityScore({name:"BİM",category:"market",address:"Cadde 1",openingHours:"24/7",phone:"1"})', context) > 10);

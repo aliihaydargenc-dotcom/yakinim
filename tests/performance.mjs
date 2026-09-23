@@ -27,7 +27,7 @@ assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.doesNotMatch(app, /radiusSelect/);
 assert.match(lib, /PROVIDER_TIMEOUT_MS = 2600/);
 assert.match(lib, /\[timeout:5\]/);
-assert.match(lib, /Yakinim\/2\.7\.3/);
+assert.match(lib, /Yakinim\/2\.11\.1/);
 assert.match(api, /s-maxage=180/);
 assert.match(api, /stale-while-revalidate=900/);
 
