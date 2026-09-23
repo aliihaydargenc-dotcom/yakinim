@@ -41,6 +41,8 @@ for (const name of [
   "personalizationSignalStrength",
   "hasMeaningfulPersonalization",
   "discoveryBrandKey",
+  "discoveryContextBoost",
+  "parseDiscoveryQuery",
   "discoveryScore",
   "discoveryReason",
   "rankDiscoveryPlaces",
@@ -78,12 +80,21 @@ context.bundle = {
   ],
 };
 context.discoverySignals = { categoryViews: {}, placeViews: {}, lastCategory: null, interactions: 0 };
+context.CATEGORY_QUERY_ALIASES = {
+  cafe: ["kafe", "kahve", "coffee"],
+  food: ["yemek", "restoran", "lokanta", "fast food"],
+  market: ["market", "süpermarket", "supermarket"],
+  pharmacy: ["eczane"],
+};
 context.favorites = [];
 context.fixedNow = new Date("2026-09-21T10:00:00");
 context.result = vm.runInContext("rankDiscoveryPlaces(bundle, discoverySignals, favorites, fixedNow, 3)", context);
 assert.equal(context.result.length, 3);
-assert.equal(context.result[0].place.id, "m1", "Open, nearby, data-rich place should outrank a closed nearer place");
+assert.notEqual(context.result[0].place.id, "f1", "A closed place should not win only because it is nearer");
+assert.equal(context.result.some(item => item.place.id === "m1"), true);
+assert.equal(context.result.some(item => item.place.id === "c1"), true);
 assert.ok(new Set(context.result.map(item => item.place.category)).size >= 2, "Recommendations should preserve category diversity");
+assert.ok(context.result.find(item => item.place.id === "c1").contextScore > 0, "Morning context should boost cafe relevance");
 
 context.discoverySignals = { categoryViews: { cafe: 6 }, placeViews: { c1: 2 }, lastCategory: "cafe", interactions: 8 };
 context.result = vm.runInContext("rankDiscoveryPlaces(bundle, discoverySignals, favorites, fixedNow, 3)", context);
@@ -91,6 +102,18 @@ const cafe = context.result.find(item => item.place.id === "c1");
 assert.equal(cafe.personalized, true);
 assert.equal(cafe.reason, "Şu an açık");
 assert.doesNotMatch(cafe.reason, /dk yürüme/);
+
+context.q1 = vm.runInContext('parseDiscoveryQuery("açık market")', context);
+assert.equal(context.q1.categoryId, "market");
+assert.equal(context.q1.openOnly, true);
+context.q2 = vm.runInContext('parseDiscoveryQuery("10 dk içinde kahve")', context);
+assert.equal(context.q2.categoryId, "cafe");
+assert.equal(context.q2.maxWalkMinutes, 10);
+context.q3 = vm.runInContext('parseDiscoveryQuery("en yakın eczane")', context);
+assert.equal(context.q3.categoryId, "pharmacy");
+assert.equal(context.q3.nearestFirst, true);
+context.morning = new Date("2026-09-21T08:00:00");
+assert.ok(vm.runInContext('discoveryContextBoost({category:"cafe"}, morning)', context) > 0);
 
 assert.equal(vm.runInContext('hasUsefulAddress({address:"Adres OpenStreetMap’te belirtilmemiş"})', context), false);
 assert.ok(vm.runInContext('placeDataQualityScore({name:"BİM",category:"market",address:"Cadde 1",openingHours:"24/7",phone:"1"})', context) > 10);
