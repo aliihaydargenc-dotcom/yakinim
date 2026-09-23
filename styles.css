@@ -671,3 +671,12 @@ body[data-view=map].has-route .sheet[data-state=half]{height:min(31dvh,285px)}bo
   .place-cluster{width:38px;height:38px;border-radius:13px}
   .place-cluster strong{font-size:13px}
 }
+
+
+/* v2.8 mobile vector basemap reliability */
+#map{background:#e7ebea}
+#map .maplibregl-canvas{display:block;max-width:none!important;max-height:none!important}
+#map .leaflet-tile.base-map-tile{width:256px!important;height:256px!important;max-width:none!important;max-height:none!important;image-rendering:auto}
+.map-raster .leaflet-tile-container{will-change:auto!important}
+.map-base-loading #map{background:#e7ebea}
+.map-tile-degraded #map:after{content:"Harita altlığı yeniden yükleniyor…";position:absolute;left:50%;top:50%;z-index:350;transform:translate(-50%,-50%);padding:8px 12px;border:1px solid #d9e3df;border-radius:12px;background:#fffffff2;color:#536a61;font-size:11px;font-weight:700;box-shadow:0 5px 18px #173c3220;pointer-events:none}

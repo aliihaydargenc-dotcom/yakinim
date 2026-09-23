@@ -48,6 +48,8 @@ assert.ok(groups.some(group => group.places.length === 2), "Nearly identical POI
 assert.equal(vm.runInContext("markerCollisionDistancePx()", context), 22, "High zoom uses a much tighter cluster radius");
 
 assert.match(app, /map\.createPane\("placeLabels"\)/);
+assert.ok(app.includes("window.maplibregl.supported"));
+assert.ok(!app.includes('!window.matchMedia("(pointer: coarse)").matches'));
 assert.match(app, /pane: "placeLabels"/);
 assert.match(app, /direction: "top"/);
 assert.match(app, /hitsOtherPin/);
