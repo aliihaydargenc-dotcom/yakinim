@@ -26,4 +26,12 @@ const ctx=vm.createContext({URLSearchParams,AbortController,setTimeout,clearTime
 vm.runInContext(app.slice(app.indexOf('async function fetchNearbyPayload(')),ctx);
 await vm.runInContext('fetchNearbyPayload({lat:36.89,lng:30.70},1000)',ctx);
 assert.ok(requested.startsWith('/api/nearby?'));assert.ok(requested.includes('radius=1000'));
+let fallbackUrl;
+const fallbackCtx=vm.createContext({URLSearchParams,AbortController,setTimeout,clearTimeout,console:{warn(){}},statusText:{textContent:''},fetch:async url=>{
+  if (url.startsWith('/api/')) return {ok:false,status:503};
+  fallbackUrl=url;return ok([{id:17}]);
+}});
+vm.runInContext(app.slice(app.indexOf('async function fetchNearbyPayload(')),fallbackCtx);
+assert.equal((await vm.runInContext('fetchNearbyPayload({lat:36.89,lng:30.70},1000)',fallbackCtx)).elements[0].id,17);
+assert.ok(fallbackUrl.includes('/api/interpreter?data='));
 console.log('Network tests PASS: proxy routing, validation, provider failover, incomplete responses, API success.');

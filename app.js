@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.2.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -65,7 +65,11 @@ const map = L.map("map", {
   zoomSnap: 0.5,
 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
+const canUseVectorMap = !window.matchMedia("(pointer: coarse)").matches && (() => {
+  try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
+})();
 try {
+  if (!canUseVectorMap) throw new Error("WebGL unavailable or mobile raster mode");
   L.maplibreGL({ style: MAP_STYLE_URL }).addTo(map);
 } catch (error) {
   console.warn("Vector map unavailable; loading raster map.", error);
@@ -1139,7 +1143,7 @@ function categorySvg(id) {
 
 async function fetchNearbyPayload(location, radius) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
+  const timer = setTimeout(() => controller.abort(), 44000);
   try {
     const params = new URLSearchParams({ lat: location.lat.toFixed(6), lng: location.lng.toFixed(6), radius: String(radius) });
     const response = await fetch(`/api/nearby?${params}`, { signal: controller.signal, cache: "no-store" });
@@ -1147,6 +1151,23 @@ async function fetchNearbyPayload(location, radius) {
     const payload = await response.json();
     if (!Array.isArray(payload.elements)) throw new Error("Invalid nearby response");
     return payload;
+  } catch (error) {
+    console.warn("Nearby proxy unavailable; trying browser source.", error);
+    statusText.textContent = "Başka veri kaynağı deneniyor…";
+    const area = `around:${radius},${location.lat.toFixed(6)},${location.lng.toFixed(6)}`;
+    const query = `[out:json][timeout:12];(nwr(${area})[amenity~"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$"];nwr(${area})[shop~"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$"];nwr(${area})[leisure=park];);out center tags;`;
+    const fallbackController = new AbortController();
+    const fallbackTimer = setTimeout(() => fallbackController.abort(), 15000);
+    try {
+      const url = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
+      const fallback = await fetch(url, { signal: fallbackController.signal });
+      if (!fallback.ok) throw new Error(`Nearby fallback ${fallback.status}`);
+      const payload = await fallback.json();
+      if (!Array.isArray(payload.elements) || payload.remark) throw new Error("Invalid nearby fallback");
+      return payload;
+    } finally {
+      clearTimeout(fallbackTimer);
+    }
   } finally {
     clearTimeout(timer);
   }
