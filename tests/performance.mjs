@@ -20,10 +20,12 @@ assert.match(app, /activeViewportRequest\?\.controller\.abort\(\)/);
 assert.match(app, /if \(signal\?\.aborted\) throw new DOMException/);
 assert.match(app, /mergeBundleIntoSpatialPool/);
 assert.match(app, /bundleFromSpatialPool/);
+assert.match(app, /if \(restored \|\| permissionState === "granted"\)/);
+assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.doesNotMatch(app, /radiusSelect/);
 assert.match(lib, /PROVIDER_TIMEOUT_MS = 2600/);
 assert.match(lib, /\[timeout:5\]/);
-assert.match(lib, /Yakinim\/2\.7\.1/);
+assert.match(lib, /Yakinim\/2\.7\.2/);
 assert.match(api, /s-maxage=180/);
 assert.match(api, /stale-while-revalidate=900/);
 

@@ -1,4 +1,4 @@
-const APP_VERSION = "2.7.1";
+const APP_VERSION = "2.7.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -318,9 +318,11 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
     if (!background) showLocationFailure("Bu tarayıcı konum özelliğini desteklemiyor.");
     return;
   }
+
   const serial = ++locationAttemptSerial;
   manualLocationMode = false;
   document.body.classList.remove("is-selecting-location");
+
   if (!background) {
     locateButton.disabled = true;
     locateButton.classList.add("is-loading");
@@ -328,17 +330,10 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
     statusText.textContent = "Konum aranıyor…";
     if (!activePlaces.length) showState("loading", "Konum hızlıca belirleniyor…");
   }
-  const permissionState = await getGeolocationPermissionState();
-  if (serial !== locationAttemptSerial) return;
-  if (permissionState === "denied") {
-    if (!background) {
-      locateButton.disabled = false;
-      locateButton.classList.remove("is-loading");
-      showLocationFailure("Konum izni kapalı. Tarayıcı iznini açabilir veya haritadan konum seçebilirsin.");
-    }
-    return;
-  }
 
+  // Do not gate geolocation behind Permissions API.
+  // Safari/iOS can report "prompt" (or stale permission state) even when
+  // getCurrentPosition is allowed. The geolocation call is authoritative.
   const fastPromise = settlePosition("fast", {
     enableHighAccuracy: false,
     timeout: FAST_LOCATION_TIMEOUT,
@@ -370,9 +365,22 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
 
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
-  if (!background && !userLocation) showLocationFailure(locationErrorMessage(second.error || first.error));
-  else if (userLocation) statusText.textContent = "Son bilinen konum kullanılıyor.";
+  const error = chooseLocationError(first.error, second.error);
+  if (!background && !userLocation) showLocationFailure(locationErrorMessage(error));
+  else if (userLocation) statusText.textContent = error?.code === 1
+    ? "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı."
+    : "Son bilinen konum kullanılıyor.";
 }
+
+function chooseLocationError(firstError, secondError) {
+  // Permission denial is the most actionable result. Otherwise prefer the
+  // latest concrete browser error over a generic timeout.
+  if (firstError?.code === 1) return firstError;
+  if (secondError?.code === 1) return secondError;
+  if (secondError) return secondError;
+  return firstError;
+}
+
 
 function getCurrentPosition(options) {
   return new Promise((resolve, reject) => {
@@ -385,13 +393,12 @@ async function settlePosition(kind, options) {
 }
 
 async function getGeolocationPermissionState() {
-  if (!navigator.permissions?.query) return "prompt";
-
+  if (!navigator.permissions?.query) return "unknown";
   try {
     const permission = await navigator.permissions.query({ name: "geolocation" });
-    return permission.state;
+    return permission.state || "unknown";
   } catch {
-    return "prompt";
+    return "unknown";
   }
 }
 
@@ -460,10 +467,10 @@ function showLocationFailure(message) {
 }
 
 function locationErrorMessage(error) {
-  if (error?.code === 1) return "Konum izni verilmedi.";
-  if (error?.code === 2) return "Telefon şu an GPS konumu üretemedi.";
-  if (error?.code === 3) return "GPS yanıtı zaman aşımına uğradı.";
-  return "Konum alınamadı.";
+  if (error?.code === 1) return "Konum izni verilmedi. iPhone ayarlarında bu tarayıcı için Konum erişimini açıp tekrar deneyebilirsin.";
+  if (error?.code === 2) return "Telefon şu an konum üretemedi. Konum Servisleri açıkken yeniden dene.";
+  if (error?.code === 3) return "Konum yanıtı zaman aşımına uğradı. Yeniden deneyebilir veya haritadan konum seçebilirsin.";
+  return "Konum alınamadı. Yeniden deneyebilir veya haritadan konum seçebilirsin.";
 }
 
 function enableManualLocationMode() {
@@ -574,8 +581,15 @@ function restoreLastLocation() {
 
 async function bootstrapLocationDiscovery() {
   const restored = restoreLastLocation();
+  if (!navigator.geolocation) return;
+
   const permissionState = await getGeolocationPermissionState();
-  if (permissionState === "granted") {
+
+  // Permissions API is advisory only. If this device already has a recent
+  // saved location, refresh it in the background even when Safari reports
+  // "prompt". On first visit, avoid forcing a permission prompt until the
+  // user taps the location action unless the browser explicitly says granted.
+  if (restored || permissionState === "granted") {
     locateUser({ forceFresh: false, background: restored });
   }
 }
