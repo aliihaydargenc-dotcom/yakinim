@@ -69,8 +69,10 @@ assert.match(app, /mobileViewport \? 10 : 22/);
 assert.match(styles, /has-location\[data-view=map\] \.map-context\{display:none!important\}/);
 assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);
 assert.match(app, /· en yakın/);
-assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
+assert.match(app, /if \(isMobileLayout\) \{[\s\S]*loadNowDashboard\(\)/);
+assert.match(app, /yakinimView: isMobileLayout \? "section-now" : "list"/);
+assert.match(styles, /v3\.3 mobile app shell \+ Now home/);
 assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail", yakinimSection: "nearby" \}/);
 assert.doesNotMatch(app, /pointer: coarse\), \(prefers-reduced-motion/);
 
-console.log("Mobile discovery tests PASS: collision clustering, separate label pane, map-first navigation and touch motion.");
+console.log("Mobile discovery tests PASS: collision clustering, separate label pane, Now-home mobile navigation and touch motion.");

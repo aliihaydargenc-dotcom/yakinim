@@ -1,4 +1,4 @@
-const APP_VERSION = "3.2.2";
+const APP_VERSION = "3.3.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -103,7 +103,7 @@ let detailTrigger = null;
 let quickCardReturnSheetState = "peek";
 let quickCardReturnHistoryState = "map-peek";
 let lastDiscoveryInteraction = { placeId: null, at: 0 };
-let appSection = "nearby";
+let appSection = "now";
 let activeNewsCategory = "gundem";
 let activeRadioScope = "turkiye";
 let activeRadioLibrary = "discover";
@@ -304,6 +304,15 @@ const quickDetails = document.querySelector("#quickDetails");
 const quickShare = document.querySelector("#quickShare");
 const quickClose = document.querySelector("#quickClose");
 const sectionNav = document.querySelector("#sectionNav");
+const nowSection = document.querySelector("#nowSection");
+const nowContext = document.querySelector("#nowContext");
+const nowNearbyStat = document.querySelector("#nowNearbyStat");
+const nowSavedStat = document.querySelector("#nowSavedStat");
+const nowRouteStat = document.querySelector("#nowRouteStat");
+const nowNearbyList = document.querySelector("#nowNearbyList");
+const nowNewsList = document.querySelector("#nowNewsList");
+const nowRadioList = document.querySelector("#nowRadioList");
+const nowQuickActions = document.querySelector("#nowQuickActions");
 const sectionTransition = document.querySelector("#sectionTransition");
 const sectionTransitionLabel = document.querySelector("#sectionTransitionLabel");
 const newsSection = document.querySelector("#newsSection");
@@ -389,6 +398,8 @@ quickDetails?.addEventListener("click", () => {
   openPlaceDetails(place, trigger);
 });
 sectionNav?.querySelectorAll("[data-section]").forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
+nowSection?.querySelectorAll("[data-now-section]").forEach(button => button.addEventListener("click", () => setSection(button.dataset.nowSection)));
+nowQuickActions?.querySelectorAll("[data-now-category]").forEach(button => button.addEventListener("click", () => openNowCategory(button.dataset.nowCategory)));
 newsSection?.querySelectorAll("[data-news-category]").forEach(button => button.addEventListener("click", () => loadNews(button.dataset.newsCategory)));
 radioLibraryTabs?.querySelectorAll("[data-radio-library]").forEach(button => button.addEventListener("click", () => selectRadioLibrary(button.dataset.radioLibrary)));
 radioSearch?.addEventListener("input", event => {
@@ -451,7 +462,11 @@ document.addEventListener("keydown", event => {
   if (!mapQuickCard?.hidden) dismissMapQuickCard();
   else closePlaceDetails();
 });
-history.replaceState({ ...history.state, yakinimView: "list", yakinimSection: "nearby" }, "", location.href);
+history.replaceState({
+  ...history.state,
+  yakinimView: isMobileLayout ? "section-now" : "list",
+  yakinimSection: isMobileLayout ? "now" : "nearby",
+}, "", location.href);
 window.addEventListener("popstate", event => {
   const stateSection = event.state?.yakinimSection || "nearby";
   if (stateSection !== appSection) setSection(stateSection, { pushHistory: false });
@@ -480,7 +495,16 @@ window.addEventListener("popstate", event => {
   requestAnimationFrame(() => map.invalidateSize());
 });
 renderRoute();
-setView(isMobileLayout ? "map" : "list", isMobileLayout ? "peek" : "expanded");
+if (isMobileLayout) {
+  document.body.dataset.view = "list";
+  nowSection.hidden = false;
+  newsSection.hidden = true;
+  radioSection.hidden = true;
+  loadNowDashboard();
+} else {
+  setSection("nearby", { pushHistory: false });
+  setView("list", "expanded");
+}
 bootstrapLocationDiscovery();
 window.addEventListener("resize", syncMapControlOffset);
 syncMapControlOffset();
@@ -488,7 +512,12 @@ function showSectionTransition(section) {
   if (!sectionTransition) return;
   clearTimeout(sectionTransitionTimer);
   sectionTransitionStartedAt = Date.now();
-  const labels = { nearby: "Yakınım açılıyor…", news: "Haberler yükleniyor…", radio: "Radyo hazırlanıyor…" };
+  const labels = {
+    now: "Şimdi hazırlanıyor…",
+    nearby: "Yakınım açılıyor…",
+    news: "Haberler yükleniyor…",
+    radio: "Radyo hazırlanıyor…",
+  };
   if (sectionTransitionLabel) sectionTransitionLabel.textContent = labels[section] || "Yükleniyor…";
   sectionTransition.hidden = false;
   document.body.classList.add("section-transitioning");
@@ -505,10 +534,215 @@ function hideSectionTransition(minVisible = 220) {
   }, remaining);
 }
 
+function nowPlaceCandidates() {
+  const candidates = [];
+  if (lastDiscoveryBundle) {
+    Object.values(lastDiscoveryBundle).forEach(rows => {
+      if (Array.isArray(rows)) candidates.push(...rows);
+    });
+  }
+  candidates.push(...activePlaces);
+  const unique = new Map();
+  for (const place of candidates) {
+    if (!place?.id || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) continue;
+    const distanceKm = userLocation
+      ? distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng)
+      : place.distanceKm;
+    const next = { ...place, distanceKm };
+    const previous = unique.get(place.id);
+    if (!previous || (next.distanceKm ?? Infinity) < (previous.distanceKm ?? Infinity)) unique.set(place.id, next);
+  }
+  return [...unique.values()].sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+}
+
+function renderNowNearby() {
+  if (!nowNearbyList) return;
+  const places = nowPlaceCandidates();
+  if (nowNearbyStat) nowNearbyStat.textContent = userLocation ? String(Math.min(places.length, 99)) + (places.length > 99 ? "+" : "") : "—";
+  if (nowSavedStat) nowSavedStat.textContent = String(favorites.length);
+  if (nowRouteStat) nowRouteStat.textContent = String(routeStops.length);
+
+  if (nowContext) {
+    nowContext.textContent = userLocation
+      ? (places.length ? `${places.length} yakın nokta hazır. İhtiyacını seç veya haritaya geç.` : "Konumun hazır; çevredeki yerler yükleniyor.")
+      : "Konumunu aç; yakındaki yerler, gündem ve canlı radyo tek ekranda toplansın.";
+  }
+
+  nowNearbyList.replaceChildren();
+  if (!userLocation) {
+    const empty = document.createElement("button");
+    empty.type = "button";
+    empty.className = "now-empty-action";
+    empty.innerHTML = '<span aria-hidden="true">◎</span><span><strong>Çevreni aç</strong><small>Yakındaki yerleri görmek için konumunu kullan</small></span><b aria-hidden="true">↗</b>';
+    empty.addEventListener("click", () => locateUser({ forceFresh: false }));
+    nowNearbyList.append(empty);
+    return;
+  }
+
+  if (!places.length) {
+    nowNearbyList.innerHTML = '<div class="now-inline-loading"><span class="module-spinner" aria-hidden="true"></span><span>Yakındaki yerler hazırlanıyor…</span></div>';
+    return;
+  }
+
+  places.slice(0, 3).forEach(place => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "now-place-card";
+    button.dataset.category = place.category || "all";
+    const icon = document.createElement("span");
+    icon.className = "now-place-icon";
+    icon.innerHTML = categorySvg(place.category || "all");
+    const copy = document.createElement("span");
+    copy.className = "now-place-copy";
+    const name = document.createElement("strong");
+    name.textContent = place.name;
+    const category = categories.find(item => item.id === place.category)?.label || "Yer";
+    const meta = document.createElement("small");
+    meta.textContent = [category, Number.isFinite(place.distanceKm) ? formatDistance(place.distanceKm) : "", Number.isFinite(place.distanceKm) ? formatWalkingTime(place.distanceKm) : ""].filter(Boolean).join(" · ");
+    copy.append(name, meta);
+    const arrow = document.createElement("b");
+    arrow.textContent = "›";
+    arrow.setAttribute("aria-hidden", "true");
+    button.append(icon, copy, arrow);
+    button.addEventListener("click", () => {
+      setSection("nearby");
+      requestAnimationFrame(() => {
+        setView("map", "peek");
+        setTimeout(() => focusPlace(place), MOTION.fast);
+      });
+    });
+    nowNearbyList.append(button);
+  });
+}
+
+function renderNowNewsPreview(payload) {
+  if (!nowNewsList) return;
+  const items = Array.isArray(payload?.items) ? payload.items.slice(0, 3) : [];
+  nowNewsList.replaceChildren();
+  if (!items.length) {
+    nowNewsList.innerHTML = '<div class="now-inline-loading"><span class="module-spinner" aria-hidden="true"></span><span>Başlıklar hazırlanıyor…</span></div>';
+    return;
+  }
+  items.forEach(item => {
+    const link = document.createElement("a");
+    link.className = "now-news-item";
+    link.href = item.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const source = document.createElement("span");
+    source.textContent = item.source || "Haber";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const time = document.createElement("small");
+    time.textContent = formatRelativeTime(item.publishedAt);
+    link.append(source, title, time);
+    nowNewsList.append(link);
+  });
+}
+
+function renderNowRadioPreview(payload) {
+  if (!nowRadioList) return;
+  let stations = Array.isArray(payload?.stations) ? payload.stations.slice(0, 4) : [];
+  if (currentRadioStation) {
+    const current = stations.find(station => station.id === currentRadioStation.id) || currentRadioStation;
+    stations = [current, ...stations.filter(station => station.id !== current.id)].slice(0, 4);
+  }
+  nowRadioList.replaceChildren();
+  if (!stations.length) {
+    nowRadioList.innerHTML = '<div class="now-inline-loading"><span class="module-spinner" aria-hidden="true"></span><span>Canlı radyolar hazırlanıyor…</span></div>';
+    return;
+  }
+
+  stations.slice(0, 3).forEach(station => {
+    const row = document.createElement("div");
+    row.className = "now-radio-item";
+    row.classList.toggle("is-playing", currentRadioStation?.id === station.id && !radioAudio.paused);
+    const avatar = createRadioAvatar(station, "now-radio-avatar");
+    const copy = document.createElement("span");
+    copy.className = "now-radio-copy";
+    const name = document.createElement("strong");
+    name.textContent = station.name;
+    const meta = document.createElement("small");
+    meta.textContent = station.measuredRank ? `#${station.measuredRank} RİAK · Canlı` : "Canlı yayın";
+    copy.append(name, meta);
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "now-radio-play";
+    const playing = currentRadioStation?.id === station.id && !radioAudio.paused;
+    play.textContent = playing ? "Ⅱ" : "▶";
+    play.setAttribute("aria-label", playing ? `${station.name} yayınını duraklat` : `${station.name} yayınını dinle`);
+    play.addEventListener("click", () => playRadioStation(station));
+    row.append(avatar, copy, play);
+    nowRadioList.append(row);
+  });
+}
+
+async function ensureNowNews() {
+  const cached = newsClientCache.get("gundem");
+  if (cached) {
+    renderNowNewsPreview(cached);
+    return cached;
+  }
+  try {
+    const response = await fetch(`/api/news?category=gundem&v=${encodeURIComponent(APP_VERSION)}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("news_" + response.status);
+    const payload = await response.json();
+    newsClientCache.set("gundem", payload);
+    renderNowNewsPreview(payload);
+    return payload;
+  } catch {
+    if (nowNewsList) nowNewsList.innerHTML = '<button class="now-retry" type="button">Haberleri yeniden dene</button>';
+    nowNewsList?.querySelector("button")?.addEventListener("click", () => ensureNowNews());
+    return null;
+  }
+}
+
+async function ensureNowRadio() {
+  const cached = radioClientCache.get("turkiye");
+  if (cached) {
+    renderNowRadioPreview(cached);
+    return cached;
+  }
+  try {
+    const response = await fetch(`/api/radio?scope=turkiye&v=${encodeURIComponent(APP_VERSION)}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("radio_" + response.status);
+    const payload = await response.json();
+    radioClientCache.set("turkiye", payload);
+    renderNowRadioPreview(payload);
+    return payload;
+  } catch {
+    if (nowRadioList) nowRadioList.innerHTML = '<button class="now-retry" type="button">Radyoları yeniden dene</button>';
+    nowRadioList?.querySelector("button")?.addEventListener("click", () => ensureNowRadio());
+    return null;
+  }
+}
+
+function loadNowDashboard() {
+  renderNowNearby();
+  renderNowNewsPreview(newsClientCache.get("gundem"));
+  renderNowRadioPreview(radioClientCache.get("turkiye"));
+  ensureNowNews();
+  ensureNowRadio();
+  hideSectionTransition(240);
+}
+
+function openNowCategory(categoryId) {
+  const category = categories.find(item => item.id === categoryId);
+  if (!category) return;
+  setSection("nearby");
+  selectCategory(category);
+  requestAnimationFrame(() => {
+    if (isMobileLayout) setView("map", "peek");
+  });
+}
+
 function setSection(section, { pushHistory = true } = {}) {
-  const next = ["nearby", "news", "radio"].includes(section) ? section : "nearby";
+  const next = ["now", "nearby", "news", "radio"].includes(section) ? section : "now";
   if (next === appSection) {
-    if (next === "nearby") animateIn(sheet);
+    if (next === "now") {
+      animateIn(nowSection);
+      loadNowDashboard();
+    } else if (next === "nearby") animateIn(sheet);
     else animateIn(next === "news" ? newsSection : radioSection);
     return;
   }
@@ -532,6 +766,7 @@ function setSection(section, { pushHistory = true } = {}) {
     document.body.classList.remove("radio-player-expanded");
   }
 
+  nowSection.hidden = next !== "now";
   newsSection.hidden = next !== "news";
   radioSection.hidden = next !== "radio";
 
@@ -543,7 +778,10 @@ function setSection(section, { pushHistory = true } = {}) {
   }
 
   window.scrollTo(0, 0);
-  if (next === "news") {
+  if (next === "now") {
+    animateIn(nowSection);
+    loadNowDashboard();
+  } else if (next === "news") {
     animateIn(newsSection);
     loadNews(activeNewsCategory);
   } else if (next === "radio") {
@@ -611,6 +849,8 @@ function renderNews(payload) {
     article.append(link);
     newsList.append(article);
   });
+
+  if (appSection === "now" || nowSection) renderNowNewsPreview(payload);
 }
 
 function formatRelativeTime(value, now = Date.now()) {
@@ -1204,6 +1444,8 @@ function renderRadioStations(payload) {
     card.append(avatar, copy, actions);
     radioList.append(card);
   });
+
+  if (appSection === "now" || nowSection) renderNowRadioPreview(payload);
 }
 
 async function playRadioStation(station) {
@@ -1250,6 +1492,8 @@ function syncRadioPlayerState() {
     try { navigator.mediaSession.playbackState = paused ? "paused" : "playing"; } catch {}
   }
   if (appSection === "radio") renderRadioStations(currentRadioPayload());
+
+  if (nowSection) renderNowRadioPreview(currentRadioPayload());
 }
 
 function closeRadioPlayer() {
@@ -2703,6 +2947,8 @@ function renderPlaces(places, category) {
     else if (!mapQuickCard?.hidden) dismissMapQuickCard();
     else closePlaceDetails(false);
   }
+
+  if (nowSection) renderNowNearby();
 }
 
 function createResultCard(place, icon, isNearest = false, index = 0) {
@@ -3360,9 +3606,10 @@ function syncMapControlOffset() {
     if (document.body.dataset.view !== "map") return;
     const surface = !mapQuickCard?.hidden ? mapQuickCard : sheet;
     const fallbackHeight = !mapQuickCard?.hidden ? 188 : 82;
-    const height = surface?.getBoundingClientRect?.().height || fallbackHeight;
-    const safeHeight = Math.min(Math.round(window.innerHeight * 0.74), Math.max(fallbackHeight, Math.round(height)));
-    document.body.style.setProperty("--map-sheet-offset", `${safeHeight}px`);
+    const rect = surface?.getBoundingClientRect?.();
+    const measuredOffset = rect && Number.isFinite(rect.top) ? Math.max(fallbackHeight, Math.round(window.innerHeight - rect.top)) : fallbackHeight;
+    const safeOffset = Math.min(Math.round(window.innerHeight * 0.82), measuredOffset);
+    document.body.style.setProperty("--map-sheet-offset", `${safeOffset}px`);
   });
 }
 

@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.2\.2"/);
+assert.match(app, /APP_VERSION = "3\.3\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -71,6 +71,11 @@ assert.match(app, /addEventListener\("stalled"/);
 assert.match(app, /reportRadioFailure/);
 assert.match(app, /showSectionTransition/);
 assert.match(app, /hideSectionTransition/);
+assert.match(app, /loadNowDashboard/);
+assert.match(app, /renderNowNearby/);
+assert.match(app, /renderNowNewsPreview/);
+assert.match(app, /renderNowRadioPreview/);
+assert.match(app, /openNowCategory/);
 assert.match(app, /resultCountLabel/);
 assert.match(app, /heading\.textContent = "Öne çıkanlar"/);
 assert.match(app, /supportsVectorBaseMap/);
@@ -93,7 +98,7 @@ assert.match(index, /id="quickShare"/);
 assert.match(index, /Öne çıkanlar/);
 assert.doesNotMatch(index, /data-radio-scope=/);
 assert.doesNotMatch(index, /rel="preload" href="https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js"/);
-for (const id of ["sectionNav","sectionTransition","sectionTransitionLabel","newsSection","newsList","radioSection","radioList","radioPlayer","radioSearch","radioLibraryTabs","radioPlayerAvatar","radioPlayerFavorite","radioPlayerShare","radioPlayerExpand","radioPrev","radioNext","radioVolume"]) assert.match(index, new RegExp(`id="${id}"`));
+for (const id of ["sectionNav","nowSection","nowContext","nowNearbyStat","nowSavedStat","nowRouteStat","nowNearbyList","nowNewsList","nowRadioList","nowQuickActions","sectionTransition","sectionTransitionLabel","newsSection","newsList","radioSection","radioList","radioPlayer","radioSearch","radioLibraryTabs","radioPlayerAvatar","radioPlayerFavorite","radioPlayerShare","radioPlayerExpand","radioPrev","radioNext","radioVolume"]) assert.match(index, new RegExp(`id="${id}"`));
 assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
 assert.match(styles, /v2\.8 mobile vector basemap reliability/);
@@ -109,6 +114,10 @@ assert.match(styles, /v3\.1\.1 radio mobile semantics \+ compact player/);
 assert.match(styles, /v3\.1\.2 radio single discovery feed/);
 assert.match(styles, /v3\.2 resilient media \+ multi-source news \+ section transitions/);
 assert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);
+assert.match(styles, /v3\.3 mobile app shell \+ Now home/);
+assert.match(index, /data-section="now"/);
+assert.match(index, />Şimdi<\/b>/);
+assert.match(styles, /position:fixed!important;[\s\S]*bottom:max\(8px,env\(safe-area-inset-bottom\)\)!important/);
 assert.match(index, /class="radio-player-actions"/);
 assert.match(styles, /grid-template-columns:48px minmax\(96px,1fr\) auto!important/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools\{display:grid!important/);
@@ -123,7 +132,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v44/);
+assert.match(sw, /yakinimda-shell-v45/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

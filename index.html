@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.2.2" as="script" />
+    <link rel="preload" href="./app.js?v=3.3.0" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,9 +28,9 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.2.2" />
+    <link rel="stylesheet" href="./styles.css?v=3.3.0" />
   </head>
-  <body data-view="list" data-section="nearby">
+  <body data-view="list" data-section="now">
     <main class="app-shell">
       <div id="map" aria-label="Yakındaki yerler haritası"></div>
       <button id="mapContext" class="map-context" type="button" aria-label="Harita keşif panelini aç">
@@ -87,9 +87,10 @@
       </header>
 
       <nav id="sectionNav" class="section-nav" aria-label="Uygulama bölümleri">
-        <button type="button" data-section="nearby" aria-pressed="true"><span aria-hidden="true">⌖</span> Yakınım</button>
-        <button type="button" data-section="news" aria-pressed="false"><span aria-hidden="true">▤</span> Haber</button>
-        <button type="button" data-section="radio" aria-pressed="false"><span aria-hidden="true">◉</span> Radyo</button>
+        <button type="button" data-section="now" aria-pressed="true"><span aria-hidden="true">✦</span><b>Şimdi</b></button>
+        <button type="button" data-section="nearby" aria-pressed="false"><span aria-hidden="true">⌖</span><b>Yakınım</b></button>
+        <button type="button" data-section="news" aria-pressed="false"><span aria-hidden="true">▤</span><b>Haber</b></button>
+        <button type="button" data-section="radio" aria-pressed="false"><span aria-hidden="true">◉</span><b>Radyo</b></button>
       </nav>
       <div id="sectionTransition" class="section-transition" role="status" aria-live="polite" hidden>
         <div class="section-transition-card">
@@ -97,6 +98,54 @@
           <strong id="sectionTransitionLabel">Yükleniyor…</strong>
         </div>
       </div>
+
+      <section id="nowSection" class="module-panel now-section" aria-labelledby="nowHeading">
+        <div class="now-hero">
+          <div class="now-hero-copy">
+            <p class="eyebrow">ŞİMDİ</p>
+            <h2 id="nowHeading">Bugün yakınında</h2>
+            <p id="nowContext">Çevren, gündem ve canlı radyo tek ekranda hazırlanıyor.</p>
+          </div>
+          <div class="now-stats" aria-label="Hızlı özet">
+            <span><strong id="nowNearbyStat">—</strong><small>yakın yer</small></span>
+            <span><strong id="nowSavedStat">0</strong><small>kayıtlı</small></span>
+            <span><strong id="nowRouteStat">0</strong><small>rotada</small></span>
+          </div>
+        </div>
+
+        <div id="nowQuickActions" class="now-quick-grid" aria-label="Hızlı ihtiyaçlar">
+          <button type="button" data-now-category="market"><span aria-hidden="true">▱</span><strong>Market</strong><small>En yakını bul</small></button>
+          <button type="button" data-now-category="cafe"><span aria-hidden="true">☕</span><strong>Kafe</strong><small>Yakında otur</small></button>
+          <button type="button" data-now-category="duty"><span aria-hidden="true">+</span><strong>Nöbetçi</strong><small>Eczaneyi aç</small></button>
+          <button type="button" data-now-category="atm"><span aria-hidden="true">₺</span><strong>ATM</strong><small>Hızlıca bul</small></button>
+        </div>
+
+        <section class="now-block now-nearby-block" aria-labelledby="nowNearbyHeading">
+          <div class="now-block-head">
+            <div><p>ÇEVREN</p><h3 id="nowNearbyHeading">Hemen yakınında</h3></div>
+            <button type="button" data-now-section="nearby">Haritayı aç <span aria-hidden="true">↗</span></button>
+          </div>
+          <div id="nowNearbyList" class="now-nearby-list"></div>
+        </section>
+
+        <div class="now-content-grid">
+          <section class="now-block now-news-block" aria-labelledby="nowNewsHeading">
+            <div class="now-block-head">
+              <div><p>GÜNDEM</p><h3 id="nowNewsHeading">Son başlıklar</h3></div>
+              <button type="button" data-now-section="news">Tümü</button>
+            </div>
+            <div id="nowNewsList" class="now-news-list"></div>
+          </section>
+
+          <section class="now-block now-radio-block" aria-labelledby="nowRadioHeading">
+            <div class="now-block-head">
+              <div><p>CANLI</p><h3 id="nowRadioHeading">Radyoda şimdi</h3></div>
+              <button type="button" data-now-section="radio">Radyolar</button>
+            </div>
+            <div id="nowRadioList" class="now-radio-list"></div>
+          </section>
+        </div>
+      </section>
 
       <section class="sheet" aria-label="Yakındaki yerler">
         <div class="explore-heading"><p class="eyebrow">YAKININDAKİ İHTİYAÇLAR</p><h2>Bugün nereye uğrayacaksın?</h2></div>
@@ -259,6 +308,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.2.2" defer></script>
+    <script src="./app.js?v=3.3.0" defer></script>
   </body>
 </html>
