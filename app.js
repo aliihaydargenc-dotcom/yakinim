@@ -1,4 +1,4 @@
-const APP_VERSION = "2.7.3";
+const APP_VERSION = "2.8.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -109,27 +109,114 @@ const placeLabelPane = map.getPane("placeLabels");
 placeLabelPane.style.zIndex = "690";
 placeLabelPane.style.pointerEvents = "none";
 
-const canUseVectorMap = !window.matchMedia("(pointer: coarse)").matches && (() => {
-  try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
-})();
-try {
-  if (!canUseVectorMap) throw new Error("WebGL unavailable or mobile raster mode");
-  L.maplibreGL({ style: MAP_STYLE_URL }).addTo(map);
-} catch (error) {
-  console.warn("Vector map unavailable; loading raster map.", error);
+let baseMapLayer = null;
+let baseMapMode = "loading";
+let vectorLoadTimer = 0;
+let rasterTileErrorCount = 0;
+
+initializeBaseMap();
+
+function supportsVectorBaseMap() {
+  try {
+    if (!window.maplibregl || typeof L.maplibreGL !== "function") return false;
+    if (typeof window.maplibregl.supported === "function") return window.maplibregl.supported();
+    return Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+}
+
+function initializeBaseMap() {
+  if (supportsVectorBaseMap()) {
+    try {
+      const vectorLayer = L.maplibreGL({ style: MAP_STYLE_URL });
+      vectorLayer.addTo(map);
+      baseMapLayer = vectorLayer;
+      baseMapMode = "vector";
+      document.body.classList.add("map-vector");
+      document.body.classList.remove("map-raster", "map-tile-degraded");
+
+      const glMap = vectorLayer.getMaplibreMap?.();
+      if (glMap) {
+        let loaded = Boolean(glMap.loaded?.());
+        const confirmLoaded = () => {
+          loaded = true;
+          clearTimeout(vectorLoadTimer);
+          document.body.classList.remove("map-base-loading");
+          map.invalidateSize({ pan: false });
+        };
+        glMap.on?.("load", confirmLoaded);
+        glMap.on?.("error", event => console.warn("Vector map resource error", event?.error || event));
+        if (!loaded) {
+          document.body.classList.add("map-base-loading");
+          vectorLoadTimer = setTimeout(() => {
+            if (loaded || glMap.loaded?.()) return confirmLoaded();
+            switchToRasterBaseMap("Vector map load timeout");
+          }, 12000);
+        } else {
+          confirmLoaded();
+        }
+      }
+      return;
+    } catch (error) {
+      console.warn("Vector map unavailable; loading raster fallback.", error);
+    }
+  }
+  switchToRasterBaseMap("WebGL/MapLibre unavailable");
+}
+
+function switchToRasterBaseMap(reason = "") {
+  clearTimeout(vectorLoadTimer);
+  if (baseMapLayer && map.hasLayer(baseMapLayer)) {
+    try { map.removeLayer(baseMapLayer); } catch {}
+  }
+
+  baseMapMode = "raster";
+  document.body.classList.remove("map-vector", "map-base-loading");
   document.body.classList.add("map-raster");
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  console.warn("Raster map fallback active.", reason);
+
+  const rasterLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "© OpenStreetMap contributors",
-  }).addTo(map);
+    crossOrigin: true,
+    updateWhenZooming: false,
+    updateWhenIdle: true,
+    keepBuffer: 4,
+    detectRetina: false,
+    className: "base-map-tile",
+  });
+
+  rasterLayer.on("tileerror", () => {
+    rasterTileErrorCount += 1;
+    if (rasterTileErrorCount >= 4) document.body.classList.add("map-tile-degraded");
+  });
+  rasterLayer.on("load", () => {
+    rasterTileErrorCount = 0;
+    document.body.classList.remove("map-tile-degraded");
+    map.invalidateSize({ pan: false });
+  });
+
+  rasterLayer.addTo(map);
+  baseMapLayer = rasterLayer;
   L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
-  document.addEventListener("DOMContentLoaded", () => {
+  setMapAttributionForMode("raster");
+}
+
+function setMapAttributionForMode(mode) {
+  const apply = () => {
     const attribution = document.querySelector(".osm-attribution");
-    if (attribution) {
+    if (!attribution) return;
+    if (mode === "raster") {
       attribution.href = "https://www.openstreetmap.org/copyright";
       attribution.textContent = "Harita: © OpenStreetMap contributors";
+      return;
     }
-  });
+    attribution.href = "https://openfreemap.org/";
+    attribution.textContent = "Harita: OpenFreeMap · OpenMapTiles · © OpenStreetMap";
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", apply, { once: true });
+  else apply();
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
