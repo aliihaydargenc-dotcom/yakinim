@@ -1,4 +1,4 @@
-const APP_VERSION = "3.1.1";
+const APP_VERSION = "3.1.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -9,7 +9,7 @@ const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
 const DISCOVERY_CARD_LIMIT = 4;
 const DISCOVERY_PERSONALIZATION_THRESHOLD = 5;
 const NEWS_CATEGORIES = ["gundem", "turkiye", "dunya", "ekonomi", "teknoloji", "yasam"];
-const RADIO_SCOPES = ["antalya", "turkiye", "pop", "rock"];
+const RADIO_SCOPES = ["turkiye"];
 const RADIO_FAVORITES_KEY = "yakinimda:radio-favorites:v1";
 const RADIO_RECENTS_KEY = "yakinimda:radio-recents:v1";
 const RADIO_VOLUME_KEY = "yakinimda:radio-volume:v1";
@@ -105,7 +105,7 @@ let quickCardReturnHistoryState = "map-peek";
 let lastDiscoveryInteraction = { placeId: null, at: 0 };
 let appSection = "nearby";
 let activeNewsCategory = "gundem";
-let activeRadioScope = "antalya";
+let activeRadioScope = "turkiye";
 let activeRadioLibrary = "discover";
 let radioSearchTerm = "";
 let currentRadioStation = null;
@@ -381,11 +381,6 @@ quickDetails?.addEventListener("click", () => {
 });
 sectionNav?.querySelectorAll("[data-section]").forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
 newsSection?.querySelectorAll("[data-news-category]").forEach(button => button.addEventListener("click", () => loadNews(button.dataset.newsCategory)));
-radioSection?.querySelectorAll("[data-radio-scope]").forEach(button => button.addEventListener("click", () => {
-  activeRadioLibrary = "discover";
-  syncRadioLibraryTabs();
-  loadRadio(button.dataset.radioScope);
-}));
 radioLibraryTabs?.querySelectorAll("[data-radio-library]").forEach(button => button.addEventListener("click", () => selectRadioLibrary(button.dataset.radioLibrary)));
 radioSearch?.addEventListener("input", event => {
   radioSearchTerm = normalizeSearchValue(event.target.value);
@@ -641,7 +636,6 @@ function radioStationForStorage(station) {
     state: station.state || "",
     countryCode: station.countryCode || "TR",
     language: station.language || "",
-    scopeSource: station.scopeSource || "",
     clickcount: Number(station.clickcount) || 0,
     votes: Number(station.votes) || 0,
   };
@@ -719,7 +713,7 @@ function radioStationsForView(payload) {
   return [...unique.values()];
 }
 
-function updateRadioStatus(stations, payload = currentRadioPayload()) {
+function updateRadioStatus(stations) {
   const count = stations.length;
   if (radioSearchTerm) {
     radioStatus.textContent = count ? `${count} eşleşme` : "Aramana uyan istasyon bulunamadı.";
@@ -733,26 +727,7 @@ function updateRadioStatus(stations, payload = currentRadioPayload()) {
     radioStatus.textContent = count ? `${count} son dinlenen istasyon` : "Henüz bir istasyon dinlemedin.";
     return;
   }
-
-  if (activeRadioScope === "antalya") {
-    const localCount = Number(payload?.localCount) || 0;
-    const fallbackCount = Number(payload?.fallbackCount) || 0;
-    if (localCount && fallbackCount) {
-      radioStatus.textContent = `${localCount} Antalya · ${fallbackCount} Türkiye önerisi`;
-      return;
-    }
-    if (localCount) {
-      radioStatus.textContent = `${localCount} Antalya istasyonu`;
-      return;
-    }
-    if (fallbackCount) {
-      radioStatus.textContent = `Antalya için doğrulanmış yayın yok · ${fallbackCount} Türkiye önerisi`;
-      return;
-    }
-  }
-
-  const scopeLabel = activeRadioScope === "turkiye" ? "Türkiye" : titleCaseRadioText(activeRadioScope);
-  radioStatus.textContent = count ? `${count} istasyon · ${scopeLabel}` : "Uygun yayın bulunamadı.";
+  radioStatus.textContent = count ? `${count} istasyon` : "Uygun yayın bulunamadı.";
 }
 
 function syncRadioPlayerExpanded() {
@@ -854,41 +829,36 @@ function updateRadioMediaSession(station) {
   } catch {}
 }
 
-async function loadRadio(scope = activeRadioScope, { force = false } = {}) {
-  if (!RADIO_SCOPES.includes(scope)) scope = "antalya";
-  activeRadioScope = scope;
-  radioSection?.querySelectorAll("[data-radio-scope]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.radioScope === scope)));
-
-  const cached = radioClientCache.get(scope);
+async function loadRadio(scope = "turkiye", { force = false } = {}) {
+  activeRadioScope = "turkiye";
+  const cached = radioClientCache.get("turkiye");
   if (cached && !force) {
     renderRadioStations(cached);
     return;
   }
-
   if (activeRadioLibrary !== "discover") {
     renderRadioStations(currentRadioPayload());
     return;
   }
-
   radioStatus.textContent = "İstasyonlar yükleniyor…";
   radioList.innerHTML = '<div class="module-loading">Canlı yayınlar aranıyor…</div>';
   try {
-    const response = await fetch(`/api/radio?scope=${encodeURIComponent(scope)}`, { headers: { Accept: "application/json" } });
+    const response = await fetch("/api/radio?scope=turkiye", { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("radio_" + response.status);
     const payload = await response.json();
-    radioClientCache.set(scope, payload);
+    radioClientCache.set("turkiye", payload);
     renderRadioStations(payload);
   } catch {
     radioStatus.textContent = "Radyo listesi şu an alınamıyor.";
     radioList.innerHTML = '<button class="module-retry" type="button">Yeniden dene</button>';
-    radioList.querySelector("button")?.addEventListener("click", () => loadRadio(scope, { force: true }));
+    radioList.querySelector("button")?.addEventListener("click", () => loadRadio("turkiye", { force: true }));
   }
 }
 
 function renderRadioStations(payload) {
   const stations = radioStationsForView(payload);
   lastRenderedRadioStations = stations;
-  updateRadioStatus(stations, payload);
+  updateRadioStatus(stations);
   radioList.replaceChildren();
 
   if (!stations.length) {
@@ -898,7 +868,7 @@ function renderRadioStations(payload) {
       ? "Beğendiğin radyolarda ★ simgesine dokun; burada toplansın."
       : activeRadioLibrary === "recent"
         ? "Bir radyo dinlediğinde son dinlenenler burada görünür."
-        : "Bu filtrede uygun istasyon bulunamadı.";
+        : "Bu aramada uygun istasyon bulunamadı.";
     radioList.append(empty);
     return;
   }
@@ -908,7 +878,6 @@ function renderRadioStations(payload) {
     card.className = "radio-card";
     card.dataset.stationId = station.id;
     card.classList.toggle("is-playing", currentRadioStation?.id === station.id && !radioAudio.paused);
-
     const avatar = createRadioAvatar(station);
     const copy = document.createElement("div");
     copy.className = "radio-copy";
@@ -920,16 +889,10 @@ function renderRadioStations(payload) {
     copy.append(name, meta);
 
     const tags = radioStationTags(station);
-    if (station.scopeSource === "fallback" || tags.length) {
+    if (tags.length) {
       const tagRow = document.createElement("span");
       tagRow.className = "radio-tags";
-      if (station.scopeSource === "fallback") {
-        const fallback = document.createElement("small");
-        fallback.className = "radio-fallback-tag";
-        fallback.textContent = "Türkiye önerisi";
-        tagRow.append(fallback);
-      }
-      tags.slice(0, station.scopeSource === "fallback" ? 1 : 2).forEach(tag => {
+      tags.slice(0, 2).forEach(tag => {
         const chip = document.createElement("small");
         chip.textContent = titleCaseRadioText(tag);
         tagRow.append(chip);
@@ -939,7 +902,6 @@ function renderRadioStations(payload) {
 
     const actions = document.createElement("div");
     actions.className = "radio-card-actions";
-
     const favorite = document.createElement("button");
     favorite.type = "button";
     favorite.className = "radio-favorite";
@@ -947,7 +909,6 @@ function renderRadioStations(payload) {
     favorite.setAttribute("aria-pressed", String(isRadioFavorite(station.id)));
     favorite.setAttribute("aria-label", isRadioFavorite(station.id) ? "Favoriden çıkar" : "Favoriye ekle");
     favorite.addEventListener("click", () => toggleRadioFavorite(station));
-
     const play = document.createElement("button");
     play.type = "button";
     play.className = "radio-play";
@@ -955,7 +916,6 @@ function renderRadioStations(payload) {
     play.textContent = playing ? "Ⅱ" : "▶";
     play.setAttribute("aria-label", playing ? `${station.name} yayınını duraklat` : `${station.name} yayınını dinle`);
     play.addEventListener("click", () => playRadioStation(station));
-
     actions.append(favorite, play);
     card.append(avatar, copy, actions);
     radioList.append(card);
