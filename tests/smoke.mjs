@@ -12,7 +12,7 @@ const [app, index, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.3\.0"/);
+assert.match(app, /APP_VERSION = "2\.3\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -68,7 +68,7 @@ assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
 assert.doesNotMatch(sw, /staleWhileRevalidate/);
 assert.match(sw, /LEAFLET_ORIGIN/);
-assert.match(sw, /yakinimda-shell-v19/);
+assert.match(sw, /yakinimda-shell-v20/);
 assert.doesNotMatch(sw, /tile\.openstreetmap\.org/);
 
 assert.ok(Array.isArray(vercel.headers));

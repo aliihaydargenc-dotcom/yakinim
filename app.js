@@ -1,4 +1,4 @@
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -989,6 +989,10 @@ function renderRoute() {
   const tray = document.querySelector("#routeTray");
   tray.hidden = !routeStops.length;
   document.body.classList.toggle("has-route", !!routeStops.length);
+  results.querySelectorAll(".result-card").forEach(card => {
+    card.querySelector(".route-button").textContent = routeStops.some(stop => stop.id === card.dataset.placeId) ? "Rotadan çıkar" : "Rotaya ekle";
+  });
+  if (selectedPlace) document.querySelector("#detailRoute").textContent = routeStops.some(stop => stop.id === selectedPlace.id) ? "Rotadan çıkar" : "Rotaya ekle";
   if (!routeStops.length) return;
   document.querySelector("#routeStops").textContent = routeStops.map((stop, index) => `${index + 1}. ${stop.name}`).join("  →  ");
   document.querySelector("#openRoute").href = buildRouteUrl(routeStops);
