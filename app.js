@@ -1,4 +1,4 @@
-const APP_VERSION = "3.1.4";
+const APP_VERSION = "3.2.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -109,6 +109,9 @@ let activeRadioScope = "turkiye";
 let activeRadioLibrary = "discover";
 let radioSearchTerm = "";
 let currentRadioStation = null;
+let currentRadioStreamIndex = 0;
+let radioRecoveryInProgress = false;
+let radioPlaybackSerial = 0;
 let lastRenderedRadioStations = [];
 let radioFavoriteStations = readJson(RADIO_FAVORITES_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 60);
 let radioRecentStations = readJson(RADIO_RECENTS_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 20);
@@ -120,6 +123,8 @@ const failedRadioArtwork = new Set();
 let listScrollY = 0;
 let mapHasFramedResults = false;
 let toastTimer;
+let sectionTransitionTimer = 0;
+let sectionTransitionStartedAt = 0;
 let userMarker = null;
 let userAccuracyCircle = null;
 let requestSerial = 0;
@@ -298,6 +303,8 @@ const quickDetails = document.querySelector("#quickDetails");
 const quickShare = document.querySelector("#quickShare");
 const quickClose = document.querySelector("#quickClose");
 const sectionNav = document.querySelector("#sectionNav");
+const sectionTransition = document.querySelector("#sectionTransition");
+const sectionTransitionLabel = document.querySelector("#sectionTransitionLabel");
 const newsSection = document.querySelector("#newsSection");
 const newsList = document.querySelector("#newsList");
 const newsStatus = document.querySelector("#newsStatus");
@@ -407,13 +414,13 @@ radioVolume?.addEventListener("input", event => setRadioVolume(Number(event.targ
 radioPlayerClose?.addEventListener("click", closeRadioPlayer);
 radioAudio?.addEventListener("play", syncRadioPlayerState);
 radioAudio?.addEventListener("pause", syncRadioPlayerState);
-radioAudio?.addEventListener("ended", syncRadioPlayerState);
+radioAudio?.addEventListener("ended", () => {
+  syncRadioPlayerState();
+  if (currentRadioStation) recoverRadioStream("ended");
+});
 radioAudio?.addEventListener("error", () => {
   syncRadioPlayerState();
-  if (currentRadioStation) {
-    radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
-    radioPlayer.classList.add("has-error");
-  }
+  if (currentRadioStation) recoverRadioStream("error");
 });
 setRadioVolume(radioVolumeLevel);
 syncRadioLibraryTabs();
@@ -465,11 +472,36 @@ setView(isMobileLayout ? "map" : "list", isMobileLayout ? "peek" : "expanded");
 bootstrapLocationDiscovery();
 window.addEventListener("resize", syncMapControlOffset);
 syncMapControlOffset();
+function showSectionTransition(section) {
+  if (!sectionTransition) return;
+  clearTimeout(sectionTransitionTimer);
+  sectionTransitionStartedAt = Date.now();
+  const labels = { nearby: "Yakınım açılıyor…", news: "Haberler yükleniyor…", radio: "Radyo hazırlanıyor…" };
+  if (sectionTransitionLabel) sectionTransitionLabel.textContent = labels[section] || "Yükleniyor…";
+  sectionTransition.hidden = false;
+  document.body.classList.add("section-transitioning");
+  sectionTransitionTimer = setTimeout(() => hideSectionTransition(0), 900);
+}
+
+function hideSectionTransition(minVisible = 220) {
+  if (!sectionTransition || sectionTransition.hidden) return;
+  clearTimeout(sectionTransitionTimer);
+  const remaining = Math.max(0, minVisible - (Date.now() - sectionTransitionStartedAt));
+  sectionTransitionTimer = setTimeout(() => {
+    sectionTransition.hidden = true;
+    document.body.classList.remove("section-transitioning");
+  }, remaining);
+}
+
 function setSection(section, { pushHistory = true } = {}) {
   const next = ["nearby", "news", "radio"].includes(section) ? section : "nearby";
-  if (next === appSection && !pushHistory) return;
+  if (next === appSection) {
+    if (next === "nearby") animateIn(sheet);
+    else animateIn(next === "news" ? newsSection : radioSection);
+    return;
+  }
 
-  const previous = appSection;
+  showSectionTransition(next);
   appSection = next;
   document.body.dataset.section = next;
   sectionNav?.querySelectorAll("[data-section]").forEach(button => {
@@ -483,8 +515,10 @@ function setSection(section, { pushHistory = true } = {}) {
     document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === "list")));
   }
 
-  // Radio intentionally keeps playing while the user moves between app sections.
-  if (next !== "radio") radioPlayer?.classList.remove("is-expanded");
+  if (next !== "radio") {
+    radioPlayer?.classList.remove("is-expanded");
+    document.body.classList.remove("radio-player-expanded");
+  }
 
   newsSection.hidden = next !== "news";
   radioSection.hidden = next !== "radio";
@@ -497,11 +531,16 @@ function setSection(section, { pushHistory = true } = {}) {
   }
 
   window.scrollTo(0, 0);
-  if (next === "news") loadNews(activeNewsCategory);
-  if (next === "radio") loadRadio(activeRadioScope);
-  if (next === "nearby") {
+  if (next === "news") {
+    animateIn(newsSection);
+    loadNews(activeNewsCategory);
+  } else if (next === "radio") {
+    animateIn(radioSection);
+    loadRadio(activeRadioScope);
+  } else {
     animateIn(sheet);
     requestAnimationFrame(() => map.invalidateSize());
+    hideSectionTransition(240);
   }
 }
 
@@ -513,13 +552,14 @@ async function loadNews(category = activeNewsCategory, { force = false } = {}) {
   const cached = newsClientCache.get(category);
   if (cached && !force) {
     renderNews(cached);
+    hideSectionTransition(220);
     return;
   }
 
   newsStatus.textContent = "Haberler yükleniyor…";
-  newsList.innerHTML = '<div class="module-loading">Güncel başlıklar alınıyor…</div>';
+  newsList.innerHTML = '<div class="module-loading"><span class="module-spinner" aria-hidden="true"></span><span>Güncel başlıklar alınıyor…</span></div>';
   try {
-    const response = await fetch(`/api/news?category=${encodeURIComponent(category)}`, { headers: { Accept: "application/json" } });
+    const response = await fetch(`/api/news?category=${encodeURIComponent(category)}&v=${encodeURIComponent(APP_VERSION)}`, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("news_" + response.status);
     const payload = await response.json();
     newsClientCache.set(category, payload);
@@ -528,12 +568,17 @@ async function loadNews(category = activeNewsCategory, { force = false } = {}) {
     newsStatus.textContent = "Haber akışı şu an alınamıyor.";
     newsList.innerHTML = '<button class="module-retry" type="button">Yeniden dene</button>';
     newsList.querySelector("button")?.addEventListener("click", () => loadNews(category, { force: true }));
+  } finally {
+    hideSectionTransition(220);
   }
 }
 
 function renderNews(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
-  newsStatus.textContent = items.length ? `${payload.source || "Kaynak"} · en yeni başlıklar` : "Başlık bulunamadı.";
+  const sources = Array.isArray(payload?.sources) ? payload.sources : [];
+  newsStatus.textContent = items.length
+    ? `${items.length} başlık · ${sources.length || 1} kaynak · en yeniye göre`
+    : "Başlık bulunamadı.";
   newsList.replaceChildren();
   items.forEach(item => {
     const article = document.createElement("article");
@@ -652,6 +697,7 @@ function radioStationForStorage(station) {
     id: station.id,
     name: station.name,
     streamUrl: station.streamUrl,
+    streamCandidates: Array.isArray(station.streamCandidates) ? station.streamCandidates.slice(0, 4) : [],
     homepage: station.homepage || "",
     favicon: normalizeRadioArtworkUrl(station.favicon),
     tags: Array.isArray(station.tags) ? station.tags.slice(0, 6) : [],
@@ -662,6 +708,9 @@ function radioStationForStorage(station) {
     language: station.language || "",
     clickcount: Number(station.clickcount) || 0,
     votes: Number(station.votes) || 0,
+    measuredRank: Number(station.measuredRank) || null,
+    rankingPeriod: station.rankingPeriod || "",
+    liveVerified: Boolean(station.liveVerified),
   };
 }
 
@@ -737,7 +786,7 @@ function radioStationsForView(payload) {
   return [...unique.values()];
 }
 
-function updateRadioStatus(stations) {
+function updateRadioStatus(stations, payload = currentRadioPayload()) {
   const count = stations.length;
   if (radioSearchTerm) {
     radioStatus.textContent = count ? `${count} eşleşme` : "Aramana uyan istasyon bulunamadı.";
@@ -751,12 +800,18 @@ function updateRadioStatus(stations) {
     radioStatus.textContent = count ? `${count} son dinlenen istasyon` : "Henüz bir istasyon dinlemedin.";
     return;
   }
-  radioStatus.textContent = count ? `${count} istasyon` : "Uygun yayın bulunamadı.";
+  if (!count) {
+    radioStatus.textContent = "Uygun yayın bulunamadı.";
+    return;
+  }
+  const verified = Number(payload?.verifiedCount) || stations.filter(station => station.liveVerified).length;
+  radioStatus.textContent = `${count} istasyon · ${verified} canlı doğrulandı · RİAK Mayıs 2026 önceliği`;
 }
 
 function syncRadioPlayerExpanded() {
   if (!radioPlayerExpand || !radioPlayer) return;
   const expanded = radioPlayer.classList.contains("is-expanded");
+  document.body.classList.toggle("radio-player-expanded", expanded);
   radioPlayerExpand.textContent = expanded ? "⌄" : "•••";
   radioPlayerExpand.setAttribute("aria-expanded", String(expanded));
   radioPlayerExpand.setAttribute("aria-label", expanded ? "Radyo kontrollerini daralt" : "Radyo kontrollerini genişlet");
@@ -790,7 +845,8 @@ function updateRadioPlayer(station) {
   if (wasHidden) radioPlayer.classList.remove("is-expanded");
   radioPlayer.hidden = false;
   radioPlayerName.textContent = station.name;
-  radioPlayerMeta.textContent = radioStationMeta(station).join(" · ") || "Canlı yayın";
+  const rank = station.measuredRank ? `#${station.measuredRank} RİAK` : "";
+  radioPlayerMeta.textContent = [rank, ...radioStationMeta(station)].filter(Boolean).join(" · ") || "Canlı yayın";
   radioPlayerAvatar?.replaceChildren(createRadioAvatar(station, "radio-player-avatar-inner"));
   syncRadioPlayerFavorite();
   syncRadioPlayerExpanded();
@@ -854,19 +910,93 @@ function updateRadioMediaSession(station) {
   } catch {}
 }
 
+function stationStreamCandidates(station) {
+  const candidates = Array.isArray(station?.streamCandidates) ? station.streamCandidates : [];
+  const rows = candidates.length ? candidates : [{ id: station?.id, url: station?.streamUrl, codec: station?.codec, bitrate: station?.bitrate, hls: station?.hls }];
+  const seen = new Set();
+  return rows.filter(candidate => {
+    const url = String(candidate?.url || "").trim();
+    if (!/^https:\/\//i.test(url) || seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
+}
+
+function reportRadioFailure(streamUrl) {
+  if (!/^https:\/\//i.test(String(streamUrl || ""))) return;
+  fetch("/api/radio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "failure", streamUrl }),
+  }).catch(() => {});
+}
+
+async function startRadioCandidate(startIndex = 0, { countClick = false } = {}) {
+  if (!currentRadioStation || !radioAudio) return false;
+  const serial = ++radioPlaybackSerial;
+  const candidates = stationStreamCandidates(currentRadioStation);
+  radioRecoveryInProgress = true;
+  for (let index = Math.max(0, startIndex); index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    currentRadioStreamIndex = index;
+    radioPlayer.classList.remove("has-error");
+    radioPlayerMeta.textContent = index > 0 ? "Yedek canlı yayın deneniyor…" : "Canlı yayına bağlanıyor…";
+    radioAudio.src = candidate.url;
+    radioAudio.load();
+    try {
+      await radioAudio.play();
+      if (serial !== radioPlaybackSerial) return false;
+      const rank = currentRadioStation.measuredRank ? `#${currentRadioStation.measuredRank} RİAK` : "";
+      radioPlayerMeta.textContent = [rank, ...radioStationMeta({ ...currentRadioStation, codec: candidate.codec || currentRadioStation.codec, bitrate: candidate.bitrate || currentRadioStation.bitrate })].filter(Boolean).join(" · ") || "Canlı yayın";
+      if (countClick) {
+        fetch("/api/radio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stationuuid: candidate.id || currentRadioStation.id }),
+        }).catch(() => {});
+      }
+      radioRecoveryInProgress = false;
+      return true;
+    } catch {
+      reportRadioFailure(candidate.url);
+    }
+  }
+  radioRecoveryInProgress = false;
+  radioPlayerMeta.textContent = "Bu istasyonun çalışan canlı yayını bulunamadı";
+  radioPlayer.classList.add("has-error");
+  return false;
+}
+
+async function recoverRadioStream(reason = "error") {
+  if (!currentRadioStation || radioRecoveryInProgress) return;
+  const candidates = stationStreamCandidates(currentRadioStation);
+  const failed = candidates[currentRadioStreamIndex];
+  if (failed?.url) reportRadioFailure(failed.url);
+  const nextIndex = currentRadioStreamIndex + 1;
+  if (nextIndex >= candidates.length) {
+    radioPlayerMeta.textContent = reason === "ended" ? "Yayın sona erdi; çalışan yedek bulunamadı" : "Yayın kesildi; çalışan yedek bulunamadı";
+    radioPlayer.classList.add("has-error");
+    return;
+  }
+  await startRadioCandidate(nextIndex);
+}
+
 async function loadRadio(scope = "turkiye", { force = false } = {}) {
   activeRadioScope = "turkiye";
   const cached = radioClientCache.get("turkiye");
   if (cached && !force) {
     renderRadioStations(cached);
+    hideSectionTransition(220);
     return;
   }
   if (activeRadioLibrary !== "discover") {
     renderRadioStations(currentRadioPayload());
+    hideSectionTransition(220);
     return;
   }
-  radioStatus.textContent = "İstasyonlar yükleniyor…";
-  radioList.innerHTML = '<div class="module-loading">Canlı yayınlar aranıyor…</div>';
+
+  radioStatus.textContent = "İstasyonlar doğrulanıyor…";
+  radioList.innerHTML = '<div class="module-loading"><span class="module-spinner" aria-hidden="true"></span><span>Popüler ve çalışan yayınlar kontrol ediliyor…</span></div>';
   try {
     const response = await fetch(`/api/radio?scope=turkiye&v=${encodeURIComponent(APP_VERSION)}`, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("radio_" + response.status);
@@ -877,13 +1007,15 @@ async function loadRadio(scope = "turkiye", { force = false } = {}) {
     radioStatus.textContent = "Radyo listesi şu an alınamıyor.";
     radioList.innerHTML = '<button class="module-retry" type="button">Yeniden dene</button>';
     radioList.querySelector("button")?.addEventListener("click", () => loadRadio("turkiye", { force: true }));
+  } finally {
+    hideSectionTransition(220);
   }
 }
 
 function renderRadioStations(payload) {
   const stations = radioStationsForView(payload);
   lastRenderedRadioStations = stations;
-  updateRadioStatus(stations);
+  updateRadioStatus(stations, payload);
   radioList.replaceChildren();
 
   if (!stations.length) {
@@ -893,7 +1025,7 @@ function renderRadioStations(payload) {
       ? "Beğendiğin radyolarda ★ simgesine dokun; burada toplansın."
       : activeRadioLibrary === "recent"
         ? "Bir radyo dinlediğinde son dinlenenler burada görünür."
-        : "Bu aramada uygun istasyon bulunamadı.";
+        : "Bu aramada çalışan istasyon bulunamadı.";
     radioList.append(empty);
     return;
   }
@@ -903,21 +1035,38 @@ function renderRadioStations(payload) {
     card.className = "radio-card";
     card.dataset.stationId = station.id;
     card.classList.toggle("is-playing", currentRadioStation?.id === station.id && !radioAudio.paused);
+
     const avatar = createRadioAvatar(station);
     const copy = document.createElement("div");
     copy.className = "radio-copy";
+    const nameRow = document.createElement("div");
+    nameRow.className = "radio-name-row";
     const name = document.createElement("strong");
     name.textContent = station.name;
+    nameRow.append(name);
+    if (station.measuredRank) {
+      const rank = document.createElement("span");
+      rank.className = "radio-rank";
+      rank.textContent = `#${station.measuredRank}`;
+      rank.title = "RİAK Mayıs 2026";
+      nameRow.append(rank);
+    }
     const meta = document.createElement("span");
     meta.className = "radio-meta";
     meta.textContent = radioStationMeta(station).join(" · ") || "Canlı yayın";
-    copy.append(name, meta);
+    copy.append(nameRow, meta);
 
     const tags = radioStationTags(station);
-    if (tags.length) {
+    if (tags.length || station.liveVerified) {
       const tagRow = document.createElement("span");
       tagRow.className = "radio-tags";
-      tags.slice(0, 2).forEach(tag => {
+      if (station.liveVerified) {
+        const live = document.createElement("small");
+        live.className = "radio-live-tag";
+        live.textContent = "Canlı doğrulandı";
+        tagRow.append(live);
+      }
+      tags.slice(0, station.liveVerified ? 1 : 2).forEach(tag => {
         const chip = document.createElement("small");
         chip.textContent = titleCaseRadioText(tag);
         tagRow.append(chip);
@@ -934,6 +1083,7 @@ function renderRadioStations(payload) {
     favorite.setAttribute("aria-pressed", String(isRadioFavorite(station.id)));
     favorite.setAttribute("aria-label", isRadioFavorite(station.id) ? "Favoriden çıkar" : "Favoriye ekle");
     favorite.addEventListener("click", () => toggleRadioFavorite(station));
+
     const play = document.createElement("button");
     play.type = "button";
     play.className = "radio-play";
@@ -941,6 +1091,7 @@ function renderRadioStations(payload) {
     play.textContent = playing ? "Ⅱ" : "▶";
     play.setAttribute("aria-label", playing ? `${station.name} yayınını duraklat` : `${station.name} yayınını dinle`);
     play.addEventListener("click", () => playRadioStation(station));
+
     actions.append(favorite, play);
     card.append(avatar, copy, actions);
     radioList.append(card);
@@ -949,39 +1100,40 @@ function renderRadioStations(payload) {
 
 async function playRadioStation(station) {
   if (!station?.streamUrl || !radioAudio) return;
-  if (currentRadioStation?.id === station.id && !radioAudio.paused) {
-    radioAudio.pause();
-    return;
+
+  if (currentRadioStation?.id === station.id) {
+    if (!radioAudio.paused) {
+      radioAudio.pause();
+      return;
+    }
+    try {
+      await radioAudio.play();
+      return;
+    } catch {
+      await recoverRadioStream("resume");
+      return;
+    }
   }
 
+  ++radioPlaybackSerial;
+  radioRecoveryInProgress = false;
   currentRadioStation = station;
+  currentRadioStreamIndex = 0;
   rememberRadioRecent(station);
   updateRadioPlayer(station);
   updateRadioMediaSession(station);
-  if (radioAudio.src !== station.streamUrl) radioAudio.src = station.streamUrl;
-
-  try {
-    await radioAudio.play();
-    fetch("/api/radio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stationuuid: station.id }),
-    }).catch(() => {});
-  } catch {
-    radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
-    radioPlayer.classList.add("has-error");
-  }
+  await startRadioCandidate(0, { countClick: true });
   syncRadioPlayerState();
   renderRadioStations(currentRadioPayload());
 }
 
 function toggleRadioPlayback() {
   if (!radioAudio || !currentRadioStation) return;
-  if (radioAudio.paused) radioAudio.play().catch(() => {
-    radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
-    radioPlayer.classList.add("has-error");
-  });
-  else radioAudio.pause();
+  if (radioAudio.paused) {
+    radioAudio.play().catch(() => recoverRadioStream("resume"));
+  } else {
+    radioAudio.pause();
+  }
 }
 
 function syncRadioPlayerState() {
@@ -997,14 +1149,18 @@ function syncRadioPlayerState() {
 }
 
 function closeRadioPlayer() {
+  ++radioPlaybackSerial;
+  radioRecoveryInProgress = false;
+  currentRadioStation = null;
+  currentRadioStreamIndex = 0;
+  document.body.classList.remove("radio-player-expanded");
   if (radioAudio) {
     radioAudio.pause();
     radioAudio.removeAttribute("src");
     radioAudio.load();
   }
-  currentRadioStation = null;
   radioPlayer.hidden = true;
-  radioPlayer.classList.remove("is-playing", "has-error");
+  radioPlayer.classList.remove("is-playing", "is-expanded", "has-error");
   if ("mediaSession" in navigator) {
     try {
       navigator.mediaSession.metadata = null;

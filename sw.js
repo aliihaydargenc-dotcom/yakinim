@@ -1,6 +1,6 @@
-const CACHE_NAME = "yakinimda-shell-v41";
+const CACHE_NAME = "yakinimda-shell-v42";
 const RUNTIME_CACHE = "yakinimda-runtime-v1";
-const APP_SHELL = ["./", "./index.html", "./styles.css?v=3.1.4", "./app.js?v=3.1.4", "./manifest.webmanifest", "./icon.svg"];
+const APP_SHELL = ["./", "./index.html", "./styles.css?v=3.2.0", "./app.js?v=3.2.0", "./manifest.webmanifest", "./icon.svg"];
 const LEAFLET_ORIGIN = "https://unpkg.com";
 
 self.addEventListener("install", (event) => {

@@ -1000,3 +1000,33 @@ body:not([data-section=radio]) .radio-player-main{grid-template-columns:46px min
 /* v3.1.2 radio single discovery feed */
 .radio-scope-filter{display:none!important}
 .radio-library-tabs{padding-bottom:12px}
+
+
+/* v3.2 resilient media + multi-source news + section transitions */
+.section-transition{position:fixed;z-index:880;inset:0;display:grid;place-items:center;background:#f8fafcc9;backdrop-filter:blur(6px);pointer-events:all}
+.section-transition[hidden]{display:none!important}
+.section-transition-card{display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid #d7e2de;border-radius:16px;background:#fffffff5;box-shadow:0 14px 38px #173c3226;color:var(--ink);font-size:11px}
+.section-transition-spinner,.module-spinner{width:18px;height:18px;border:2px solid #c7d9d2;border-top-color:var(--accent);border-radius:50%;animation:yakinim-spin .75s linear infinite}
+.module-loading{display:flex;gap:10px;align-items:center;justify-content:center}
+@keyframes yakinim-spin{to{transform:rotate(360deg)}}
+.news-card{transition:transform var(--motion-fast) ease,box-shadow var(--motion-fast) ease}
+.news-card:active{transform:scale(.992)}
+.radio-name-row{min-width:0;display:flex;align-items:center;gap:6px}
+.radio-name-row strong{min-width:0;flex:0 1 auto}
+.radio-rank{flex:0 0 auto;padding:2px 5px;border-radius:999px;background:#e5f1ec;color:var(--accent);font-size:7.5px;font-weight:900}
+.radio-live-tag{background:#e6f4ed!important;color:#26775d!important}
+.radio-player.is-expanded .radio-player-tools{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.radio-player.is-expanded .radio-player-tools>button,.radio-player.is-expanded .radio-player-tools>a{width:100%;min-width:0}
+.radio-player.is-expanded .radio-volume-control{grid-column:1/-1;min-width:0;min-height:38px;border:1px solid #d9e4df;border-radius:10px;background:#f8faf9}
+.radio-player.is-expanded .radio-player-close{grid-column:1/-1;width:100%;height:36px}
+body.radio-player-expanded[data-section=radio] .radio-section{padding-bottom:238px}
+.radio-player.has-error .radio-player-copy span{color:#9a5148}
+@media(max-width:759px){
+  .section-transition-card{padding:12px 15px;border-radius:14px}
+  .radio-player{overflow:hidden}
+  .radio-player.is-expanded{padding-bottom:10px}
+  .radio-player.is-expanded .radio-player-tools{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .radio-player.is-expanded .radio-player-tools>button,.radio-player.is-expanded .radio-player-tools>a{padding:0 5px;font-size:8.5px}
+  .radio-player.is-expanded .radio-volume-control{grid-column:1/-1}
+  .radio-player.is-expanded .radio-player-close{grid-column:1/-1}
+}

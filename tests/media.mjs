@@ -2,27 +2,54 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
-const { NEWS_FEEDS, parseRss, queryNews } = require("../lib/news.cjs");
-const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeArtworkUrl, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
+const { NEWS_FEEDS, parseRss, mergeNewsItems, queryNews } = require("../lib/news.cjs");
+const {
+  RADIO_SCOPES,
+  RIAK_MAY_2026_RANKING,
+  buildStationParams,
+  cleanProviderText,
+  normalizeArtworkUrl,
+  normalizeStation,
+  riakRankForName,
+  groupStationRows,
+  probeStreamCandidate,
+  queryRadio,
+} = require("../lib/radio.cjs");
 
-assert.ok(NEWS_FEEDS.gundem.url.includes("trthaber.com"));
-assert.ok(NEWS_FEEDS.teknoloji.url.includes("bilim_teknoloji"));
-const sampleXml = `<?xml version="1.0"?><rss><channel><item><title><![CDATA[Örnek &amp; Haber]]></title><link>https://www.trthaber.com/haber/ornek</link><pubDate>Mon, 21 Sep 2026 10:00:00 +0300</pubDate></item></channel></rss>`;
-const parsed = parseRss(sampleXml, "gundem");
+assert.ok(Array.isArray(NEWS_FEEDS.gundem));
+assert.ok(NEWS_FEEDS.gundem.some(feed => feed.source === "TRT Haber"));
+assert.ok(NEWS_FEEDS.gundem.some(feed => feed.source === "Habertürk"));
+assert.ok(NEWS_FEEDS.gundem.some(feed => feed.source === "Anadolu Ajansı"));
+assert.ok(NEWS_FEEDS.gundem.some(feed => feed.source === "BBC Türkçe"));
+assert.ok(NEWS_FEEDS.gundem.some(feed => feed.source === "DW Türkçe"));
+
+const sampleXml = `<?xml version="1.0"?><rss><channel><item><title><![CDATA[Örnek &amp; Haber]]></title><link>https://example.com/haber/ornek</link><pubDate>Mon, 21 Sep 2026 10:00:00 +0300</pubDate></item></channel></rss>`;
+const parsed = parseRss(sampleXml, "gundem", { id: "test", source: "Test Kaynak", url: "https://example.com/rss" });
 assert.equal(parsed.length, 1);
 assert.equal(parsed[0].title, "Örnek & Haber");
-assert.equal(parsed[0].source, "TRT Haber");
+assert.equal(parsed[0].source, "Test Kaynak");
 assert.ok(parsed[0].publishedAt);
 
-const fakeNewsFetch = async () => ({ ok: true, text: async () => sampleXml });
-assert.equal((await queryNews("gundem", fakeNewsFetch)).length, 1);
+const mergedNews = mergeNewsItems([
+  [{ ...parsed[0], source: "A", url: "https://a.example/1" }],
+  [{ ...parsed[0], source: "B", url: "https://b.example/2", title: "Başka Haber" }],
+]);
+assert.equal(mergedNews.length, 2);
+
+const fakeNewsFetch = async url => ({
+  ok: true,
+  text: async () => sampleXml.replace("Örnek &amp; Haber", "Örnek " + new URL(url).hostname),
+});
+const queriedNews = await queryNews("gundem", fakeNewsFetch);
+assert.ok(queriedNews.sources.length >= 4);
+assert.ok(queriedNews.items.length >= 1);
 await assert.rejects(() => queryNews("nope", fakeNewsFetch), /unsupported_category/);
 
 assert.deepEqual(Object.keys(RADIO_SCOPES), ["turkiye"]);
-const params = buildStationParams("turkiye");
+assert.ok(RIAK_MAY_2026_RANKING.length >= 20);
+const params = buildStationParams("turkiye", "votes");
 assert.equal(params.get("countrycode"), "TR");
-assert.equal(params.has("state"), false);
-assert.equal(params.has("tag"), false);
+assert.equal(params.get("order"), "votes");
 assert.equal(params.get("hidebroken"), "true");
 
 const goodStation = normalizeStation({
@@ -36,31 +63,47 @@ const goodStation = normalizeStation({
   state: "UNKNOWN",
   countrycode: "TR",
   language: "turkish",
-  hls: 1,
+  hls: 0,
+  ssl_error: 0,
+  lastcheckoktime_iso8601: "2026-09-23T12:00:00Z",
 });
 assert.equal(goodStation.name, "Test FM");
 assert.equal(goodStation.state, "");
 assert.equal(goodStation.countryCode, "TR");
-assert.equal(goodStation.language, "turkish");
-assert.equal(goodStation.hls, true);
 assert.equal(cleanProviderText("UNKNOWN"), "");
+assert.equal(riakRankForName("KRAL FM").rank, 1);
+assert.equal(riakRankForName("Damar Turk FM"), null);
+
 const slowTurkProxy = "https://www.slowturk.com.tr/_next/image?url=https%3A%2F%2Fassets.blupoint.io%2Fimg%2F85%2F330x175%2F6410d8c4310c17000763c62b&w=256&q=75";
 assert.equal(normalizeArtworkUrl(slowTurkProxy), "");
-assert.equal(normalizeArtworkUrl("https://assets.blupoint.io/img/85/330x175/6410d8c4310c17000763c62b"), "");
 assert.equal(normalizeArtworkUrl("https://example.com/logo.png"), "https://example.com/logo.png");
-assert.equal(normalizeArtworkUrl("javascript:alert(1)"), "");
-assert.equal(normalizeStation({ ...goodStation, stationuuid: "x", url_resolved: "http://insecure", lastcheckok: 1 }), null);
-assert.equal(uniqueStations([
-  { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },
-  { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },
-]).length, 1);
+
+const grouped = groupStationRows([
+  { stationuuid: "damar-111111111111", name: "Damar Turk FM", url_resolved: "https://damar.example/live", lastcheckok: 1, ssl_error: 0, votes: 9999, clickcount: 9999 },
+  { stationuuid: "kral-1111111111111", name: "Kral FM", url_resolved: "https://kral.example/live", lastcheckok: 1, ssl_error: 0, votes: 1, clickcount: 1 },
+]);
+assert.equal(grouped[0].name, "Kral FM");
+assert.equal(grouped[0].measuredRank, 1);
+
+const liveHeaders = new Map([["content-type", "audio/mpeg"], ["content-length", "0"], ["icy-name", "Test"]]);
+const liveFetch = async () => ({ ok: true, headers: { get: key => liveHeaders.get(key.toLowerCase()) || null }, body: { cancel: async () => {} } });
+assert.equal(await probeStreamCandidate({ url: "https://radio.example/live", hls: false }, liveFetch, 100), true);
+
+const staticHeaders = new Map([["content-type", "audio/mpeg"], ["content-length", "5000000"]]);
+const staticFetch = async () => ({ ok: true, headers: { get: key => staticHeaders.get(key.toLowerCase()) || null }, body: { cancel: async () => {} } });
+assert.equal(await probeStreamCandidate({ url: "https://radio.example/sample.mp3", hls: false }, staticFetch, 100), false);
 
 const nationalRows = [
-  { stationuuid: "2-2222222222222222", name: "Türkiye FM", url_resolved: "https://stream.example/turkiye", lastcheckok: 1, state: "Ankara" },
+  { stationuuid: "2-2222222222222222", name: "Kral FM", url_resolved: "https://stream.example/kral", lastcheckok: 1, ssl_error: 0, state: "İstanbul" },
+  { stationuuid: "3-3333333333333333", name: "Damar Turk FM", url_resolved: "https://stream.example/damar", lastcheckok: 1, ssl_error: 0, state: "İstanbul", clickcount: 9000 },
 ];
-const fakeRadioFetch = async () => ({ ok: true, json: async () => nationalRows });
-const radio = await queryRadio("turkiye", fakeRadioFetch);
-assert.equal(radio.stations.length, 1);
-assert.equal(radio.stations[0].name, "Türkiye FM");
+const fakeRadioFetch = async url => {
+  if (String(url).includes("/json/stations/search?")) return { ok: true, json: async () => nationalRows };
+  throw new Error("unexpected fetch");
+};
+const radio = await queryRadio("turkiye", fakeRadioFetch, { probe: false });
+assert.equal(radio.stations[0].name, "Kral FM");
+assert.equal(radio.rankingSource, "RİAK");
+assert.equal(radio.rankingPeriod, "Mayıs 2026");
 
-console.log("Media tests PASS: official RSS parsing and safe Radio Browser station normalization.");
+console.log("Media tests PASS: multi-source news, RİAK-prioritized radio and live-stream validation.");

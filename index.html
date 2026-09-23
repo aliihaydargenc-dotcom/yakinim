@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.1.4" as="script" />
+    <link rel="preload" href="./app.js?v=3.2.0" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.1.4" />
+    <link rel="stylesheet" href="./styles.css?v=3.2.0" />
   </head>
   <body data-view="list" data-section="nearby">
     <main class="app-shell">
@@ -91,6 +91,12 @@
         <button type="button" data-section="news" aria-pressed="false"><span aria-hidden="true">▤</span> Haber</button>
         <button type="button" data-section="radio" aria-pressed="false"><span aria-hidden="true">◉</span> Radyo</button>
       </nav>
+      <div id="sectionTransition" class="section-transition" role="status" aria-live="polite" hidden>
+        <div class="section-transition-card">
+          <span class="section-transition-spinner" aria-hidden="true"></span>
+          <strong id="sectionTransitionLabel">Yükleniyor…</strong>
+        </div>
+      </div>
 
       <section class="sheet" aria-label="Yakındaki yerler">
         <div class="explore-heading"><p class="eyebrow">YAKININDAKİ İHTİYAÇLAR</p><h2>Bugün nereye uğrayacaksın?</h2></div>
@@ -165,7 +171,7 @@
         </div>
         <p id="newsStatus" class="module-status">Güncel başlıklar yüklenmeye hazır.</p>
         <div id="newsList" class="news-list" aria-live="polite"></div>
-        <p class="module-source-note">Haber başlıkları kaynak sayfasına bağlanır; içerik uygulama içinde yeniden yayımlanmaz.</p>
+        <p class="module-source-note">TRT Haber, Habertürk, Anadolu Ajansı, BBC Türkçe ve DW Türkçe gibi RSS kaynakları birlikte kullanılır. Kaynak sırası kişiselleştirilmez; içerik uygulama içinde yeniden yayımlanmaz.</p>
       </section>
 
       <section id="radioSection" class="module-panel radio-section" aria-labelledby="radioHeading" hidden>
@@ -189,7 +195,7 @@
 
         <p id="radioStatus" class="module-status">İstasyonlar yüklenmeye hazır.</p>
         <div id="radioList" class="radio-list" aria-live="polite"></div>
-        <p class="module-source-note">İstasyon dizini: Radio Browser. Yayın erişilebilirliği istasyona göre değişebilir.</p>
+        <p class="module-source-note">Sıralama önceliği: RİAK Mayıs 2026 ölçümü. Yayın adresleri Radio Browser kataloğundan alınır ve mümkün olduğunda canlı olarak doğrulanır.</p>
       </section>
 
       <div id="radioPlayer" class="radio-player" hidden>
@@ -251,6 +257,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.1.4" defer></script>
+    <script src="./app.js?v=3.2.0" defer></script>
   </body>
 </html>

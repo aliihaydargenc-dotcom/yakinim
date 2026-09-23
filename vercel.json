@@ -33,7 +33,7 @@
       "maxDuration": 15
     },
     "api/radio.js": {
-      "maxDuration": 20
+      "maxDuration": 30
     }
   }
 }
