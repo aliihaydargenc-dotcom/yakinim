@@ -737,3 +737,16 @@ body[data-view=map] .map-quick-card[hidden]{display:none!important}
   body[data-view=map] .map-recenter{display:grid}
   body[data-view=map] .map-quick-card{left:auto;right:22px;width:360px}
 }
+
+
+/* v2.9.1 map interaction stabilization */
+body[data-view=map] .map-recenter{display:none}
+body[data-view=map][data-sheet-state=peek] .map-recenter{display:grid}
+body[data-view=map].has-map-quick-card .map-context,
+body[data-view=map].has-place-detail .map-context{opacity:0;pointer-events:none;transform:translateY(-5px)}
+body[data-view=map][data-sheet-state=half] .map-recenter,
+body[data-view=map][data-sheet-state=expanded] .map-recenter,
+body[data-view=map].has-place-detail .map-recenter{display:none!important}
+@media(max-width:759px){
+  body[data-view=map][data-sheet-state=peek] .map-recenter{display:grid}
+}

@@ -50,5 +50,8 @@ assert.match(styles, /leaflet-control-zoom\{display:none!important\}/);
 assert.match(app, /if \(!userLocation\) \{\s*locateUser\(\{ forceFresh: false \}\)/);
 assert.match(app, /searchableVisiblePlaces/);
 assert.match(app, /mapSearchInput/);
+assert.match(app, /document\.body\.dataset\.sheetState = nextState/);
+assert.match(app, /if \(document\.body\.dataset\.view === "map"\) openMapQuickCard\(place, main\)/);
+assert.match(styles, /data-sheet-state=peek.*map-recenter/s);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");

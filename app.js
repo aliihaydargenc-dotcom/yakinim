@@ -1,4 +1,4 @@
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.9.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -1640,7 +1640,10 @@ function createResultCard(place, icon, isNearest = false, index = 0) {
   favoriteButton.classList.toggle("is-favorite", isFavorite(place.id));
   favoriteButton.setAttribute("aria-label", isFavorite(place.id) ? "Favoriden çıkar" : "Favoriye ekle");
 
-  main.addEventListener("click", () => openPlaceDetails(place, main));
+  main.addEventListener("click", () => {
+    if (document.body.dataset.view === "map") openMapQuickCard(place, main);
+    else openPlaceDetails(place, main);
+  });
   favoriteButton.addEventListener("click", () => toggleFavorite(place));
   routeButton.textContent = routeStops.some(stop => stop.id === place.id) ? "Rotadan çıkar" : "Rotaya ekle";
   routeButton.addEventListener("click", () => toggleRouteStop(place));
@@ -2014,6 +2017,7 @@ function updateResultSummary(places) {
 function applySheetState(state) {
   const nextState = SHEET_STATES.includes(state) ? state : "half";
   sheet.dataset.state = nextState;
+  document.body.dataset.sheetState = nextState;
   prefs.sheetState = nextState;
   persistPrefs();
   const labels = { peek: "Paneli aç", half: "Paneli genişlet", expanded: "Paneli küçült" };
