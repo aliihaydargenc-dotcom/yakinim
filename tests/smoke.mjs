@@ -12,7 +12,7 @@ const [app, index, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.4\.0"/);
+assert.match(app, /APP_VERSION = "2\.5\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -37,6 +37,9 @@ assert.match(app, /getGeolocationPermissionState/);
 assert.match(app, /enableManualLocationMode/);
 assert.match(app, /handleManualMapClick/);
 assert.match(app, /fitResultsOnMap/);
+assert.match(app, /QUICK_DISCOVERY_RADIUS = 1000/);
+assert.match(app, /settlePosition/);
+assert.match(app, /placesFromBundle/);
 assert.match(app, /MOTION = Object\.freeze/);
 assert.match(app, /buildMapClusters/);
 assert.match(app, /addPlaceCluster/);
@@ -74,7 +77,7 @@ assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
 assert.doesNotMatch(sw, /staleWhileRevalidate/);
 assert.match(sw, /LEAFLET_ORIGIN/);
-assert.match(sw, /yakinimda-shell-v21/);
+assert.match(sw, /yakinimda-shell-v22/);
 assert.doesNotMatch(sw, /tile\.openstreetmap\.org/);
 
 assert.ok(Array.isArray(vercel.headers));
