@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const app=readFileSync('app.js','utf8');
+assert.ok(!app.includes('document.querySelectorAll("[data-view]")'), 'View listener must not attach to body and close details on every click');
 function extract(name){const start=app.indexOf(`function ${name}(`);const end=app.indexOf('\nfunction ',start+1);return app.slice(start,end<0?app.length:end);}
 let selected=null;
 const marker={bindTooltip(){return this;},addTo(){return this;},on(event,callback){this.click=callback;},getElement(){return {id:'pin'};}};
