@@ -1,4 +1,4 @@
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.1.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -311,6 +311,7 @@ const radioPlayerAvatar = document.querySelector("#radioPlayerAvatar");
 const radioPlayerName = document.querySelector("#radioPlayerName");
 const radioPlayerMeta = document.querySelector("#radioPlayerMeta");
 const radioPlayToggle = document.querySelector("#radioPlayToggle");
+const radioPlayerExpand = document.querySelector("#radioPlayerExpand");
 const radioPlayerFavorite = document.querySelector("#radioPlayerFavorite");
 const radioPlayerShare = document.querySelector("#radioPlayerShare");
 const radioPlayerHomepage = document.querySelector("#radioPlayerHomepage");
@@ -401,6 +402,7 @@ radioSearchClear?.addEventListener("click", () => {
   renderRadioStations(currentRadioPayload());
 });
 radioPlayToggle?.addEventListener("click", toggleRadioPlayback);
+radioPlayerExpand?.addEventListener("click", toggleRadioPlayerExpanded);
 radioPlayerFavorite?.addEventListener("click", () => { if (currentRadioStation) toggleRadioFavorite(currentRadioStation); });
 radioPlayerShare?.addEventListener("click", () => { if (currentRadioStation) shareRadioStation(currentRadioStation); });
 radioPrev?.addEventListener("click", () => stepRadioStation(-1));
@@ -486,6 +488,7 @@ function setSection(section, { pushHistory = true } = {}) {
   }
 
   // Radio intentionally keeps playing while the user moves between app sections.
+  if (next !== "radio") radioPlayer?.classList.remove("is-expanded");
 
   newsSection.hidden = next !== "news";
   radioSection.hidden = next !== "radio";
@@ -638,6 +641,7 @@ function radioStationForStorage(station) {
     state: station.state || "",
     countryCode: station.countryCode || "TR",
     language: station.language || "",
+    scopeSource: station.scopeSource || "",
     clickcount: Number(station.clickcount) || 0,
     votes: Number(station.votes) || 0,
   };
@@ -715,7 +719,7 @@ function radioStationsForView(payload) {
   return [...unique.values()];
 }
 
-function updateRadioStatus(stations) {
+function updateRadioStatus(stations, payload = currentRadioPayload()) {
   const count = stations.length;
   if (radioSearchTerm) {
     radioStatus.textContent = count ? `${count} eşleşme` : "Aramana uyan istasyon bulunamadı.";
@@ -729,8 +733,40 @@ function updateRadioStatus(stations) {
     radioStatus.textContent = count ? `${count} son dinlenen istasyon` : "Henüz bir istasyon dinlemedin.";
     return;
   }
-  const scopeLabel = activeRadioScope === "antalya" ? "Antalya" : activeRadioScope === "turkiye" ? "Türkiye" : titleCaseRadioText(activeRadioScope);
+
+  if (activeRadioScope === "antalya") {
+    const localCount = Number(payload?.localCount) || 0;
+    const fallbackCount = Number(payload?.fallbackCount) || 0;
+    if (localCount && fallbackCount) {
+      radioStatus.textContent = `${localCount} Antalya · ${fallbackCount} Türkiye önerisi`;
+      return;
+    }
+    if (localCount) {
+      radioStatus.textContent = `${localCount} Antalya istasyonu`;
+      return;
+    }
+    if (fallbackCount) {
+      radioStatus.textContent = `Antalya için doğrulanmış yayın yok · ${fallbackCount} Türkiye önerisi`;
+      return;
+    }
+  }
+
+  const scopeLabel = activeRadioScope === "turkiye" ? "Türkiye" : titleCaseRadioText(activeRadioScope);
   radioStatus.textContent = count ? `${count} istasyon · ${scopeLabel}` : "Uygun yayın bulunamadı.";
+}
+
+function syncRadioPlayerExpanded() {
+  if (!radioPlayerExpand || !radioPlayer) return;
+  const expanded = radioPlayer.classList.contains("is-expanded");
+  radioPlayerExpand.textContent = expanded ? "⌄" : "•••";
+  radioPlayerExpand.setAttribute("aria-expanded", String(expanded));
+  radioPlayerExpand.setAttribute("aria-label", expanded ? "Radyo kontrollerini daralt" : "Radyo kontrollerini genişlet");
+}
+
+function toggleRadioPlayerExpanded() {
+  if (!radioPlayer || radioPlayer.hidden) return;
+  radioPlayer.classList.toggle("is-expanded");
+  syncRadioPlayerExpanded();
 }
 
 function syncRadioPlayerFavorite() {
@@ -750,12 +786,15 @@ function setRadioVolume(level) {
 
 function updateRadioPlayer(station) {
   if (!station) return;
+  const wasHidden = radioPlayer.hidden;
   radioPlayer.classList.remove("has-error");
+  if (wasHidden) radioPlayer.classList.remove("is-expanded");
   radioPlayer.hidden = false;
   radioPlayerName.textContent = station.name;
   radioPlayerMeta.textContent = radioStationMeta(station).join(" · ") || "Canlı yayın";
   radioPlayerAvatar?.replaceChildren(createRadioAvatar(station, "radio-player-avatar-inner"));
   syncRadioPlayerFavorite();
+  syncRadioPlayerExpanded();
 
   if (radioPlayerHomepage) {
     radioPlayerHomepage.hidden = !station.homepage;
@@ -849,7 +888,7 @@ async function loadRadio(scope = activeRadioScope, { force = false } = {}) {
 function renderRadioStations(payload) {
   const stations = radioStationsForView(payload);
   lastRenderedRadioStations = stations;
-  updateRadioStatus(stations);
+  updateRadioStatus(stations, payload);
   radioList.replaceChildren();
 
   if (!stations.length) {
@@ -881,10 +920,16 @@ function renderRadioStations(payload) {
     copy.append(name, meta);
 
     const tags = radioStationTags(station);
-    if (tags.length) {
+    if (station.scopeSource === "fallback" || tags.length) {
       const tagRow = document.createElement("span");
       tagRow.className = "radio-tags";
-      tags.slice(0, 2).forEach(tag => {
+      if (station.scopeSource === "fallback") {
+        const fallback = document.createElement("small");
+        fallback.className = "radio-fallback-tag";
+        fallback.textContent = "Türkiye önerisi";
+        tagRow.append(fallback);
+      }
+      tags.slice(0, station.scopeSource === "fallback" ? 1 : 2).forEach(tag => {
         const chip = document.createElement("small");
         chip.textContent = titleCaseRadioText(tag);
         tagRow.append(chip);
