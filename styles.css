@@ -564,3 +564,14 @@ body[data-view=map].has-place-detail .status-text{display:none}
 @keyframes shimmer{to{transform:translateX(100%)}}
 
 @media(max-width:759px){body[data-view=map].has-place-detail .sheet{max-height:65dvh}body[data-view=map].has-place-detail .sheet-row{display:none}body[data-view=map] .place-detail{max-height:36dvh}}
+[hidden]{display:none!important}
+.place-detail[data-category]{--place-color:var(--accent)}
+.place-detail .detail-icon{background:#e8f3ef;color:var(--place-color)}
+.place-marker[data-category]{color:var(--accent)}
+.place-marker[data-category="cafe"]{color:#9a633c}
+.place-marker[data-category="food"]{color:#c24f45}
+.place-marker[data-category="market"]{color:#276f9a}
+.place-marker[data-category="shopping"]{color:#7656a7}
+.place-marker[data-category="park"]{color:#43834f}
+.place-marker[data-category="duty"],.place-marker[data-category="pharmacy"],.place-marker[data-category="hospital"]{color:#b84955}
+.leaflet-marker-icon.is-selected .place-marker{transform:scale(1.16);box-shadow:0 8px 24px #193b3860}
