@@ -1,4 +1,4 @@
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -10,6 +10,7 @@ const DISCOVERY_CARD_LIMIT = 6;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
 const LAST_LOCATION_KEY = "yakinimda:last-location:v1";
 const VIEWPORT_CACHE_PREFIX = "yakinimda:viewport:v1:";
+const SPATIAL_CELL_CACHE_PREFIX = "yakinimda:spatial-cell:v1:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SHEET_STATES = ["peek", "half", "expanded"];
@@ -35,6 +36,12 @@ const VIEWPORT_DEBOUNCE_MS = 280;
 const VIEWPORT_MIN_ZOOM = 13;
 const VIEWPORT_MAX_SPAN_DEGREES = 0.12;
 const MAX_VISIBLE_PLACES = 120;
+const SPATIAL_CELL_DEGREES = 0.01;
+const SPATIAL_PREFETCH_PAD = 0.62;
+const SPATIAL_POOL_LIMIT = 1800;
+const SPATIAL_CELL_FRESH_MS = 4 * 60 * 60 * 1000;
+const SPATIAL_CELL_STALE_MS = 24 * 60 * 60 * 1000;
+const LABEL_MARKER_GAP_PX = 7;
 
 const categories = [
   { id: "cafe", label: "Kafe", icon: "☕", type: "osm", filter: '[amenity=cafe]', ttl: 6 * 60 * 60 * 1000 },
@@ -69,6 +76,8 @@ let activeCategory = categories.find((category) => category.id === prefs.categor
 let searchTerm = "";
 let activePlaces = [];
 let markers = [];
+let placeMarkerById = new Map();
+let clusterMarkers = [];
 let selectedPlace = null;
 let detailTrigger = null;
 let listScrollY = 0;
@@ -79,16 +88,14 @@ let userAccuracyCircle = null;
 let requestSerial = 0;
 let locationAttemptSerial = 0;
 let manualLocationMode = false;
-let osmBundleRequest = null;
 let lastDiscoveryBundle = null;
-let discoveryRequestSerial = 0;
 let renderedMapPlaces = [];
 let mapLabelFrame = 0;
 let viewportRefreshTimer = 0;
 let viewportRequestSerial = 0;
-let viewportRequest = null;
-let currentViewportKey = null;
-let lastViewportEnvelope = null;
+let activeViewportRequest = null;
+let spatialPoiPool = new Map();
+let spatialCellState = new Map();
 
 const map = L.map("map", {
   zoomControl: false,
@@ -96,6 +103,11 @@ const map = L.map("map", {
   preferCanvas: true,
   zoomSnap: 0.5,
 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+map.createPane("placeLabels");
+const placeLabelPane = map.getPane("placeLabels");
+placeLabelPane.style.zIndex = "690";
+placeLabelPane.style.pointerEvents = "none";
 
 const canUseVectorMap = !window.matchMedia("(pointer: coarse)").matches && (() => {
   try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
@@ -573,25 +585,170 @@ function handleMapMoveEnd() {
   if (!manualLocationMode) scheduleViewportRefresh();
 }
 
-function buildViewportEnvelope(bounds = map.getBounds()) {
+function buildViewportEnvelope(bounds = map.getBounds(), pad = 0.08) {
   if (!bounds || map.getZoom() < VIEWPORT_MIN_ZOOM) return null;
-  const padded = bounds.pad(0.3);
-  const snapDown = value => Math.floor(value / VIEWPORT_GRID_DEGREES) * VIEWPORT_GRID_DEGREES;
-  const snapUp = value => Math.ceil(value / VIEWPORT_GRID_DEGREES) * VIEWPORT_GRID_DEGREES;
+  const padded = bounds.pad(pad);
+  return snapSpatialEnvelope({
+    south: padded.getSouth(),
+    west: padded.getWest(),
+    north: padded.getNorth(),
+    east: padded.getEast(),
+  });
+}
+
+function viewportCacheKey(envelope) {
+  return VIEWPORT_CACHE_PREFIX + [envelope.south, envelope.west, envelope.north, envelope.east].join(":");
+}
+
+function snapSpatialEnvelope(input) {
+  const snapDown = value => Math.floor(value / SPATIAL_CELL_DEGREES) * SPATIAL_CELL_DEGREES;
+  const snapUp = value => Math.ceil(value / SPATIAL_CELL_DEGREES) * SPATIAL_CELL_DEGREES;
   const envelope = {
-    south: Number(snapDown(padded.getSouth()).toFixed(3)),
-    west: Number(snapDown(padded.getWest()).toFixed(3)),
-    north: Number(snapUp(padded.getNorth()).toFixed(3)),
-    east: Number(snapUp(padded.getEast()).toFixed(3)),
+    south: Number(snapDown(input.south).toFixed(3)),
+    west: Number(snapDown(input.west).toFixed(3)),
+    north: Number(snapUp(input.north).toFixed(3)),
+    east: Number(snapUp(input.east).toFixed(3)),
   };
   if (envelope.north <= envelope.south || envelope.east <= envelope.west) return null;
   if (envelope.north - envelope.south > VIEWPORT_MAX_SPAN_DEGREES || envelope.east - envelope.west > VIEWPORT_MAX_SPAN_DEGREES) return null;
   return envelope;
 }
 
-function viewportCacheKey(envelope) {
-  return VIEWPORT_CACHE_PREFIX + [envelope.south, envelope.west, envelope.north, envelope.east].join(":");
+function buildSpatialPrefetchEnvelope(bounds = map.getBounds()) {
+  if (!bounds || map.getZoom() < VIEWPORT_MIN_ZOOM) return null;
+  const wide = bounds.pad(SPATIAL_PREFETCH_PAD);
+  const wideEnvelope = snapSpatialEnvelope({
+    south: wide.getSouth(),
+    west: wide.getWest(),
+    north: wide.getNorth(),
+    east: wide.getEast(),
+  });
+  if (wideEnvelope) return wideEnvelope;
+  return buildViewportEnvelope(bounds, 0.18);
 }
+
+function spatialCellKey(row, column) {
+  return `${row}:${column}`;
+}
+
+function spatialCellsForEnvelope(envelope) {
+  if (!envelope) return [];
+  const firstRow = Math.floor(envelope.south / SPATIAL_CELL_DEGREES);
+  const lastRow = Math.ceil(envelope.north / SPATIAL_CELL_DEGREES) - 1;
+  const firstColumn = Math.floor(envelope.west / SPATIAL_CELL_DEGREES);
+  const lastColumn = Math.ceil(envelope.east / SPATIAL_CELL_DEGREES) - 1;
+  const cells = [];
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    for (let column = firstColumn; column <= lastColumn; column += 1) {
+      cells.push({
+        row,
+        column,
+        key: spatialCellKey(row, column),
+        south: Number((row * SPATIAL_CELL_DEGREES).toFixed(3)),
+        west: Number((column * SPATIAL_CELL_DEGREES).toFixed(3)),
+        north: Number(((row + 1) * SPATIAL_CELL_DEGREES).toFixed(3)),
+        east: Number(((column + 1) * SPATIAL_CELL_DEGREES).toFixed(3)),
+      });
+    }
+  }
+  return cells;
+}
+
+function pointInSpatialCell(place, cell) {
+  return place.lat >= cell.south && place.lat < cell.north && place.lng >= cell.west && place.lng < cell.east;
+}
+
+function mergePlacesIntoSpatialPool(places) {
+  for (const place of places || []) {
+    if (!place?.id || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) continue;
+    const previous = spatialPoiPool.get(place.id);
+    if (previous) spatialPoiPool.delete(place.id);
+    spatialPoiPool.set(place.id, { ...previous, ...place });
+  }
+  while (spatialPoiPool.size > SPATIAL_POOL_LIMIT) {
+    const oldestKey = spatialPoiPool.keys().next().value;
+    if (!oldestKey) break;
+    spatialPoiPool.delete(oldestKey);
+  }
+}
+
+function mergeBundleIntoSpatialPool(bundle) {
+  if (!bundle) return;
+  for (const places of Object.values(bundle)) mergePlacesIntoSpatialPool(places);
+}
+
+function bundleFromSpatialPool() {
+  const bundle = Object.fromEntries(osmCategories.map(category => [category.id, []]));
+  for (const place of spatialPoiPool.values()) {
+    if (bundle[place.category]) bundle[place.category].push(place);
+  }
+  return bundle;
+}
+
+function readSpatialCell(cell) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SPATIAL_CELL_CACHE_PREFIX + cell.key));
+    if (!cached || !Array.isArray(cached.places) || !Number.isFinite(cached.savedAt)) return null;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
+function writeSpatialCell(cell, places, savedAt = Date.now()) {
+  spatialCellState.set(cell.key, { savedAt });
+  try {
+    localStorage.setItem(SPATIAL_CELL_CACHE_PREFIX + cell.key, JSON.stringify({ savedAt, places }));
+  } catch {
+    // Spatial cache is optional; the in-memory pool remains usable.
+  }
+}
+
+function hydrateSpatialCells(cells) {
+  let hydrated = false;
+  const now = Date.now();
+  for (const cell of cells) {
+    const known = spatialCellState.get(cell.key);
+    if (known && now - known.savedAt <= SPATIAL_CELL_STALE_MS) continue;
+    const cached = readSpatialCell(cell);
+    if (!cached || now - cached.savedAt > SPATIAL_CELL_STALE_MS) continue;
+    spatialCellState.set(cell.key, { savedAt: cached.savedAt });
+    mergePlacesIntoSpatialPool(cached.places);
+    hydrated = true;
+  }
+  return hydrated;
+}
+
+function spatialCellsAreFresh(cells) {
+  const now = Date.now();
+  return cells.length > 0 && cells.every(cell => {
+    const state = spatialCellState.get(cell.key);
+    return state && now - state.savedAt <= SPATIAL_CELL_FRESH_MS;
+  });
+}
+
+function spatialCellsHaveCoverage(cells) {
+  const now = Date.now();
+  return cells.length > 0 && cells.every(cell => {
+    const state = spatialCellState.get(cell.key);
+    return state && now - state.savedAt <= SPATIAL_CELL_STALE_MS;
+  });
+}
+
+function persistSpatialCells(cells, bundle) {
+  const savedAt = Date.now();
+  const allPlaces = Object.values(bundle || {}).flat();
+  for (const cell of cells) {
+    const cellPlaces = allPlaces.filter(place => pointInSpatialCell(place, cell));
+    writeSpatialCell(cell, cellPlaces, savedAt);
+  }
+}
+
+function refreshBundleFromSpatialPool() {
+  lastDiscoveryBundle = bundleFromSpatialPool();
+  return lastDiscoveryBundle;
+}
+
 
 function isPlaceInVisibleMap(place) {
   if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return false;
@@ -630,15 +787,17 @@ function visibleBundle(bundle = lastDiscoveryBundle) {
 }
 
 function renderActiveCategoryFromBundle(statusMessage = "") {
-  if (!lastDiscoveryBundle || activeCategory.type === "favorites" || activeCategory.type === "duty") return;
+  if (activeCategory.type === "favorites" || activeCategory.type === "duty") return;
+  if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
   const bundle = visibleBundle(lastDiscoveryBundle);
+  if (!bundle) return;
   const places = activeCategory.type === "all"
     ? Object.values(bundle).flat().sort((a, b) => a.distanceKm - b.distanceKm).slice(0, MAX_VISIBLE_PLACES)
     : (bundle[activeCategory.id] || []);
   activePlaces = places;
   renderDiscoveryHub(lastDiscoveryBundle);
   renderPlaces(places, activeCategory);
-  sourceText.textContent = "Veri: OpenStreetMap · görünen alan";
+  sourceText.textContent = "Veri: OpenStreetMap · canlı harita havuzu";
   if (statusMessage) statusText.textContent = statusMessage;
 }
 
@@ -653,92 +812,96 @@ function scheduleViewportRefresh({ force = false } = {}) {
 
 async function refreshViewportPlaces({ force = false } = {}) {
   if (!userLocation) return;
-  const envelope = buildViewportEnvelope();
-  if (!envelope) {
+
+  const visibleEnvelope = buildViewportEnvelope();
+  const prefetchEnvelope = buildSpatialPrefetchEnvelope();
+  if (!visibleEnvelope || !prefetchEnvelope) {
     document.body.classList.remove("map-results-updating");
     statusText.textContent = map.getZoom() < VIEWPORT_MIN_ZOOM
       ? "Yakındaki yerleri görmek için haritada biraz yakınlaş."
       : "Bu görünüm çok geniş; yakınlaştığında yerler otomatik akacak.";
     return;
   }
-  const key = viewportCacheKey(envelope);
-  lastViewportEnvelope = envelope;
 
-  if (!force && key === currentViewportKey && lastDiscoveryBundle) {
-    renderActiveCategoryFromBundle("Görünen alan güncel.");
+  const visibleCells = spatialCellsForEnvelope(visibleEnvelope);
+  const prefetchCells = spatialCellsForEnvelope(prefetchEnvelope);
+  const hydrated = hydrateSpatialCells(prefetchCells);
+  const hasVisibleCoverage = spatialCellsHaveCoverage(visibleCells);
+
+  if (hydrated || hasVisibleCoverage || spatialPoiPool.size) {
+    refreshBundleFromSpatialPool();
+    if (hasVisibleCoverage) renderActiveCategoryFromBundle(
+      hydrated ? "Kayıtlı çevre anında açıldı · komşu alanlar kontrol ediliyor…" : "Görünen alan hazır."
+    );
+  }
+
+  if (!force && spatialCellsAreFresh(prefetchCells)) {
+    document.body.classList.remove("map-results-updating");
+    if (hasVisibleCoverage) statusText.textContent = "Harita hazır · çevredeki hücreler önceden yüklü.";
     return;
   }
 
-  const fresh = readCache(key, VIEWPORT_CACHE_TTL);
-  if (fresh) {
-    currentViewportKey = key;
-    lastDiscoveryBundle = fresh;
-    renderActiveCategoryFromBundle("Görünen alan cihaz önbelleğinden anında açıldı.");
-    return;
-  }
+  const requestKey = viewportCacheKey(prefetchEnvelope);
+  if (activeViewportRequest?.key === requestKey) return;
 
-  let hasPreview = false;
-  const stale = readCache(key, VIEWPORT_STALE_TTL);
-  if (stale) {
-    currentViewportKey = key;
-    lastDiscoveryBundle = stale;
-    renderActiveCategoryFromBundle("Son görünen alan gösteriliyor · arka planda yenileniyor…");
-    hasPreview = true;
-  } else if (!activePlaces.length) {
-    showState("loading", "Haritada görünen alan taranıyor…");
-  }
+  activeViewportRequest?.controller.abort();
+  const controller = new AbortController();
+  const serial = ++viewportRequestSerial;
+  activeViewportRequest = { key: requestKey, controller, serial };
 
   document.body.classList.add("map-results-updating");
   updateMapContext(activePlaces, activeCategory, "loading");
+  if (!hasVisibleCoverage && !activePlaces.length) {
+    statusText.textContent = "Görünen alan yükleniyor · çevresi de hazırlanıyor…";
+  }
 
-  const serial = ++viewportRequestSerial;
   try {
-    const bundle = await fetchViewportBundle(envelope);
-    writeCache(key, bundle);
-    if (serial !== viewportRequestSerial) return;
-    const currentEnvelope = buildViewportEnvelope();
-    if (!currentEnvelope || viewportCacheKey(currentEnvelope) !== key) {
-      scheduleViewportRefresh();
-      return;
-    }
-    currentViewportKey = key;
-    lastDiscoveryBundle = bundle;
-    renderActiveCategoryFromBundle("Görünen alan yenilendi.");
+    const bundle = await fetchViewportBundle(prefetchEnvelope, { signal: controller.signal });
+    if (controller.signal.aborted || serial !== viewportRequestSerial) return;
+
+    mergeBundleIntoSpatialPool(bundle);
+    persistSpatialCells(prefetchCells, bundle);
+    refreshBundleFromSpatialPool();
+    renderActiveCategoryFromBundle("Görünen alan güncellendi · komşu alanlar hazır.");
   } catch (error) {
+    if (error?.name === "AbortError") return;
     if (serial !== viewportRequestSerial) return;
-    console.warn("Viewport discovery unavailable", error);
+    console.warn("Spatial discovery unavailable", error);
     document.body.classList.remove("map-results-updating");
-    if (hasPreview || activePlaces.length) {
-      statusText.textContent = "Mevcut yerler gösteriliyor; yeni alan şu an yenilenemedi.";
+    if (hasVisibleCoverage || activePlaces.length) {
+      statusText.textContent = "Mevcut harita verisi korunuyor; yeni hücreler şu an yenilenemedi.";
       updateMapContext(activePlaces, activeCategory);
       return;
     }
     updateMapContext([], activeCategory, "error");
-    showState("error", "Bu alanın yer verisi şu an alınamadı. Haritayı biraz hareket ettirince otomatik yeniden denenecek.");
-  }
-}
-
-async function fetchViewportBundle(envelope) {
-  const key = viewportCacheKey(envelope);
-  if (viewportRequest?.key === key) return viewportRequest.promise;
-  const promise = (async () => bundleFromOsmPayload(await fetchViewportPayload(envelope)))();
-  viewportRequest = { key, promise };
-  try {
-    return await promise;
+    showState("error", "Bu alanın yer verisi şu an alınamadı. Haritayı hareket ettirince otomatik yeniden denenecek.");
   } finally {
-    if (viewportRequest?.promise === promise) viewportRequest = null;
+    if (activeViewportRequest?.serial === serial) activeViewportRequest = null;
   }
 }
 
-async function fetchViewportPayload(envelope) {
+async function fetchViewportBundle(envelope, { signal } = {}) {
+  const payload = await fetchViewportPayload(envelope, { signal });
+  return bundleFromOsmPayload(payload);
+}
+
+async function fetchViewportPayload(envelope, { signal } = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), VIEWPORT_REQUEST_TIMEOUT);
+  let timedOut = false;
+  const forwardAbort = () => controller.abort();
+  signal?.addEventListener("abort", forwardAbort, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, VIEWPORT_REQUEST_TIMEOUT);
+
   const params = new URLSearchParams({
     south: String(envelope.south),
     west: String(envelope.west),
     north: String(envelope.north),
     east: String(envelope.east),
   });
+
   try {
     const response = await fetch(`/api/viewport?${params}`, {
       signal: controller.signal,
@@ -749,11 +912,20 @@ async function fetchViewportPayload(envelope) {
     if (!Array.isArray(payload.elements)) throw new Error("Invalid viewport response");
     return payload;
   } catch (error) {
+    if (signal?.aborted) throw new DOMException("Viewport request cancelled", "AbortError");
+    if (error?.name === "AbortError" && !timedOut) throw error;
+
     console.warn("Viewport proxy unavailable; trying browser source.", error);
     const bbox = [envelope.south, envelope.west, envelope.north, envelope.east].join(",");
     const query = `[out:json][timeout:5];(nwr[\"amenity\"~\"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$\"](${bbox});nwr[\"shop\"~\"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$\"](${bbox});nwr[\"leisure\"=\"park\"](${bbox}););out center tags qt;`;
     const fallbackController = new AbortController();
-    const fallbackTimer = setTimeout(() => fallbackController.abort(), VIEWPORT_FALLBACK_TIMEOUT);
+    let fallbackTimedOut = false;
+    const forwardFallbackAbort = () => fallbackController.abort();
+    signal?.addEventListener("abort", forwardFallbackAbort, { once: true });
+    const fallbackTimer = setTimeout(() => {
+      fallbackTimedOut = true;
+      fallbackController.abort();
+    }, VIEWPORT_FALLBACK_TIMEOUT);
     try {
       const url = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
       const fallback = await fetch(url, { signal: fallbackController.signal });
@@ -761,11 +933,17 @@ async function fetchViewportPayload(envelope) {
       const payload = await fallback.json();
       if (!Array.isArray(payload.elements) || payload.remark) throw new Error("Invalid viewport fallback");
       return payload;
+    } catch (fallbackError) {
+      if (signal?.aborted) throw new DOMException("Viewport request cancelled", "AbortError");
+      if (fallbackError?.name === "AbortError" && !fallbackTimedOut) throw fallbackError;
+      throw fallbackError;
     } finally {
       clearTimeout(fallbackTimer);
+      signal?.removeEventListener("abort", forwardFallbackAbort);
     }
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", forwardAbort);
   }
 }
 
@@ -947,9 +1125,8 @@ function normalizeDutyPharmacy(row, location) {
 }
 
 async function fetchOsmBundle() {
-  const envelope = buildViewportEnvelope();
-  if (!envelope) return Object.fromEntries(osmCategories.map(category => [category.id, []]));
-  return fetchViewportBundle(envelope);
+  if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
+  return lastDiscoveryBundle || Object.fromEntries(osmCategories.map(category => [category.id, []]));
 }
 
 function categoryForOsmElement(element) {
@@ -1065,42 +1242,111 @@ function scheduleMapLabelUpdate() {
 function handleMapZoomEnd() {
   if (renderedMapPlaces.length) renderMapPlaces(renderedMapPlaces);
   else scheduleMapLabelUpdate();
+  if (!manualLocationMode) scheduleViewportRefresh();
 }
 
 function shouldClusterPlaces(places) {
-  return places.length >= MAP_CLUSTER_MIN_COUNT && map.getZoom() < MAP_CLUSTER_MAX_ZOOM;
+  return places.length > 1;
 }
+
+function placeDisplayPriority(place, index = 0) {
+  const categoryLabel = categories.find(category => category.id === place.category)?.label || "";
+  let score = 1000 - Math.min(index, 500);
+  if (place.id === selectedPlace?.id) score += 10000;
+  if (isFavorite(place.id)) score += 1200;
+  if (routeStops.some(stop => stop.id === place.id)) score += 700;
+  if (place.name && place.name !== categoryLabel) score += 500;
+  if (activeCategory.type !== "all" && place.category === activeCategory.id) score += 300;
+  if (Number.isFinite(place.distanceKm)) score += Math.max(0, 220 - Math.round(place.distanceKm * 35));
+  return score;
+}
+
+function markerCollisionDistancePx() {
+  const zoom = map.getZoom();
+  if (zoom >= 17) return 42;
+  if (zoom >= 16) return 48;
+  if (zoom >= 15) return 54;
+  if (zoom >= 14) return 62;
+  return 76;
+}
+
 
 function buildMapClusters(places) {
   if (!shouldClusterPlaces(places)) return places.map(place => ({ places: [place] }));
-  const cellSize = map.getZoom() < 12 ? 92 : 76;
-  const buckets = new Map();
-  places.forEach(place => {
-    const point = map.latLngToLayerPoint([place.lat, place.lng]);
-    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
-    const bucket = buckets.get(key) || [];
-    bucket.push(place);
-    buckets.set(key, bucket);
-  });
-  return [...buckets.values()].map(group => ({ places: group }));
+  const radius = markerCollisionDistancePx();
+  const radiusSquared = radius * radius;
+  const ordered = [...places]
+    .map((place, index) => ({ place, index, priority: placeDisplayPriority(place, index) }))
+    .sort((a, b) => b.priority - a.priority);
+  const groups = [];
+
+  for (const item of ordered) {
+    const point = map.latLngToLayerPoint([item.place.lat, item.place.lng]);
+    let target = null;
+    for (const group of groups) {
+      const dx = point.x - group.x;
+      const dy = point.y - group.y;
+      if (dx * dx + dy * dy <= radiusSquared) {
+        target = group;
+        break;
+      }
+    }
+    if (!target) {
+      groups.push({ x: point.x, y: point.y, places: [item.place] });
+      continue;
+    }
+    target.places.push(item.place);
+    const count = target.places.length;
+    target.x = target.x + (point.x - target.x) / count;
+    target.y = target.y + (point.y - target.y) / count;
+  }
+
+  return groups.map(group => ({ places: group.places }));
 }
 
 function renderMapPlaces(places) {
   renderedMapPlaces = [...places];
-  clearPlaceMarkers();
   if (!places.length) {
+    clearPlaceMarkers();
     updateMapContext([], activeCategory, "empty");
     document.body.classList.remove("map-results-updating");
     return;
   }
+
   const groups = buildMapClusters(places);
+  const standaloneIds = new Set(groups.filter(group => group.places.length === 1).map(group => group.places[0].id));
+
+  for (const [id, marker] of placeMarkerById) {
+    if (standaloneIds.has(id)) continue;
+    marker.remove();
+    placeMarkerById.delete(id);
+  }
+
+  clusterMarkers.forEach(marker => marker.remove());
+  clusterMarkers = [];
+
   groups.forEach((group, index) => {
-    if (group.places.length > 1) addPlaceCluster(group.places, index);
-    else {
-      const place = group.places[0];
-      addPlaceMarker(place, iconForCategory(place.category), places[0]?.id === place.id, places.indexOf(place));
+    if (group.places.length > 1) {
+      clusterMarkers.push(addPlaceCluster(group.places, index));
+      return;
+    }
+    const place = group.places[0];
+    const placeIndex = places.indexOf(place);
+    let marker = placeMarkerById.get(place.id);
+    if (!marker) {
+      marker = addPlaceMarker(place, iconForCategory(place.category), places[0]?.id === place.id, placeIndex);
+      placeMarkerById.set(place.id, marker);
+    } else {
+      marker.place = place;
+      marker.labelPriority = placeDisplayPriority(place, placeIndex);
+      marker.setLatLng?.([place.lat, place.lng]);
+      marker.setTooltipContent?.(escapeHtml(place.name));
+      const markerEl = marker.getElement()?.querySelector?.(".place-marker");
+      markerEl?.classList.toggle("is-nearest", places[0]?.id === place.id);
     }
   });
+
+  markers = [...placeMarkerById.values(), ...clusterMarkers];
   markSelectedPlace();
   scheduleMapLabelUpdate();
   updateMapContext(places, activeCategory);
@@ -1120,8 +1366,8 @@ function addPlaceCluster(places, index = 0) {
     icon: L.divIcon({
       className: "",
       html: `<div data-category="${escapeHtml(categoryId)}" class="place-cluster" style="--marker-delay:${Math.min(index, 8) * 24}ms"><strong>${places.length}</strong><span>${escapeHtml(label)}</span></div>`,
-      iconSize: [58, 58],
-      iconAnchor: [29, 29],
+      iconSize: [50, 50],
+      iconAnchor: [25, 25],
     }),
   }).addTo(map);
   marker.isCluster = true;
@@ -1130,11 +1376,11 @@ function addPlaceCluster(places, index = 0) {
     map.fitBounds(bounds, {
       paddingTopLeft: [24, 110],
       paddingBottomRight: [24, mapBottomPadding()],
-      maxZoom: 16,
+      maxZoom: 18,
       animate: mapShouldAnimate,
     });
   });
-  markers.push(marker);
+  return marker;
 }
 
 function mapBottomPadding() {
@@ -1226,44 +1472,105 @@ function buildMeta(place) {
 }
 
 function addPlaceMarker(place, icon, isNearest = false, index = 0) {
-  const markerSize = 44;
+  const markerSize = isNearest ? 40 : 36;
   const marker = L.marker([place.lat, place.lng], {
     title: place.name,
     alt: place.name,
     bubblingMouseEvents: false,
     icon: L.divIcon({
       className: "",
-      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker${isNearest ? " is-nearest" : ""}" style="--marker-delay:${Math.min(index, 10) * 22}ms"><span>${categorySvg(place.category)}</span></div>`,
+      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker${isNearest ? " is-nearest" : ""}" style="--marker-delay:${Math.min(index, 10) * 18}ms"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
-  }).bindTooltip(escapeHtml(place.name), { direction: "right", offset: [12, 0], permanent: true, opacity: 1, className: "place-label" }).addTo(map);
+  }).bindTooltip(escapeHtml(place.name), {
+    direction: "top",
+    offset: [0, -22],
+    permanent: true,
+    opacity: 1,
+    className: "place-label",
+    pane: "placeLabels",
+  }).addTo(map);
   marker.isCluster = false;
   marker.placeId = place.id;
   marker.placeName = place.name;
-  marker.labelPriority = index;
+  marker.place = place;
+  marker.labelPriority = placeDisplayPriority(place, index);
   marker.hasSpecificName = place.name !== (categories.find(category => category.id === place.category)?.label || "");
-  marker.on("click", () => openPlaceDetails(place, marker.getElement()));
-  markers.push(marker);
+  marker.on("click", () => openPlaceDetails(marker.place, marker.getElement()));
+  return marker;
 }
 
 function updateMapLabels() {
   const viewport = map.getSize();
   const mobileViewport = viewport.x < 760;
-  const labelLimit = map.getZoom() >= 16 ? (mobileViewport ? 9 : 16) : map.getZoom() >= 14 ? (mobileViewport ? 6 : 11) : (mobileViewport ? 3 : 5);
-  const occupied = [];
+  const zoom = map.getZoom();
+  const labelLimit = zoom >= 17
+    ? (mobileViewport ? 16 : 26)
+    : zoom >= 16
+      ? (mobileViewport ? 12 : 20)
+      : zoom >= 15
+        ? (mobileViewport ? 9 : 15)
+        : (mobileViewport ? 6 : 10);
+
+  const placeMarkers = [...placeMarkerById.values()];
+  const markerRects = placeMarkers.map(marker => {
+    const point = map.latLngToContainerPoint(marker.getLatLng());
+    return {
+      placeId: marker.placeId,
+      left: point.x - 22,
+      right: point.x + 22,
+      top: point.y - 22,
+      bottom: point.y + 22,
+    };
+  });
+
+  const occupiedLabels = [];
   let visible = 0;
-  markers.forEach(marker => {
-    if (marker.isCluster || !marker.placeId) return;
+  const ordered = placeMarkers.sort((a, b) => {
+    const aSelected = a.placeId === selectedPlace?.id ? 1 : 0;
+    const bSelected = b.placeId === selectedPlace?.id ? 1 : 0;
+    return bSelected - aSelected || (b.labelPriority || 0) - (a.labelPriority || 0);
+  });
+
+  ordered.forEach(marker => {
     const selected = marker.placeId === selectedPlace?.id;
     const point = map.latLngToContainerPoint(marker.getLatLng());
-    const width = Math.min(178, 24 + marker.placeName.length * 6.4);
-    const rect = { left: point.x + 28, right: point.x + 28 + width, top: point.y - 18, bottom: point.y + 18 };
-    const overlaps = occupied.some(other => rect.left < other.right + 8 && rect.right + 8 > other.left && rect.top < other.bottom + 8 && rect.bottom + 8 > other.top);
-    const onScreen = rect.left < viewport.x && rect.right > 0 && rect.bottom > 0 && rect.top < viewport.y;
-    const show = selected || (marker.hasSpecificName && visible < labelLimit && onScreen && !overlaps);
-    if (show && !selected) visible++;
-    if (show) occupied.push(rect);
+    const width = Math.min(mobileViewport ? 154 : 188, 30 + marker.placeName.length * 6.35);
+    const height = selected ? 34 : 29;
+    const bottom = point.y - 30;
+    const rect = {
+      left: point.x - width / 2,
+      right: point.x + width / 2,
+      top: bottom - height,
+      bottom,
+    };
+
+    const onScreen = rect.left < viewport.x - 4 && rect.right > 4 && rect.bottom > 4 && rect.top < viewport.y - 4;
+    const overlapsLabel = occupiedLabels.some(other =>
+      rect.left < other.right + 8 &&
+      rect.right + 8 > other.left &&
+      rect.top < other.bottom + 6 &&
+      rect.bottom + 6 > other.top
+    );
+    const hitsOtherPin = markerRects.some(other =>
+      other.placeId !== marker.placeId &&
+      rect.left < other.right + LABEL_MARKER_GAP_PX &&
+      rect.right + LABEL_MARKER_GAP_PX > other.left &&
+      rect.top < other.bottom + LABEL_MARKER_GAP_PX &&
+      rect.bottom + LABEL_MARKER_GAP_PX > other.top
+    );
+
+    const show = selected || (
+      marker.hasSpecificName &&
+      visible < labelLimit &&
+      onScreen &&
+      !overlapsLabel &&
+      !hitsOtherPin
+    );
+
+    if (show && !selected) visible += 1;
+    if (show) occupiedLabels.push(rect);
     if (show) marker.openTooltip();
     else marker.closeTooltip();
   });
@@ -1402,7 +1709,10 @@ function renderRoute() {
 }
 
 function clearPlaceMarkers() {
-  markers.forEach((marker) => marker.remove());
+  for (const marker of placeMarkerById.values()) marker.remove();
+  clusterMarkers.forEach(marker => marker.remove());
+  placeMarkerById.clear();
+  clusterMarkers = [];
   markers = [];
 }
 
