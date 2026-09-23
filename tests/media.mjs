@@ -45,7 +45,9 @@ assert.equal(goodStation.language, "turkish");
 assert.equal(goodStation.hls, true);
 assert.equal(cleanProviderText("UNKNOWN"), "");
 const slowTurkProxy = "https://www.slowturk.com.tr/_next/image?url=https%3A%2F%2Fassets.blupoint.io%2Fimg%2F85%2F330x175%2F6410d8c4310c17000763c62b&w=256&q=75";
-assert.equal(normalizeArtworkUrl(slowTurkProxy), "https://assets.blupoint.io/img/85/330x175/6410d8c4310c17000763c62b");
+assert.equal(normalizeArtworkUrl(slowTurkProxy), "");
+assert.equal(normalizeArtworkUrl("https://assets.blupoint.io/img/85/330x175/6410d8c4310c17000763c62b"), "");
+assert.equal(normalizeArtworkUrl("https://example.com/logo.png"), "https://example.com/logo.png");
 assert.equal(normalizeArtworkUrl("javascript:alert(1)"), "");
 assert.equal(normalizeStation({ ...goodStation, stationuuid: "x", url_resolved: "http://insecure", lastcheckok: 1 }), null);
 assert.equal(uniqueStations([
