@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.3";
+const APP_VERSION = "2.2.4";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -89,7 +89,7 @@ try {
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
-map.on("zoomend", updateMapLabels);
+map.on("moveend zoomend", updateMapLabels);
 
 const categoryStrip = document.querySelector("#categoryStrip");
 const results = document.querySelector("#results");
@@ -814,6 +814,7 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
     .addTo(map);
 
   marker.placeId = place.id;
+  marker.placeName = place.name;
   marker.labelPriority = index;
   marker.hasSpecificName = place.name !== (categories.find(category => category.id === place.category)?.label || "");
   marker.on("click", () => openPlaceDetails(place, marker.getElement()));
@@ -821,11 +822,20 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
 }
 
 function updateMapLabels() {
-  const labelLimit = map.getZoom() >= 15 ? 16 : map.getZoom() >= 13 ? 10 : 5;
+  const labelLimit = map.getZoom() >= 15 ? 14 : map.getZoom() >= 13 ? 9 : 5;
+  const occupied = [];
+  const viewport = map.getSize();
   let visible = 0;
   markers.forEach(marker => {
-    const show = marker.placeId === selectedPlace?.id || (marker.hasSpecificName && visible < labelLimit);
-    if (show && marker.placeId !== selectedPlace?.id) visible++;
+    const selected = marker.placeId === selectedPlace?.id;
+    const point = map.latLngToContainerPoint(marker.getLatLng());
+    const width = Math.min(165, 20 + marker.placeName.length * 6.5);
+    const rect = { left: point.x + 29, right: point.x + 29 + width, top: point.y - 17, bottom: point.y + 17 };
+    const overlaps = occupied.some(other => rect.left < other.right + 7 && rect.right + 7 > other.left && rect.top < other.bottom + 7 && rect.bottom + 7 > other.top);
+    const onScreen = rect.left < viewport.x && rect.right > 0 && rect.bottom > 0 && rect.top < viewport.y;
+    const show = selected || (marker.hasSpecificName && visible < labelLimit && onScreen && !overlaps);
+    if (show && !selected) visible++;
+    if (show) occupied.push(rect);
     if (show) marker.openTooltip();
     else marker.closeTooltip();
   });

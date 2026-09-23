@@ -5,8 +5,8 @@ const app=readFileSync('app.js','utf8');
 assert.ok(!app.includes('document.querySelectorAll("[data-view]")'), 'View listener must not attach to body and close details on every click');
 function extract(name){const start=app.indexOf(`function ${name}(`);const end=app.indexOf('\nfunction ',start+1);return app.slice(start,end<0?app.length:end);}
 let selected=null;
-const marker={bindTooltip(text,options){this.tooltip={text,options};return this;},addTo(){return this;},on(event,callback){this.click=callback;},getElement(){return {id:'pin'};},openTooltip(){this.labelOpen=true;},closeTooltip(){this.labelOpen=false;}};
-const ctx=vm.createContext({L:{marker:()=>marker,divIcon:o=>o},map:{getZoom:()=>14},markers:[],selectedPlace:null,categories:[{id:'cafe',label:'Kafe'}],categorySvg:()=>'<svg/>',escapeHtml:s=>s,openPlaceDetails:p=>{selected=p;},setView:()=>{throw Error('Unexpected view switch');}});
+const marker={bindTooltip(text,options){this.tooltip={text,options};return this;},addTo(){return this;},on(event,callback){this.click=callback;},getElement(){return {id:'pin'};},getLatLng(){return {lat:36,lng:30};},openTooltip(){this.labelOpen=true;},closeTooltip(){this.labelOpen=false;}};
+const ctx=vm.createContext({L:{marker:()=>marker,divIcon:o=>o},map:{getZoom:()=>14,getSize:()=>({x:400,y:800}),latLngToContainerPoint:()=>({x:100,y:100})},markers:[],selectedPlace:null,categories:[{id:'cafe',label:'Kafe'}],categorySvg:()=>'<svg/>',escapeHtml:s=>s,openPlaceDetails:p=>{selected=p;},setView:()=>{throw Error('Unexpected view switch');}});
 vm.runInContext(extract('addPlaceMarker'),ctx);
 ctx.place={id:'one',name:'Test cafe',category:'cafe',lat:36,lng:30};
 vm.runInContext('addPlaceMarker(place,"",false)',ctx);marker.click();assert.equal(selected.id,'one');
