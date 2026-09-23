@@ -647,3 +647,27 @@ body[data-view=map].has-route .sheet[data-state=half]{height:min(31dvh,285px)}bo
 .leaflet-tooltip-top.place-label:before{border-top-color:#fff!important}
 .leaflet-tooltip.place-label.is-selected-place-label{max-width:220px;padding:7px 10px!important;border-color:#9fc8b7!important;background:#fff!important;color:#103a2e!important;font-size:12px!important;box-shadow:0 9px 24px #173c3238!important;transform:translateY(-2px) scale(1.03)}
 @media(max-width:759px){.leaflet-tooltip.place-label{max-width:154px;font-size:10.5px!important}.leaflet-tooltip.place-label.is-selected-place-label{max-width:188px;font-size:11.5px!important}}
+
+
+/* v2.7.1 mobile cartography density pass */
+.map-context-chevron{display:none!important}
+.place-cluster{width:40px;height:40px;border-radius:14px;border:2px solid #fff;display:grid;place-items:center;align-content:center;box-shadow:0 5px 15px #173c323d}
+.place-cluster strong{font-size:14px;line-height:1}
+.place-cluster span{display:none!important}
+@media(max-width:759px){
+  body[data-view=map] .sheet[data-state=peek]{height:82px;padding:3px 14px 8px}
+  body[data-view=map] .sheet[data-state=peek] .viewport-live-hint{display:none!important}
+  body[data-view=map] .sheet[data-state=peek] .sheet-row{align-items:center}
+  body[data-view=map] .sheet[data-state=peek] .sheet-row>div{min-width:0;width:100%}
+  body[data-view=map] .sheet[data-state=peek] .result-title{font-size:13.5px;line-height:1.15}
+  body[data-view=map] .sheet[data-state=peek] .result-summary{font-size:10.5px;line-height:1.25}
+  body[data-view=map] .map-context{min-height:48px;padding:6px 10px 6px 7px;gap:8px}
+  body[data-view=map] .map-context-icon{width:34px;height:34px;flex-basis:34px;border-radius:10px}
+  body[data-view=map] .map-context-copy strong{font-size:11.5px}
+  body[data-view=map] .map-context-copy small{font-size:9.5px}
+  .place-marker{width:32px;height:32px;border-radius:11px}
+  .place-marker.is-nearest{width:36px;height:36px}
+  .place-marker svg{width:15px;height:15px}
+  .place-cluster{width:38px;height:38px;border-radius:13px}
+  .place-cluster strong{font-size:13px}
+}
