@@ -1,4 +1,4 @@
-const APP_VERSION = "2.7.2";
+const APP_VERSION = "2.7.3";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -23,8 +23,8 @@ const MOTION = Object.freeze({
 const MAP_CLUSTER_MIN_COUNT = 8;
 const MAP_CLUSTER_MAX_ZOOM = 14;
 const STALE_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
-const FAST_LOCATION_TIMEOUT = 2500;
-const ACCURATE_LOCATION_TIMEOUT = 7000;
+const FAST_LOCATION_TIMEOUT = 5000;
+const ACCURATE_LOCATION_TIMEOUT = 12000;
 const LOCATION_REFRESH_DISTANCE_M = 120;
 const LAST_LOCATION_MAX_AGE = 3 * 24 * 60 * 60 * 1000;
 const VIEWPORT_GRID_DEGREES = 0.01;
@@ -327,49 +327,54 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
     locateButton.disabled = true;
     locateButton.classList.add("is-loading");
     manualLocationButton.hidden = true;
-    statusText.textContent = "Konum aranıyor…";
-    if (!activePlaces.length) showState("loading", "Konum hızlıca belirleniyor…");
+    statusText.textContent = "Hassas konum aranıyor…";
+    if (!activePlaces.length) showState("loading", "Telefonun gerçek konumu bekleniyor…");
   }
 
-  // Do not gate geolocation behind Permissions API.
-  // Safari/iOS can report "prompt" (or stale permission state) even when
-  // getCurrentPosition is allowed. The geolocation call is authoritative.
-  const fastPromise = settlePosition("fast", {
-    enableHighAccuracy: false,
-    timeout: FAST_LOCATION_TIMEOUT,
-    maximumAge: forceFresh ? 2 * 60 * 1000 : 15 * 60 * 1000,
-  });
-  const accuratePromise = settlePosition("accurate", {
+  // iOS/Safari is more reliable with one authoritative geolocation request
+  // at a time. Ask for a fresh high-accuracy fix first; only fall back to a
+  // coarse position after that request actually fails.
+  const accurate = await settlePosition("accurate", {
     enableHighAccuracy: true,
     timeout: ACCURATE_LOCATION_TIMEOUT,
-    maximumAge: 0,
+    maximumAge: forceFresh ? 0 : 30 * 1000,
   });
 
-  const first = await Promise.race([fastPromise, accuratePromise]);
   if (serial !== locationAttemptSerial) return;
-  if (first.position) {
-    applyUserPosition(first.position, { provisional: first.kind === "fast", background });
-    if (first.kind === "accurate") return;
-    const refined = await accuratePromise;
-    if (serial !== locationAttemptSerial) return;
-    if (refined.position) refineUserPosition(refined.position);
+  if (accurate.position) {
+    applyUserPosition(accurate.position, { provisional: false, background });
     return;
   }
 
-  const second = await (first.kind === "fast" ? accuratePromise : fastPromise);
+  if (accurate.error?.code === 1) {
+    locateButton.disabled = false;
+    locateButton.classList.remove("is-loading");
+    if (!background && !userLocation) showLocationFailure(locationErrorMessage(accurate.error));
+    else if (userLocation) statusText.textContent = "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı.";
+    return;
+  }
+
+  if (!background) statusText.textContent = "Hassas konum alınamadı · yaklaşık konum deneniyor…";
+
+  const fallback = await settlePosition("fallback", {
+    enableHighAccuracy: false,
+    timeout: FAST_LOCATION_TIMEOUT,
+    maximumAge: forceFresh ? 60 * 1000 : 5 * 60 * 1000,
+  });
+
   if (serial !== locationAttemptSerial) return;
-  if (second.position) {
-    applyUserPosition(second.position, { provisional: second.kind === "fast", background });
+  if (fallback.position) {
+    applyUserPosition(fallback.position, { provisional: true, background });
     return;
   }
 
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
-  const error = chooseLocationError(first.error, second.error);
+  const error = chooseLocationError(accurate.error, fallback.error);
   if (!background && !userLocation) showLocationFailure(locationErrorMessage(error));
   else if (userLocation) statusText.textContent = error?.code === 1
     ? "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı."
-    : "Son bilinen konum kullanılıyor.";
+    : "Canlı konum alınamadı · son bilinen konum korunuyor.";
 }
 
 function chooseLocationError(firstError, secondError) {
@@ -388,8 +393,13 @@ function getCurrentPosition(options) {
   });
 }
 async function settlePosition(kind, options) {
-  try { return { kind, position: await getCurrentPosition(options), error: null }; }
-  catch (error) { return { kind, position: null, error }; }
+  try {
+    const position = await getCurrentPosition(options);
+    if (!positionIsUsable(position)) return { kind, position: null, error: { code: 2, message: "invalid_position" } };
+    return { kind, position, error: null };
+  } catch (error) {
+    return { kind, position: null, error };
+  }
 }
 
 async function getGeolocationPermissionState() {
@@ -402,25 +412,55 @@ async function getGeolocationPermissionState() {
   }
 }
 
+function locationZoomForAccuracy(accuracy, currentZoom = map.getZoom()) {
+  if (!Number.isFinite(accuracy) || accuracy <= 0) return Math.max(currentZoom, 14);
+  if (accuracy <= 80) return Math.max(currentZoom, 16);
+  if (accuracy <= 200) return Math.max(currentZoom, 15);
+  if (accuracy <= 600) return Math.max(Math.min(currentZoom, 15), 14);
+  if (accuracy <= 1500) return Math.max(Math.min(currentZoom, 14), 13);
+  if (accuracy <= 5000) return Math.max(Math.min(currentZoom, 13), 12);
+  return Math.max(Math.min(currentZoom, 12), 11);
+}
+
+function positionIsUsable(position) {
+  const lat = Number(position?.coords?.latitude);
+  const lng = Number(position?.coords?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+
 function applyUserPosition(position, { provisional = false, background = false } = {}) {
+  if (!positionIsUsable(position)) {
+    if (!background) showLocationFailure("Tarayıcı geçerli bir konum döndürmedi.");
+    return;
+  }
+
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
   manualLocationButton.hidden = true;
+
+  const accuracy = Number(position.coords.accuracy);
   userLocation = {
-    lat: position.coords.latitude,
-    lng: position.coords.longitude,
-    accuracy: position.coords.accuracy,
-    source: provisional ? "gps-fast" : "gps",
+    lat: Number(position.coords.latitude),
+    lng: Number(position.coords.longitude),
+    accuracy: Number.isFinite(accuracy) ? accuracy : null,
+    source: provisional ? "gps-fallback" : "gps",
   };
+
   persistLastLocation();
   document.querySelector("#welcome").hidden = true;
   document.body.classList.add("has-location");
   drawUserLocation();
-  const accuracyText = Number.isFinite(userLocation.accuracy) ? ` · yaklaşık ${Math.round(userLocation.accuracy)} m doğruluk` : "";
+
+  const accuracyText = Number.isFinite(userLocation.accuracy)
+    ? ` · yaklaşık ${Math.round(userLocation.accuracy)} m doğruluk`
+    : "";
   statusText.textContent = provisional
-    ? `Konum hazır${accuracyText} · doğruluk iyileştiriliyor…`
-    : `Konum hazır${accuracyText}`;
-  const targetZoom = Math.max(map.getZoom(), 15);
+    ? `Yaklaşık konum bulundu${accuracyText}`
+    : `Konum bulundu${accuracyText}`;
+
+  const targetZoom = locationZoomForAccuracy(userLocation.accuracy);
   map.flyTo([userLocation.lat, userLocation.lng], targetZoom, {
     animate: mapShouldAnimate && !background,
     duration: background ? 0.35 : 0.55,
