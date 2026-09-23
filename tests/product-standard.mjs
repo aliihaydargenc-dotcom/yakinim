@@ -45,7 +45,7 @@ status = vm.runInContext('openingStatus("Mo-Su 09:00-22:00", mondayLate)', conte
 assert.equal(status.state, "closed");
 assert.equal(vm.runInContext('openingStatus("sunrise-sunset", mondayTen)', context), null);
 
-for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "sectionTransition", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPlayerExpand", "radioPrev", "radioNext", "radioVolume"]) {
+for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "nowSection", "nowNearbyList", "nowNewsList", "nowRadioList", "sectionTransition", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPlayerExpand", "radioPrev", "radioNext", "radioVolume"]) {
   assert.match(index, new RegExp(`id="${id}"`));
 }
 assert.match(styles, /body\[data-view=map\] \.topbar\{display:none!important\}/);
@@ -83,6 +83,10 @@ assert.match(app, /radioCandidateNativePlayable/);
 assert.match(app, /scheduleRadioRecovery/);
 assert.match(app, /showSectionTransition/);
 assert.match(app, /hideSectionTransition/);
+assert.match(app, /loadNowDashboard/);
+assert.match(app, /openNowCategory/);
+assert.match(styles, /v3\.3 mobile app shell \+ Now home/);
+assert.match(index, /data-section="now"/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools\{display:grid!important/);
 assert.match(styles, /section-transition/);
@@ -91,6 +95,6 @@ assert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);
-assert.match(app, /setView\(isMobileLayout \? "map" : "list", isMobileLayout \? "peek"/);
+assert.match(app, /if \(isMobileLayout\) \{[\s\S]*loadNowDashboard\(\)/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");

@@ -1,6 +1,6 @@
 {
   "name": "yakinim",
-  "version": "3.2.2",
+  "version": "3.3.0",
   "private": true,
   "description": "Mobil öncelikli günlük ihtiyaç haritası",
   "scripts": {
