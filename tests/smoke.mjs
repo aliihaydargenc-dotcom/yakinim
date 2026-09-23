@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.11\.0"/);
+assert.match(app, /APP_VERSION = "2\.11\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -54,6 +54,8 @@ assert.match(app, /rankDiscoveryPlaces/);
 assert.match(app, /placeDataQualityScore/);
 assert.match(app, /hasMeaningfulPersonalization/);
 assert.match(app, /recordPlaceSignal/);
+assert.match(app, /resultCountLabel/);
+assert.match(app, /heading\.textContent = "Öne çıkanlar"/);
 assert.match(app, /supportsVectorBaseMap/);
 assert.ok(app.includes("window.maplibregl.supported"));
 assert.match(app, /switchToRasterBaseMap/);
@@ -91,7 +93,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v33/);
+assert.match(sw, /yakinimda-shell-v34/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

@@ -24,12 +24,15 @@ function extract(name) {
 }
 
 const context = vm.createContext({ Number, Math, Date, String });
-for (const name of ["estimateWalkingMinutes", "formatWalkingTime", "openingStatus"]) {
+context.MAX_VISIBLE_PLACES = 120;
+for (const name of ["estimateWalkingMinutes", "formatWalkingTime", "openingStatus", "resultCountLabel"]) {
   vm.runInContext(extract(name), context);
 }
 assert.equal(vm.runInContext("estimateWalkingMinutes(0.8)", context), 10);
 assert.equal(vm.runInContext('formatWalkingTime(0.8)', context), "~10 dk yürüme");
 assert.equal(vm.runInContext('formatWalkingTime(5)', context), "~1 sa 3 dk yürüme");
+assert.equal(vm.runInContext('resultCountLabel(119)', context), "119 sonuç");
+assert.equal(vm.runInContext('resultCountLabel(120)', context), "120+ sonuç");
 
 context.mondayTen = new Date("2026-09-21T10:00:00");
 context.mondayLate = new Date("2026-09-21T23:00:00");

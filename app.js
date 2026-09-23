@@ -1,4 +1,4 @@
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.11.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -1261,10 +1261,9 @@ function discoveryScore(place, signals = discoverySignals, favoriteRows = favori
 
 function discoveryReason(place, scored, favoriteRows = favorites) {
   if (favoriteRows.some(item => item.id === place.id)) return "Kaydettiğin yer";
-  if (scored.hours?.state === "open" && Number.isFinite(place.distanceKm)) return `Açık · ${formatWalkingTime(place.distanceKm)}`;
   if (scored.hours?.state === "open") return "Şu an açık";
   if (scored.personalScore >= 9) return "İlgilendiğin kategoriden";
-  if (Number.isFinite(place.distanceKm) && place.distanceKm <= .8) return `Yakınında · ${formatWalkingTime(place.distanceKm)}`;
+  if (Number.isFinite(place.distanceKm) && place.distanceKm <= .8) return "Yakınında";
   return categories.find(category => category.id === place.category)?.label || "Yakınında";
 }
 
@@ -1324,6 +1323,9 @@ function renderDiscoveryHub(bundle) {
     discoveryHub.hidden = true;
     return;
   }
+
+  const heading = discoveryHub.querySelector(".discovery-head h3");
+  if (heading) heading.textContent = "Öne çıkanlar";
 
   discoveryHub.hidden = false;
   discoveryCards.replaceChildren();
@@ -2184,6 +2186,11 @@ function showState(kind, message) {
   results.innerHTML = `<div class="state-card ${kind}-state" role="${kind === "error" ? "alert" : "status"}"><span class="state-visual" aria-hidden="true">${symbols[kind] || "·"}</span><div><strong>${escapeHtml(titles[kind] || "Bilgi")}</strong><p>${escapeHtml(message)}</p></div></div>`;
 }
 
+function resultCountLabel(count) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  return safeCount >= MAX_VISIBLE_PLACES ? `${MAX_VISIBLE_PLACES}+ sonuç` : `${safeCount} sonuç`;
+}
+
 function updateResultSummary(places) {
   if (!places.length) {
     resultSummary.textContent = "Görünen alanda sonuç yok";
@@ -2193,7 +2200,7 @@ function updateResultSummary(places) {
   const nearestText = nearest
     ? ` · en yakın ${formatDistance(nearest.distanceKm)} · ${formatWalkingTime(nearest.distanceKm)}`
     : "";
-  resultSummary.textContent = `${places.length} sonuç · görünen alan${nearestText}`;
+  resultSummary.textContent = `${resultCountLabel(places.length)} · görünen alan${nearestText}`;
 }
 
 function applySheetState(state) {
