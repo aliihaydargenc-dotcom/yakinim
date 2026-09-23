@@ -28,6 +28,12 @@
     },
     "api/viewport.js": {
       "maxDuration": 30
+    },
+    "api/news.js": {
+      "maxDuration": 15
+    },
+    "api/radio.js": {
+      "maxDuration": 20
     }
   }
 }

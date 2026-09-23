@@ -69,7 +69,7 @@ assert.match(app, /mobileViewport \? 10 : 22/);
 assert.match(styles, /has-location\[data-view=map\] \.map-context\{display:none!important\}/);
 assert.match(app, /· en yakın/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
-assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail" \}/);
+assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail", yakinimSection: "nearby" \}/);
 assert.doesNotMatch(app, /pointer: coarse\), \(prefers-reduced-motion/);
 
 console.log("Mobile discovery tests PASS: collision clustering, separate label pane, map-first navigation and touch motion.");

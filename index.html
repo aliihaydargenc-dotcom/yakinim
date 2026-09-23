@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=2.11.1" as="script" />
+    <link rel="preload" href="./app.js?v=3.0.0" as="script" />
     <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script" crossorigin />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -29,9 +29,9 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=2.11.1" />
+    <link rel="stylesheet" href="./styles.css?v=3.0.0" />
   </head>
-  <body data-view="list">
+  <body data-view="list" data-section="nearby">
     <main class="app-shell">
       <div id="map" aria-label="Yakındaki yerler haritası"></div>
       <button id="mapContext" class="map-context" type="button" aria-label="Harita keşif panelini aç">
@@ -86,6 +86,12 @@
           </button>
         </div>
       </header>
+
+      <nav id="sectionNav" class="section-nav" aria-label="Uygulama bölümleri">
+        <button type="button" data-section="nearby" aria-pressed="true"><span aria-hidden="true">⌖</span> Yakınım</button>
+        <button type="button" data-section="news" aria-pressed="false"><span aria-hidden="true">▤</span> Haber</button>
+        <button type="button" data-section="radio" aria-pressed="false"><span aria-hidden="true">◉</span> Radyo</button>
+      </nav>
 
       <section class="sheet" aria-label="Yakındaki yerler">
         <div class="explore-heading"><p class="eyebrow">YAKININDAKİ İHTİYAÇLAR</p><h2>Bugün nereye uğrayacaksın?</h2></div>
@@ -144,6 +150,48 @@
           <span>Favoriler cihazında saklanır.</span>
         </footer>
       </section>
+      <section id="newsSection" class="module-panel news-section" aria-labelledby="newsHeading" hidden>
+        <div class="module-heading">
+          <p class="eyebrow">GÜNDEM</p>
+          <h2 id="newsHeading">Haberler</h2>
+          <p>Başlıklar kaynak ve yayın zamanına göre gösterilir; kişiselleştirilmez.</p>
+        </div>
+        <div class="module-filter" aria-label="Haber kategorileri">
+          <button type="button" data-news-category="gundem" aria-pressed="true">Gündem</button>
+          <button type="button" data-news-category="turkiye" aria-pressed="false">Türkiye</button>
+          <button type="button" data-news-category="dunya" aria-pressed="false">Dünya</button>
+          <button type="button" data-news-category="ekonomi" aria-pressed="false">Ekonomi</button>
+          <button type="button" data-news-category="teknoloji" aria-pressed="false">Teknoloji</button>
+          <button type="button" data-news-category="yasam" aria-pressed="false">Yaşam</button>
+        </div>
+        <p id="newsStatus" class="module-status">Güncel başlıklar yüklenmeye hazır.</p>
+        <div id="newsList" class="news-list" aria-live="polite"></div>
+        <p class="module-source-note">Haber başlıkları kaynak sayfasına bağlanır; içerik uygulama içinde yeniden yayımlanmaz.</p>
+      </section>
+
+      <section id="radioSection" class="module-panel radio-section" aria-labelledby="radioHeading" hidden>
+        <div class="module-heading">
+          <p class="eyebrow">CANLI</p>
+          <h2 id="radioHeading">Radyo</h2>
+          <p>Çalışan HTTPS yayınlar arasından dinle. Antalya istasyonları varsa önce onlar gelir.</p>
+        </div>
+        <div class="module-filter" aria-label="Radyo filtreleri">
+          <button type="button" data-radio-scope="antalya" aria-pressed="true">Antalya</button>
+          <button type="button" data-radio-scope="turkiye" aria-pressed="false">Türkiye</button>
+          <button type="button" data-radio-scope="pop" aria-pressed="false">Pop</button>
+          <button type="button" data-radio-scope="rock" aria-pressed="false">Rock</button>
+        </div>
+        <p id="radioStatus" class="module-status">İstasyonlar yüklenmeye hazır.</p>
+        <div id="radioList" class="radio-list" aria-live="polite"></div>
+        <div id="radioPlayer" class="radio-player" hidden>
+          <button id="radioPlayToggle" type="button" class="radio-player-toggle" aria-label="Radyoyu oynat">▶</button>
+          <div class="radio-player-copy"><strong id="radioPlayerName"></strong><span id="radioPlayerMeta"></span></div>
+          <button id="radioPlayerClose" type="button" class="radio-player-close" aria-label="Radyo oynatıcısını kapat">×</button>
+          <audio id="radioAudio" preload="none"></audio>
+        </div>
+        <p class="module-source-note">İstasyon dizini: Radio Browser. Yayın erişilebilirliği istasyona göre değişebilir.</p>
+      </section>
+
     </main>
 
     <aside id="routeTray" class="route-tray" aria-label="Çok duraklı rota" hidden>
@@ -181,6 +229,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=2.11.1" defer></script>
+    <script src="./app.js?v=3.0.0" defer></script>
   </body>
 </html>

@@ -45,7 +45,7 @@ status = vm.runInContext('openingStatus("Mo-Su 09:00-22:00", mondayLate)', conte
 assert.equal(status.state, "closed");
 assert.equal(vm.runInContext('openingStatus("sunrise-sunset", mondayTen)', context), null);
 
-for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare"]) {
+for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "newsSection", "radioSection", "radioPlayer"]) {
   assert.match(index, new RegExp(`id="${id}"`));
 }
 assert.match(styles, /body\[data-view=map\] \.topbar\{display:none!important\}/);
@@ -65,6 +65,11 @@ assert.match(app, /yakinimView: "map-place"/);
 assert.match(app, /navigator\.share/);
 assert.match(app, /rankDiscoveryPlaces/);
 assert.match(app, /hasUsefulAddress/);
+assert.match(app, /parseDiscoveryQuery/);
+assert.match(app, /setSection/);
+assert.match(app, /loadNews/);
+assert.match(app, /loadRadio/);
+assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list", isMobileLayout \? "peek"/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");
