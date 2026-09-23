@@ -54,10 +54,14 @@ assert.match(app, /document\.body\.dataset\.sheetState = nextState/);
 assert.match(app, /if \(document\.body\.dataset\.view === "map"\) openMapQuickCard\(place, main\)/);
 assert.match(styles, /data-sheet-state=peek.*map-recenter/s);
 assert.match(styles, /has-map-quick-card \.sheet\{display:none!important\}/);
+assert.match(styles, /body\[data-view=list\] \.viewport-live-hint\{display:none!important\}/);
+assert.match(styles, /has-location\[data-view=map\] \.map-context\{display:none!important\}/);
 assert.match(app, /sheet\.inert = true/);
 assert.match(app, /map\.on\("dragstart", handleMapDragStart\)/);
 assert.match(app, /yakinimView: "map-place"/);
 assert.match(app, /navigator\.share/);
+assert.match(app, /rankDiscoveryPlaces/);
+assert.match(app, /hasUsefulAddress/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list", isMobileLayout \? "peek"/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");

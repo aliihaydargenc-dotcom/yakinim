@@ -1,4 +1,4 @@
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.11.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -6,7 +6,8 @@ const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
 const ROUTE_KEY = "yakinimda:route:v1";
 const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
-const DISCOVERY_CARD_LIMIT = 6;
+const DISCOVERY_CARD_LIMIT = 4;
+const DISCOVERY_PERSONALIZATION_THRESHOLD = 5;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
 const LAST_LOCATION_KEY = "yakinimda:last-location:v1";
 const VIEWPORT_CACHE_PREFIX = "yakinimda:viewport:v1:";
@@ -70,7 +71,7 @@ const isMobileLayout = window.matchMedia("(max-width: 759px)").matches;
 const prefs = readJson(PREFS_KEY, { category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
 let routeStops = readJson(ROUTE_KEY, []).filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lng)).slice(0, 4);
-let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, lastCategory: null });
+let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, placeViews: {}, lastCategory: null, interactions: 0 });
 let userLocation = null;
 let activeCategory = categories.find((category) => category.id === prefs.category) || categories[0];
 let searchTerm = "";
@@ -82,6 +83,7 @@ let selectedPlace = null;
 let detailTrigger = null;
 let quickCardReturnSheetState = "peek";
 let quickCardReturnHistoryState = "map-peek";
+let lastDiscoveryInteraction = { placeId: null, at: 0 };
 let listScrollY = 0;
 let mapHasFramedResults = false;
 let toastTimer;
@@ -428,7 +430,7 @@ function selectCategory(category) {
   if (mapSearchInput) mapSearchInput.value = "";
   if (mapSearchClear) mapSearchClear.hidden = true;
   closeMapQuickCard();
-  resultTitle.textContent = category.type === "all" ? "Görünen alandaki yerler" : category.label;
+  resultTitle.textContent = category.type === "all" ? "Yakındaki yerler" : category.label;
   prefs.category = category.id;
   persistPrefs();
   renderCategoryButtons();
@@ -449,7 +451,7 @@ function selectCategory(category) {
     refreshDutyViewport({ force: true });
     return;
   }
-  if (lastDiscoveryBundle) renderActiveCategoryFromBundle("Kategori anında değiştirildi.");
+  if (lastDiscoveryBundle) renderActiveCategoryFromBundle();
   else showState("loading", "Görünen alan hazırlanıyor…");
   scheduleViewportRefresh();
 }
@@ -1002,7 +1004,7 @@ function renderActiveCategoryFromBundle(statusMessage = "") {
   renderDiscoveryHub(lastDiscoveryBundle);
   renderPlaces(places, activeCategory);
   sourceText.textContent = "Veri: OpenStreetMap · canlı harita havuzu";
-  if (statusMessage) statusText.textContent = statusMessage;
+  statusText.textContent = statusMessage;
 }
 
 function scheduleViewportRefresh({ force = false } = {}) {
@@ -1035,13 +1037,13 @@ async function refreshViewportPlaces({ force = false } = {}) {
   if (hydrated || hasVisibleCoverage || spatialPoiPool.size) {
     refreshBundleFromSpatialPool();
     if (hasVisibleCoverage) renderActiveCategoryFromBundle(
-      hydrated ? "Kayıtlı çevre anında açıldı · komşu alanlar kontrol ediliyor…" : "Görünen alan hazır."
+      hydrated ? "Yakındaki yerler cihazdan gösteriliyor · güncelleniyor…" : ""
     );
   }
 
   if (!force && spatialCellsAreFresh(prefetchCells)) {
     document.body.classList.remove("map-results-updating");
-    if (hasVisibleCoverage) statusText.textContent = "Harita hazır · çevredeki hücreler önceden yüklü.";
+    if (hasVisibleCoverage) statusText.textContent = "";
     return;
   }
 
@@ -1066,7 +1068,7 @@ async function refreshViewportPlaces({ force = false } = {}) {
     mergeBundleIntoSpatialPool(bundle);
     persistSpatialCells(prefetchCells, bundle);
     refreshBundleFromSpatialPool();
-    renderActiveCategoryFromBundle("Görünen alan güncellendi · komşu alanlar hazır.");
+    renderActiveCategoryFromBundle();
   } catch (error) {
     if (error?.name === "AbortError") return;
     if (serial !== viewportRequestSerial) return;
@@ -1168,7 +1170,7 @@ async function refreshDutyViewport({ force = false } = {}) {
   if (cached) {
     activePlaces = decorateViewportPlaces(cached);
     renderPlaces(activePlaces, activeCategory);
-    statusText.textContent = "Nöbetçi eczaneler görünen alan için hazır.";
+    statusText.textContent = "";
     return;
   }
   document.body.classList.add("map-results-updating");
@@ -1179,7 +1181,7 @@ async function refreshDutyViewport({ force = false } = {}) {
     if (activeCategory.type !== "duty") return;
     activePlaces = decorateViewportPlaces(rows);
     renderPlaces(activePlaces, activeCategory);
-    statusText.textContent = "Nöbetçi eczaneler görünen alana göre yenilendi.";
+    statusText.textContent = "";
   } catch (error) {
     document.body.classList.remove("map-results-updating");
     console.warn("Duty viewport unavailable", error);
@@ -1196,27 +1198,117 @@ async function refreshDiscoveryHub() {
   renderDiscoveryHub(lastDiscoveryBundle);
 }
 
-function rankDiscoveryCategories(bundle, signals = { categoryViews: {}, lastCategory: null }, favoriteRows = []) {
-  const fallbackOrder = ["food", "cafe", "market", "park", "pharmacy", "bakery", "atm", "fuel", "shopping", "hospital", "parking", "greengrocer"];
-  const fallbackScore = new Map(fallbackOrder.map((id, index) => [id, fallbackOrder.length - index]));
-  const favoriteCounts = favoriteRows.reduce((counts, place) => {
-    counts[place.category] = (counts[place.category] || 0) + 1;
-    return counts;
-  }, {});
-  const views = signals?.categoryViews || {};
+function personalizationSignalStrength(signals = discoverySignals, favoriteRows = favorites) {
+  const categoryViews = Object.values(signals?.categoryViews || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const placeViews = Object.values(signals?.placeViews || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const interactions = Number(signals?.interactions) || 0;
+  return Math.max(interactions, categoryViews + placeViews) + favoriteRows.length * 2;
+}
 
-  return osmCategories
-    .filter((category) => (bundle?.[category.id] || []).length > 0)
-    .map((category) => ({
-      category,
-      score:
-        (fallbackScore.get(category.id) || 0) +
-        (Number(views[category.id]) || 0) * 24 +
-        (favoriteCounts[category.id] || 0) * 18 +
-        (signals?.lastCategory === category.id ? 32 : 0),
-    }))
-    .sort((a, b) => b.score - a.score || a.category.label.localeCompare(b.category.label, "tr"))
-    .map((item) => item.category);
+function hasMeaningfulPersonalization(signals = discoverySignals, favoriteRows = favorites) {
+  return personalizationSignalStrength(signals, favoriteRows) >= DISCOVERY_PERSONALIZATION_THRESHOLD;
+}
+
+function hasUsefulAddress(place) {
+  const address = String(place?.address || "").trim();
+  if (!address) return false;
+  return !/OpenStreetMap.*belirtilmemiş|Adres bilgisi yok/i.test(address);
+}
+
+function placeDataQualityScore(place) {
+  let score = 0;
+  if (placeHasSpecificName(place)) score += 10;
+  if (hasUsefulAddress(place)) score += 6;
+  if (place?.openingHours) score += 5;
+  if (place?.phone) score += 3;
+  if (place?.website) score += 2;
+  return score;
+}
+
+function discoveryBrandKey(place) {
+  const categoryLabel = categories.find(category => category.id === place.category)?.label || "";
+  const name = normalizeSearchValue(place?.name);
+  if (!name || name === normalizeSearchValue(categoryLabel)) return `category:${place?.category || "other"}`;
+  return name.replace(/\b(şubesi|subesi|branch|market|mağazası|magazasi)\b/g, "").replace(/\s+/g, " ").trim();
+}
+
+function discoveryScore(place, signals = discoverySignals, favoriteRows = favorites, now = new Date()) {
+  const distanceKm = Number.isFinite(place?.distanceKm) ? Math.max(0, place.distanceKm) : 5;
+  const distanceScore = Math.max(0, 72 - Math.min(distanceKm, 4) * 22);
+  const hours = openingStatus(place?.openingHours, now);
+  const availabilityScore = hours?.state === "open" ? 26 : hours?.state === "closed" ? -38 : 0;
+  const qualityScore = placeDataQualityScore(place);
+
+  const favoriteIds = new Set(favoriteRows.map(item => item.id));
+  const favoriteCategoryCount = favoriteRows.filter(item => item.category === place.category).length;
+  const explicitFavoriteScore = favoriteIds.has(place.id) ? 24 : Math.min(12, favoriteCategoryCount * 4);
+
+  const meaningful = hasMeaningfulPersonalization(signals, favoriteRows);
+  const categoryViews = Number(signals?.categoryViews?.[place.category]) || 0;
+  const placeViews = Number(signals?.placeViews?.[place.id]) || 0;
+  const personalScore = meaningful
+    ? Math.min(20, categoryViews * 3) + Math.min(24, placeViews * 6) + (signals?.lastCategory === place.category ? 7 : 0)
+    : 0;
+
+  return {
+    score: distanceScore + availabilityScore + qualityScore + explicitFavoriteScore + personalScore,
+    personalScore,
+    qualityScore,
+    hours,
+    meaningful,
+  };
+}
+
+function discoveryReason(place, scored, favoriteRows = favorites) {
+  if (favoriteRows.some(item => item.id === place.id)) return "Kaydettiğin yer";
+  if (scored.hours?.state === "open" && Number.isFinite(place.distanceKm)) return `Açık · ${formatWalkingTime(place.distanceKm)}`;
+  if (scored.hours?.state === "open") return "Şu an açık";
+  if (scored.personalScore >= 9) return "İlgilendiğin kategoriden";
+  if (Number.isFinite(place.distanceKm) && place.distanceKm <= .8) return `Yakınında · ${formatWalkingTime(place.distanceKm)}`;
+  return categories.find(category => category.id === place.category)?.label || "Yakınında";
+}
+
+function rankDiscoveryPlaces(bundle, signals = discoverySignals, favoriteRows = favorites, now = new Date(), limit = DISCOVERY_CARD_LIMIT) {
+  const candidates = Object.values(bundle || {})
+    .flat()
+    .filter(place => place?.id && Number.isFinite(place.lat) && Number.isFinite(place.lng))
+    .map(place => {
+      const scored = discoveryScore(place, signals, favoriteRows, now);
+      return {
+        place,
+        ...scored,
+        personalized: scored.meaningful && scored.personalScore >= 9,
+        reason: discoveryReason(place, scored, favoriteRows),
+      };
+    });
+
+  const remaining = [...candidates];
+  const selected = [];
+  const categoryCounts = new Map();
+  const brandCounts = new Map();
+
+  while (remaining.length && selected.length < limit) {
+    let bestIndex = 0;
+    let bestAdjusted = Number.NEGATIVE_INFINITY;
+    remaining.forEach((candidate, index) => {
+      const categoryCount = categoryCounts.get(candidate.place.category) || 0;
+      const brandKey = discoveryBrandKey(candidate.place);
+      const brandCount = brandCounts.get(brandKey) || 0;
+      const adjusted = candidate.score - categoryCount * 13 - brandCount * 22;
+      if (adjusted > bestAdjusted) {
+        bestAdjusted = adjusted;
+        bestIndex = index;
+      }
+    });
+
+    const [best] = remaining.splice(bestIndex, 1);
+    selected.push(best);
+    categoryCounts.set(best.place.category, (categoryCounts.get(best.place.category) || 0) + 1);
+    const brandKey = discoveryBrandKey(best.place);
+    brandCounts.set(brandKey, (brandCounts.get(brandKey) || 0) + 1);
+  }
+
+  return selected;
 }
 
 function renderDiscoveryHub(bundle) {
@@ -1224,35 +1316,51 @@ function renderDiscoveryHub(bundle) {
     discoveryHub.hidden = true;
     return;
   }
+
   const shown = visibleBundle(bundle);
   updateCategoryCounts(shown);
-  const visibleCategories = rankDiscoveryCategories(shown, discoverySignals, favorites).slice(0, DISCOVERY_CARD_LIMIT);
-  if (!visibleCategories.length) {
+  const recommendations = rankDiscoveryPlaces(shown, discoverySignals, favorites);
+  if (!recommendations.length) {
     discoveryHub.hidden = true;
     return;
   }
+
   discoveryHub.hidden = false;
   discoveryCards.replaceChildren();
-  const totalPlaces = Object.values(shown).reduce((total, places) => total + places.length, 0);
-  discoverySummary.textContent = totalPlaces + " nokta · " + visibleCategories.length + " kategori · haritada görünen alan";
-  const hasPersonalSignals = Object.values(discoverySignals?.categoryViews || {}).some(count => Number(count) > 0) || favorites.length > 0;
-  visibleCategories.forEach((category, index) => {
-    const places = shown[category.id] || [];
-    const nearest = places[0];
+  const personalized = recommendations.some(item => item.personalized);
+  discoverySummary.textContent = personalized
+    ? "Yakınlık, açıklık ve tercihlerine göre"
+    : "Yakınlık, açıklık ve bilgi kalitesine göre";
+
+  recommendations.forEach((recommendation, index) => {
+    const place = recommendation.place;
+    const category = categories.find(item => item.id === place.category);
     const card = document.createElement("button");
     card.type = "button";
     card.className = "discovery-card";
-    card.dataset.category = category.id;
+    card.dataset.category = place.category;
+    card.dataset.placeId = place.id;
     card.style.setProperty("--card-delay", (index * 45) + "ms");
-    card.setAttribute("aria-label", category.label + " kategorisini aç");
-    const personalizedBadge = index === 0 && hasPersonalSignals ? '<span class="personalized-badge">Sana göre</span>' : "";
+    card.setAttribute("aria-label", place.name + " ayrıntısını aç");
+
+    const personalizedBadge = recommendation.personalized
+      ? '<span class="personalized-badge">Sana göre</span>'
+      : "";
+    const travel = Number.isFinite(place.distanceKm)
+      ? formatDistance(place.distanceKm) + " · " + formatWalkingTime(place.distanceKm)
+      : (category?.label || "Yakınındaki yer");
+
     card.innerHTML =
-      '<span class="discovery-icon" aria-hidden="true">' + categorySvg(category.id) + '</span>' +
-      '<span class="discovery-copy"><span class="discovery-card-head"><strong>' + escapeHtml(category.label) + '</strong>' + personalizedBadge + '</span>' +
-      '<span class="discovery-count">' + places.length + ' yer</span>' +
-      '<span class="discovery-nearest">' + (nearest ? escapeHtml(nearest.name) + ' · ' + formatDistance(nearest.distanceKm) : 'Görünen alanda sonuç var') + '</span></span>' +
+      '<span class="discovery-icon" aria-hidden="true">' + categorySvg(place.category) + '</span>' +
+      '<span class="discovery-copy"><span class="discovery-card-head"><strong>' + escapeHtml(place.name) + '</strong>' + personalizedBadge + '</span>' +
+      '<span class="discovery-count">' + escapeHtml(category?.label || "Yer") + ' · ' + escapeHtml(recommendation.reason) + '</span>' +
+      '<span class="discovery-nearest">' + escapeHtml(travel) + '</span></span>' +
       '<span class="discovery-arrow" aria-hidden="true">›</span>';
-    card.addEventListener("click", () => selectCategory(category));
+
+    card.addEventListener("click", () => {
+      if (document.body.dataset.view === "map") openMapQuickCard(place, card);
+      else openPlaceDetails(place, card);
+    });
     discoveryCards.append(card);
   });
 }
@@ -1261,13 +1369,42 @@ function recordCategorySignal(category) {
   if (!category || ["all", "favorites"].includes(category.id)) return;
   const views = { ...(discoverySignals?.categoryViews || {}) };
   views[category.id] = (Number(views[category.id]) || 0) + 1;
-  discoverySignals = { categoryViews: views, lastCategory: category.id };
+  discoverySignals = {
+    ...discoverySignals,
+    categoryViews: views,
+    placeViews: { ...(discoverySignals?.placeViews || {}) },
+    lastCategory: category.id,
+    interactions: (Number(discoverySignals?.interactions) || 0) + 1,
+  };
+  persistDiscoverySignals();
+}
+
+function recordPlaceSignal(place) {
+  if (!place?.id) return;
+  const now = Date.now();
+  if (lastDiscoveryInteraction.placeId === place.id && now - lastDiscoveryInteraction.at < 15000) return;
+  lastDiscoveryInteraction = { placeId: place.id, at: now };
+
+  const placeViews = { ...(discoverySignals?.placeViews || {}) };
+  placeViews[place.id] = (Number(placeViews[place.id]) || 0) + 1;
+  discoverySignals = {
+    ...discoverySignals,
+    categoryViews: { ...(discoverySignals?.categoryViews || {}) },
+    placeViews,
+    lastCategory: place.category || discoverySignals?.lastCategory || null,
+    interactions: (Number(discoverySignals?.interactions) || 0) + 1,
+  };
+  persistDiscoverySignals();
+}
+
+function persistDiscoverySignals() {
   try {
     localStorage.setItem(DISCOVERY_SIGNALS_KEY, JSON.stringify(discoverySignals));
   } catch {
-    // Personalization is optional and must never block discovery.
+    // Discovery learning is optional and must never block core map behavior.
   }
 }
+
 
 function placesFromBundle(bundle, category) {
   const shown = visibleBundle(bundle);
@@ -1355,7 +1492,7 @@ function normalizeOsmElement(element, category, location) {
   const lng = Number(element.lon ?? element.center?.lon);
   const tags = element.tags || {};
   const street = [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
-  const address = street || tags["addr:full"] || tags.description || "Adres OpenStreetMap’te belirtilmemiş";
+  const address = street || tags["addr:full"] || tags.description || "";
 
   return {
     id: `osm:${element.type}:${element.id}`,
@@ -1364,6 +1501,7 @@ function normalizeOsmElement(element, category, location) {
     address,
     phone: tags.phone || tags["contact:phone"] || "",
     openingHours: tags.opening_hours || "",
+    website: tags.website || tags["contact:website"] || "",
     lat,
     lng,
     distanceKm: distanceBetween(location.lat, location.lng, lat, lng),
@@ -1465,6 +1603,15 @@ function placeDisplayPriority(place, index = 0) {
   if (routeStops.some(stop => stop.id === place.id)) score += 700;
   if (placeHasSpecificName(place)) score += 650;
   if (activeCategory.type !== "all" && place.category === activeCategory.id) score += 300;
+  score += placeDataQualityScore(place) * 8;
+
+  const hours = openingStatus(place.openingHours);
+  if (hours?.state === "open") score += 150;
+  else if (hours?.state === "closed") score -= 100;
+
+  if (hasMeaningfulPersonalization(discoverySignals, favorites)) {
+    score += Math.min(120, (Number(discoverySignals?.categoryViews?.[place.category]) || 0) * 18);
+  }
   if (Number.isFinite(place.distanceKm)) score += Math.max(0, 220 - Math.round(place.distanceKm * 35));
   return score;
 }
@@ -1666,7 +1813,9 @@ function createResultCard(place, icon, isNearest = false, index = 0) {
   iconEl.innerHTML = categorySvg(place.category);
   nameEl.textContent = place.name;
   metaEl.textContent = buildMeta(place);
-  addressEl.textContent = place.address || "Adres bilgisi yok";
+  const usefulAddress = hasUsefulAddress(place);
+  addressEl.hidden = !usefulAddress;
+  addressEl.textContent = usefulAddress ? place.address : "";
   favoriteButton.textContent = isFavorite(place.id) ? "★" : "☆";
   favoriteButton.classList.toggle("is-favorite", isFavorite(place.id));
   favoriteButton.setAttribute("aria-label", isFavorite(place.id) ? "Favoriden çıkar" : "Favoriye ekle");
@@ -1697,7 +1846,6 @@ function buildMeta(place) {
   }
   const hours = openingStatus(place.openingHours);
   if (hours) parts.push(hours.label);
-  else if (place.openingHours) parts.push(place.openingHours);
   if (place.category === "duty") parts.push("Nöbetçi");
   return parts.join(" · ");
 }
@@ -1753,12 +1901,12 @@ function updateMapLabels() {
   const mobileViewport = viewport.x < 760;
   const zoom = map.getZoom();
   const labelLimit = zoom >= 17
-    ? (mobileViewport ? 16 : 26)
+    ? (mobileViewport ? 10 : 22)
     : zoom >= 16
-      ? (mobileViewport ? 12 : 20)
+      ? (mobileViewport ? 8 : 16)
       : zoom >= 15
-        ? (mobileViewport ? 9 : 15)
-        : (mobileViewport ? 6 : 10);
+        ? (mobileViewport ? 6 : 12)
+        : (mobileViewport ? 4 : 8);
 
   const placeMarkers = [...placeMarkerById.values()];
   const markerRects = placeMarkers.map(marker => {
@@ -1852,6 +2000,7 @@ function scrollToResult(placeId) {
 }
 
 function openPlaceDetails(place, trigger = null) {
+  recordPlaceSignal(place);
   closeMapQuickCard({ clearSelection: false, restoreSheet: true });
   if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
   if (document.body.dataset.view === "map" && history.state?.yakinimView !== "map-detail") {
@@ -1864,7 +2013,9 @@ function openPlaceDetails(place, trigger = null) {
   detail.querySelector(".detail-icon").innerHTML = categorySvg(place.category);
   detail.querySelector("#detailName").textContent = place.name;
   detail.querySelector("#detailMeta").textContent = buildMeta(place);
-  detail.querySelector("#detailAddress").textContent = place.address || "Adres bilgisi yok";
+  const detailAddress = detail.querySelector("#detailAddress");
+  detailAddress.hidden = !hasUsefulAddress(place);
+  detailAddress.textContent = hasUsefulAddress(place) ? place.address : "";
   detail.querySelector("#detailDirections").href = buildDirectionsUrl(place);
   const phone = detail.querySelector("#detailPhone");
   phone.hidden = !place.phone;
@@ -2144,10 +2295,10 @@ function handleSearchInput(value) {
   if (!mapQuickCard?.hidden) dismissMapQuickCard();
 
   if (!searchTerm) {
-    resultTitle.textContent = activeCategory.type === "all" ? "Görünen alandaki yerler" : activeCategory.label;
+    resultTitle.textContent = activeCategory.type === "all" ? "Yakındaki yerler" : activeCategory.label;
     if (activeCategory.type === "favorites") loadFavorites();
     else if (activeCategory.type === "duty") renderPlaces(activePlaces, activeCategory);
-    else if (lastDiscoveryBundle) renderActiveCategoryFromBundle("Arama temizlendi.");
+    else if (lastDiscoveryBundle) renderActiveCategoryFromBundle();
     else renderPlaces(activePlaces, activeCategory);
     return;
   }
@@ -2219,6 +2370,7 @@ function syncMapControlOffset() {
 }
 
 function openMapQuickCard(place, trigger = null, { pushHistory = true, returnSheetState = null } = {}) {
+  recordPlaceSignal(place);
   if (!mapQuickCard || document.body.dataset.view !== "map") {
     openPlaceDetails(place, trigger);
     return;
@@ -2239,7 +2391,8 @@ function openMapQuickCard(place, trigger = null, { pushHistory = true, returnShe
     ? `${formatDistance(place.distanceKm)} · ${formatWalkingTime(place.distanceKm)}`
     : "";
   quickMeta.textContent = [category, travel].filter(Boolean).join(" · ");
-  quickAddress.textContent = place.address || "Adres bilgisi yok";
+  quickAddress.hidden = !hasUsefulAddress(place);
+  quickAddress.textContent = hasUsefulAddress(place) ? place.address : "";
   quickDirections.href = buildDirectionsUrl(place);
   quickFavorite.textContent = isFavorite(place.id) ? "Kaydedildi" : "Kaydet";
   quickFavorite.setAttribute("aria-pressed", String(isFavorite(place.id)));

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 const app = readFileSync("app.js", "utf8");
+const styles = readFileSync("styles.css", "utf8");
 
 function extract(name) {
   const start = app.indexOf(`function ${name}(`);
@@ -28,6 +29,10 @@ const context = vm.createContext({
   routeStops: [],
   activeCategory: { id: "all", type: "all" },
   isFavorite: () => false,
+  placeDataQualityScore: () => 0,
+  openingStatus: () => null,
+  hasMeaningfulPersonalization: () => false,
+  discoverySignals: { categoryViews: {}, placeViews: {}, interactions: 0 },
 });
 for (const name of ["shouldClusterPlaces", "placeHasSpecificName", "placeDisplayPriority", "markerCollisionDistancePx", "buildMapClusters"]) {
   vm.runInContext(extract(name), context);
@@ -60,6 +65,8 @@ assert.match(app, /syncMapControlOffset/);
 assert.match(app, /map\.on\("dragstart", handleMapDragStart\)/);
 assert.match(app, /yakinimView: "map-place"/);
 assert.match(app, /keepSelectedPlaceVisible/);
+assert.match(app, /mobileViewport \? 10 : 22/);
+assert.match(styles, /has-location\[data-view=map\] \.map-context\{display:none!important\}/);
 assert.match(app, /· en yakın/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
 assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail" \}/);
