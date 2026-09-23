@@ -750,3 +750,17 @@ body[data-view=map].has-place-detail .map-recenter{display:none!important}
 @media(max-width:759px){
   body[data-view=map][data-sheet-state=peek] .map-recenter{display:grid}
 }
+
+
+/* v2.10 single-surface map interaction model */
+body[data-view=map].has-map-quick-card .sheet{display:none!important}
+body[data-view=map].has-map-quick-card .map-quick-card{bottom:max(12px,env(safe-area-inset-bottom));}
+body[data-view=map].has-map-quick-card .map-recenter{display:none!important}
+.map-quick-tools{position:absolute;right:9px;top:8px;display:flex;gap:6px;z-index:2}
+.map-quick-tools .map-quick-close,.map-quick-tools .map-quick-share{position:static;width:32px;height:32px;border:0;border-radius:50%;display:grid;place-items:center;background:#f0f4f2;color:#60756d;font-size:18px;font-weight:700}
+.map-quick-tools .map-quick-share{color:var(--accent)}
+.map-quick-heading{padding-right:76px}
+@media(max-width:759px){
+  body[data-view=map] .sheet[data-state=peek]{height:78px}
+  body[data-view=map].has-map-quick-card .map-quick-card{left:10px;right:10px}
+}

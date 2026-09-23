@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.9\.1"/);
+assert.match(app, /APP_VERSION = "2\.10\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -41,6 +41,10 @@ assert.match(app, /one authoritative geolocation request/);
 assert.match(app, /locationZoomForAccuracy/);
 assert.match(app, /applyNearestMarkerState/);
 assert.match(app, /openMapQuickCard/);
+assert.match(app, /dismissMapQuickCard/);
+assert.match(app, /sharePlace/);
+assert.match(app, /keepSelectedPlaceVisible/);
+assert.match(app, /history\.pushState\(\{[\s\S]*yakinimView: "map-place"/);
 assert.match(app, /document\.body\.dataset\.sheetState = nextState/);
 assert.match(app, /if \(document\.body\.dataset\.view === "map"\) openMapQuickCard\(place, main\)/);
 assert.match(app, /recenterOnUser/);
@@ -62,12 +66,14 @@ assert.doesNotMatch(index, /map-context-chevron/);
 assert.match(index, /id="mapSearch"/);
 assert.match(index, /id="recenterButton"/);
 assert.match(index, /id="mapQuickCard"/);
+assert.match(index, /id="quickShare"/);
 assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
 assert.match(styles, /v2\.8 mobile vector basemap reliability/);
 assert.match(styles, /v2\.8\.1 final map state semantics/);
 assert.match(styles, /v2\.9 standard mobile map chrome \+ quick place card/);
 assert.match(styles, /v2\.9\.1 map interaction stabilization/);
+assert.match(styles, /v2\.10 single-surface map interaction model/);
 assert.doesNotMatch(styles, /is-nearest\{[^}]*background:var\(--accent\)/s);
 assert.ok(styles.includes("leaflet-tile.base-map-tile"));
 assert.match(styles, /leaflet-placeLabels-pane/);
@@ -79,7 +85,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v31/);
+assert.match(sw, /yakinimda-shell-v32/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

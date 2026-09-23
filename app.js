@@ -1,4 +1,4 @@
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "2.10.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -80,6 +80,8 @@ let placeMarkerById = new Map();
 let clusterMarkers = [];
 let selectedPlace = null;
 let detailTrigger = null;
+let quickCardReturnSheetState = "peek";
+let quickCardReturnHistoryState = "map-peek";
 let listScrollY = 0;
 let mapHasFramedResults = false;
 let toastTimer;
@@ -222,6 +224,7 @@ function setMapAttributionForMode(mode) {
 L.control.zoom({ position: "topright" }).addTo(map);
 map.on("moveend", handleMapMoveEnd);
 map.on("zoomend", handleMapZoomEnd);
+map.on("dragstart", handleMapDragStart);
 
 const categoryStrip = document.querySelector("#categoryStrip");
 const results = document.querySelector("#results");
@@ -257,6 +260,7 @@ const quickStatus = document.querySelector("#quickStatus");
 const quickDirections = document.querySelector("#quickDirections");
 const quickFavorite = document.querySelector("#quickFavorite");
 const quickDetails = document.querySelector("#quickDetails");
+const quickShare = document.querySelector("#quickShare");
 const quickClose = document.querySelector("#quickClose");
 
 applySheetState("expanded");
@@ -307,7 +311,8 @@ mapSearchClear?.addEventListener("click", () => {
   mapSearchInput?.focus();
 });
 recenterButton?.addEventListener("click", recenterOnUser);
-quickClose?.addEventListener("click", () => closeMapQuickCard());
+quickClose?.addEventListener("click", () => dismissMapQuickCard());
+quickShare?.addEventListener("click", () => { if (selectedPlace) sharePlace(selectedPlace); });
 quickFavorite?.addEventListener("click", () => { if (selectedPlace) toggleFavorite(selectedPlace); });
 quickDetails?.addEventListener("click", () => {
   if (!selectedPlace) return;
@@ -325,11 +330,27 @@ document.querySelector("#detailFavorite").addEventListener("click", () => { if (
 document.querySelector("#detailRoute").addEventListener("click", () => { if (selectedPlace) toggleRouteStop(selectedPlace); });
 document.querySelector("#detailMap").addEventListener("click", () => { if (selectedPlace) focusPlace(selectedPlace); });
 document.querySelector("#clearRoute").addEventListener("click", () => { routeStops = []; persistRoute(); renderRoute(); showToast("Rota temizlendi"); });
-document.addEventListener("keydown", event => { if (event.key === "Escape" && selectedPlace) closePlaceDetails(); });
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || !selectedPlace) return;
+  if (!mapQuickCard?.hidden) dismissMapQuickCard();
+  else closePlaceDetails();
+});
 history.replaceState({ ...history.state, yakinimView: "list" }, "", location.href);
 window.addEventListener("popstate", event => {
   const state = event.state?.yakinimView;
-  closeMapQuickCard({ clearSelection: false });
+
+  if (state === "map-place") {
+    closePlaceDetails(false);
+    document.body.dataset.view = "map";
+    const returnSheetState = event.state?.returnSheetState || "peek";
+    applySheetState(returnSheetState);
+    const place = findKnownPlace(event.state?.placeId);
+    if (place) openMapQuickCard(place, null, { pushHistory: false, returnSheetState });
+    requestAnimationFrame(() => map.invalidateSize());
+    return;
+  }
+
+  closeMapQuickCard({ clearSelection: false, restoreSheet: false });
   closePlaceDetails(false);
   const isMapState = state === "map-peek" || state === "map-open" || state === "map-detail";
   document.body.dataset.view = isMapState ? "map" : "list";
@@ -339,7 +360,7 @@ window.addEventListener("popstate", event => {
   requestAnimationFrame(() => map.invalidateSize());
 });
 renderRoute();
-setView(isMobileLayout ? "map" : "list", isMobileLayout ? "half" : "expanded");
+setView(isMobileLayout ? "map" : "list", isMobileLayout ? "peek" : "expanded");
 bootstrapLocationDiscovery();
 window.addEventListener("resize", syncMapControlOffset);
 syncMapControlOffset();
@@ -649,7 +670,7 @@ function enableManualLocationMode() {
 function handleManualMapClick(event) {
   if (!manualLocationMode) {
     if (document.body.dataset.view === "map" && !mapQuickCard?.hidden) {
-      closeMapQuickCard();
+      dismissMapQuickCard();
       return;
     }
     if (document.body.dataset.view === "map") collapseMapPanel();
@@ -756,6 +777,11 @@ async function bootstrapLocationDiscovery() {
   if (restored || permissionState === "granted") {
     locateUser({ forceFresh: false, background: restored });
   }
+}
+
+function handleMapDragStart() {
+  if (manualLocationMode) return;
+  if (!mapQuickCard?.hidden) dismissMapQuickCard();
 }
 
 function handleMapMoveEnd() {
@@ -1577,6 +1603,10 @@ function addPlaceCluster(places, index = 0) {
 
 function mapBottomPadding() {
   if (!isMobileLayout || document.body.dataset.view !== "map") return 40;
+  if (!mapQuickCard?.hidden) {
+    const quickHeight = mapQuickCard.getBoundingClientRect?.().height || 188;
+    return Math.min(Math.round(window.innerHeight * .56), Math.round(quickHeight + 28));
+  }
   if (sheet.dataset.state === "peek") return 130;
   const height = sheet.getBoundingClientRect?.().height || Math.round(window.innerHeight * .42);
   return Math.min(Math.round(window.innerHeight * .74), Math.round(height + 38));
@@ -1609,6 +1639,7 @@ function renderPlaces(places, category) {
   animateIn(results);
   if (selectedPlace) {
     if (places.some(place => place.id === selectedPlace.id)) markSelectedPlace();
+    else if (!mapQuickCard?.hidden) dismissMapQuickCard();
     else closePlaceDetails(false);
   }
 }
@@ -1821,7 +1852,7 @@ function scrollToResult(placeId) {
 }
 
 function openPlaceDetails(place, trigger = null) {
-  closeMapQuickCard({ clearSelection: false });
+  closeMapQuickCard({ clearSelection: false, restoreSheet: true });
   if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
   if (document.body.dataset.view === "map" && history.state?.yakinimView !== "map-detail") {
     history.pushState({ yakinimView: "map-detail" }, "", location.href);
@@ -2037,6 +2068,10 @@ function cycleSheetState() {
 
 function collapseMapPanel() {
   if (document.body.dataset.view !== "map") return;
+  if (history.state?.yakinimView === "map-place") {
+    dismissMapQuickCard();
+    return;
+  }
   if (history.state?.yakinimView === "map-detail") {
     history.go(-2);
     return;
@@ -2106,7 +2141,7 @@ function handleSearchInput(value) {
   if (placeSearchInput && placeSearchInput.value !== raw) placeSearchInput.value = raw;
   if (mapSearchInput && mapSearchInput.value !== raw) mapSearchInput.value = raw;
   if (mapSearchClear) mapSearchClear.hidden = !searchTerm;
-  closeMapQuickCard();
+  if (!mapQuickCard?.hidden) dismissMapQuickCard();
 
   if (!searchTerm) {
     resultTitle.textContent = activeCategory.type === "all" ? "Görünen alandaki yerler" : activeCategory.label;
@@ -2162,7 +2197,7 @@ function recenterOnUser() {
     locateUser({ forceFresh: false });
     return;
   }
-  closeMapQuickCard();
+  if (!mapQuickCard?.hidden) dismissMapQuickCard();
   const targetZoom = Math.max(map.getZoom(), Math.min(16, locationZoomForAccuracy(userLocation.accuracy, 15)));
   map.flyTo([userLocation.lat, userLocation.lng], targetZoom, {
     animate: mapShouldAnimate,
@@ -2175,16 +2210,24 @@ function recenterOnUser() {
 function syncMapControlOffset() {
   requestAnimationFrame(() => {
     if (document.body.dataset.view !== "map") return;
-    const height = sheet?.getBoundingClientRect?.().height || 82;
-    const safeHeight = Math.min(Math.round(window.innerHeight * 0.74), Math.max(82, Math.round(height)));
+    const surface = !mapQuickCard?.hidden ? mapQuickCard : sheet;
+    const fallbackHeight = !mapQuickCard?.hidden ? 188 : 82;
+    const height = surface?.getBoundingClientRect?.().height || fallbackHeight;
+    const safeHeight = Math.min(Math.round(window.innerHeight * 0.74), Math.max(fallbackHeight, Math.round(height)));
     document.body.style.setProperty("--map-sheet-offset", `${safeHeight}px`);
   });
 }
 
-function openMapQuickCard(place, trigger = null) {
+function openMapQuickCard(place, trigger = null, { pushHistory = true, returnSheetState = null } = {}) {
   if (!mapQuickCard || document.body.dataset.view !== "map") {
     openPlaceDetails(place, trigger);
     return;
+  }
+
+  const wasHidden = mapQuickCard.hidden;
+  if (wasHidden) {
+    quickCardReturnSheetState = returnSheetState || sheet.dataset.state || "peek";
+    quickCardReturnHistoryState = history.state?.yakinimView === "map-open" ? "map-open" : "map-peek";
   }
 
   selectedPlace = place;
@@ -2210,17 +2253,34 @@ function openMapQuickCard(place, trigger = null) {
   }
 
   mapQuickCard.hidden = false;
+  sheet.inert = true;
+  sheet.setAttribute("aria-hidden", "true");
   document.body.classList.add("has-map-quick-card");
-  applySheetState("peek");
+
+  if (pushHistory && history.state?.yakinimView !== "map-place") {
+    history.pushState({
+      yakinimView: "map-place",
+      placeId: place.id,
+      returnSheetState: quickCardReturnSheetState,
+      returnHistoryState: quickCardReturnHistoryState,
+    }, "", location.href);
+  } else if (history.state?.yakinimView === "map-place") {
+    history.replaceState({ ...history.state, placeId: place.id, returnSheetState: quickCardReturnSheetState }, "", location.href);
+  }
+
   markSelectedPlace();
   updateMapContext(renderedMapPlaces, activeCategory, "selected", place);
   syncMapControlOffset();
+  requestAnimationFrame(() => keepSelectedPlaceVisible(place));
 }
 
-function closeMapQuickCard({ clearSelection = true } = {}) {
+function closeMapQuickCard({ clearSelection = true, restoreSheet = true } = {}) {
   if (!mapQuickCard) return;
   mapQuickCard.hidden = true;
+  sheet.inert = false;
+  sheet.removeAttribute("aria-hidden");
   document.body.classList.remove("has-map-quick-card");
+  if (restoreSheet && document.body.dataset.view === "map") applySheetState(quickCardReturnSheetState || "peek");
   if (clearSelection && selectedPlace) {
     selectedPlace = null;
     markSelectedPlace();
@@ -2228,6 +2288,78 @@ function closeMapQuickCard({ clearSelection = true } = {}) {
   }
   syncMapControlOffset();
 }
+
+function dismissMapQuickCard({ clearSelection = true } = {}) {
+  const hasHistoryState = history.state?.yakinimView === "map-place";
+  closeMapQuickCard({ clearSelection, restoreSheet: true });
+  if (hasHistoryState) history.back();
+}
+
+function findKnownPlace(placeId) {
+  if (!placeId) return null;
+  return activePlaces.find(place => place.id === placeId)
+    || renderedMapPlaces.find(place => place.id === placeId)
+    || spatialPoiPool.get(placeId)
+    || favorites.find(place => place.id === placeId)
+    || null;
+}
+
+function keepSelectedPlaceVisible(place) {
+  if (!place || mapQuickCard?.hidden || typeof map.panInside !== "function") return;
+  const cardHeight = mapQuickCard.getBoundingClientRect?.().height || 188;
+  map.panInside([place.lat, place.lng], {
+    paddingTopLeft: [24, 86],
+    paddingBottomRight: [24, cardHeight + 28],
+    animate: mapShouldAnimate,
+  });
+}
+
+async function sharePlace(place) {
+  if (!place) return;
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.lat},${place.lng}`)}`;
+  const text = Number.isFinite(place.distanceKm)
+    ? `${place.name} · ${formatDistance(place.distanceKm)} · ${formatWalkingTime(place.distanceKm)}`
+    : place.name;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: place.name, text, url });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  const copied = await copyTextToClipboard(`${text}\n${url}`);
+  showToast(copied ? "Konum bağlantısı kopyalandı" : "Paylaşım bu tarayıcıda kullanılamıyor");
+}
+
+async function copyTextToClipboard(value) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // Fall through to the legacy copy path.
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand?.("copy") === true;
+    textarea.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
 
 function estimateWalkingMinutes(distanceKm) {
   if (!Number.isFinite(distanceKm) || distanceKm < 0) return null;
