@@ -973,3 +973,25 @@ body:not([data-section=radio]) .radio-player-tools{display:none}
   .radio-player-tools{grid-template-columns:34px 34px auto auto minmax(92px,1fr);gap:5px}
   .radio-player-tools>button,.radio-player-tools>a{padding:0 8px}
 }
+
+
+/* v3.1.1 radio mobile semantics + compact player */
+.radio-fallback-tag{background:#fff4df!important;color:#8a6130!important}
+.radio-avatar img,.radio-player-avatar-inner img{object-fit:contain!important;padding:3px;transform:scale(1.08);box-sizing:border-box}
+.radio-player-main{grid-template-columns:48px minmax(0,1fr) 34px 44px 34px}
+.radio-player-expand{width:34px;height:34px;border:0;border-radius:50%;background:#eef3f1;color:#62756d;font-size:13px;font-weight:900}
+.radio-player-tools{display:none!important}
+.radio-player.is-expanded .radio-player-tools{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px}
+.radio-player.is-expanded .radio-volume-control{flex:1 1 130px;min-width:120px}
+.radio-player.is-expanded .radio-player-close{width:auto;height:34px;border-radius:10px;padding:0 10px;font-size:9px}
+body:not([data-section=radio]) .radio-player{padding:8px 9px}
+body:not([data-section=radio]) .radio-player .radio-player-expand{display:none}
+body:not([data-section=radio]) .radio-player-main{grid-template-columns:46px minmax(0,1fr) 34px 42px}
+@media(max-width:759px){
+  .radio-player{bottom:max(8px,env(safe-area-inset-bottom));}
+  body[data-section=radio] .radio-section{padding-bottom:104px}
+  body[data-section=nearby][data-view=map] .radio-player{bottom:calc(var(--map-sheet-offset) + 8px)}
+  .radio-player-main{grid-template-columns:46px minmax(0,1fr) 32px 42px 32px;gap:6px}
+  .radio-player.is-expanded .radio-player-tools{padding-top:7px;margin-top:7px}
+  .radio-player-tools>button,.radio-player-tools>a{min-height:32px}
+}

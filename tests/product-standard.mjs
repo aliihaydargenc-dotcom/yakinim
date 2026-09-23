@@ -45,7 +45,7 @@ status = vm.runInContext('openingStatus("Mo-Su 09:00-22:00", mondayLate)', conte
 assert.equal(status.state, "closed");
 assert.equal(vm.runInContext('openingStatus("sunrise-sunset", mondayTen)', context), null);
 
-for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPrev", "radioNext", "radioVolume"]) {
+for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPlayerExpand", "radioPrev", "radioNext", "radioVolume"]) {
   assert.match(index, new RegExp(`id="${id}"`));
 }
 assert.match(styles, /body\[data-view=map\] \.topbar\{display:none!important\}/);
@@ -72,6 +72,8 @@ assert.match(app, /loadRadio/);
 assert.match(app, /toggleRadioFavorite/);
 assert.match(app, /navigator\.mediaSession/);
 assert.match(app, /rememberRadioRecent/);
+assert.match(app, /toggleRadioPlayerExpanded/);
+assert.match(styles, /radio-player\.is-expanded \.radio-player-tools/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);

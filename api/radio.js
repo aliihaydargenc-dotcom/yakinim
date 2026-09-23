@@ -34,8 +34,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { stations } = await queryRadio(scope);
-    const payload = { scope, stations, fetchedAt: new Date().toISOString() };
+    const { stations, localCount = stations.length, fallbackCount = 0, fallbackApplied = false } = await queryRadio(scope);
+    const payload = { scope, stations, localCount, fallbackCount, fallbackApplied, fetchedAt: new Date().toISOString() };
     memoryCache.set(scope, { savedAt: Date.now(), payload });
     res.setHeader("X-Yakinim-Radio-Cache", "MISS");
     res.setHeader("Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=1800");
