@@ -576,6 +576,9 @@ body[data-view=map].has-place-detail .status-text{display:none}
 .place-marker[data-category="park"]{color:#43834f}
 .place-marker[data-category="duty"],.place-marker[data-category="pharmacy"],.place-marker[data-category="hospital"]{color:#b84955}
 .leaflet-marker-icon.is-selected .place-marker{transform:scale(1.16);box-shadow:0 8px 24px #193b3860}
+.leaflet-tooltip.place-label{max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 9px!important;border:1px solid #dce8e2!important;border-radius:9px!important;background:#fffffff2!important;color:#203b32!important;font-size:11px!important;font-weight:700!important;box-shadow:0 2px 9px #173c3226!important;pointer-events:none}
+.leaflet-tooltip-right.place-label:before{border-right-color:#fff!important}
+.leaflet-marker-icon.is-selected+.place-label{z-index:850}
 .route-button{border:1px solid #cbded4;border-radius:10px;background:#f4faf6;color:#1c6b4e;min-height:39px;padding:0 12px;font-size:12px;font-weight:700}
 .route-tray{position:fixed;z-index:800;left:50%;bottom:max(12px,env(safe-area-inset-bottom));width:min(520px,calc(100vw - 24px));transform:translateX(-50%);padding:15px;border:1px solid #cfe2d7;border-radius:20px;background:#fff;box-shadow:0 12px 36px #173c3233}
 .route-tray-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
