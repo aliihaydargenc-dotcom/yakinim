@@ -98,7 +98,7 @@ const mapClickContext = vm.createContext({
   manualLocationMode: false,
   mapQuickCard: { hidden: true },
   document: { body: { dataset: { view: "map" } } },
-  closeMapQuickCard: () => {},
+  dismissMapQuickCard: () => {},
   collapseMapPanel: () => collapsed++,
 });
 vm.runInContext(extract("handleManualMapClick"), mapClickContext);

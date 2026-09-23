@@ -42,7 +42,7 @@ status = vm.runInContext('openingStatus("Mo-Su 09:00-22:00", mondayLate)', conte
 assert.equal(status.state, "closed");
 assert.equal(vm.runInContext('openingStatus("sunrise-sunset", mondayTen)', context), null);
 
-for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails"]) {
+for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare"]) {
   assert.match(index, new RegExp(`id="${id}"`));
 }
 assert.match(styles, /body\[data-view=map\] \.topbar\{display:none!important\}/);
@@ -53,5 +53,11 @@ assert.match(app, /mapSearchInput/);
 assert.match(app, /document\.body\.dataset\.sheetState = nextState/);
 assert.match(app, /if \(document\.body\.dataset\.view === "map"\) openMapQuickCard\(place, main\)/);
 assert.match(styles, /data-sheet-state=peek.*map-recenter/s);
+assert.match(styles, /has-map-quick-card \.sheet\{display:none!important\}/);
+assert.match(app, /sheet\.inert = true/);
+assert.match(app, /map\.on\("dragstart", handleMapDragStart\)/);
+assert.match(app, /yakinimView: "map-place"/);
+assert.match(app, /navigator\.share/);
+assert.match(app, /setView\(isMobileLayout \? "map" : "list", isMobileLayout \? "peek"/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");
