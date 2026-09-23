@@ -626,3 +626,11 @@ body[data-view=map]:not(.has-location) .welcome{display:grid;margin:8px 0 10px;p
 body[data-view=map].has-route .sheet[data-state=half]{height:min(31dvh,285px)}body[data-view=map].has-route .sheet[data-state=expanded]{height:min(48dvh,430px)}
 .category-strip{scroll-snap-type:x proximity}.category-button{scroll-snap-align:start}.state-card{min-height:108px;padding:17px}.leaflet-tooltip.place-label{max-width:145px}.leaflet-tooltip.place-label.is-selected-place-label{max-width:190px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* v2.6 viewport-first live discovery */
+.viewport-live-hint{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;margin-top:2px;padding:8px 10px;border:1px solid #dce8e2;border-radius:999px;background:#f5faf7;color:#41665a;font-size:10px;font-weight:700;white-space:nowrap}
+.viewport-live-hint i{width:7px;height:7px;border-radius:50%;background:#2f8f68;box-shadow:0 0 0 4px #2f8f6815;animation:liveViewportPulse 1.8s ease-in-out infinite}
+@keyframes liveViewportPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.72);opacity:.5}}
+@media(max-width:759px){.viewport-live-hint{font-size:9px;padding:7px 9px;max-width:46vw;overflow:hidden;text-overflow:ellipsis}.sheet-row{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.viewport-live-hint i{animation:none}}

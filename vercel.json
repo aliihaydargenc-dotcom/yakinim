@@ -25,6 +25,9 @@
   "functions": {
     "api/nearby.js": {
       "maxDuration": 60
+    },
+    "api/viewport.js": {
+      "maxDuration": 30
     }
   }
 }

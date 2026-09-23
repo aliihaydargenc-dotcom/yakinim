@@ -1,4 +1,4 @@
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.6.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -8,6 +8,8 @@ const ROUTE_KEY = "yakinimda:route:v1";
 const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
 const DISCOVERY_CARD_LIMIT = 6;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
+const LAST_LOCATION_KEY = "yakinimda:last-location:v1";
+const VIEWPORT_CACHE_PREFIX = "yakinimda:viewport:v1:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SHEET_STATES = ["peek", "half", "expanded"];
@@ -19,14 +21,20 @@ const MOTION = Object.freeze({
 });
 const MAP_CLUSTER_MIN_COUNT = 8;
 const MAP_CLUSTER_MAX_ZOOM = 14;
-const QUICK_DISCOVERY_RADIUS = 1000;
 const STALE_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 const FAST_LOCATION_TIMEOUT = 2500;
 const ACCURATE_LOCATION_TIMEOUT = 7000;
 const LOCATION_REFRESH_DISTANCE_M = 120;
-const NEARBY_REQUEST_TIMEOUT = 11000;
-const NEARBY_FALLBACK_TIMEOUT = 6500;
-const QUERY_LOCATION_PRECISION = 3;
+const LAST_LOCATION_MAX_AGE = 3 * 24 * 60 * 60 * 1000;
+const VIEWPORT_GRID_DEGREES = 0.01;
+const VIEWPORT_CACHE_TTL = 4 * 60 * 60 * 1000;
+const VIEWPORT_STALE_TTL = 24 * 60 * 60 * 1000;
+const VIEWPORT_REQUEST_TIMEOUT = 8000;
+const VIEWPORT_FALLBACK_TIMEOUT = 5500;
+const VIEWPORT_DEBOUNCE_MS = 280;
+const VIEWPORT_MIN_ZOOM = 13;
+const VIEWPORT_MAX_SPAN_DEGREES = 0.12;
+const MAX_VISIBLE_PLACES = 120;
 
 const categories = [
   { id: "cafe", label: "Kafe", icon: "☕", type: "osm", filter: '[amenity=cafe]', ttl: 6 * 60 * 60 * 1000 },
@@ -52,7 +60,7 @@ const osmCategories = categories.filter((category) => category.type === "osm");
 const mapShouldAnimate = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isMobileLayout = window.matchMedia("(max-width: 759px)").matches;
 
-const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
+const prefs = readJson(PREFS_KEY, { category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
 let routeStops = readJson(ROUTE_KEY, []).filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lng)).slice(0, 4);
 let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, lastCategory: null });
@@ -76,6 +84,11 @@ let lastDiscoveryBundle = null;
 let discoveryRequestSerial = 0;
 let renderedMapPlaces = [];
 let mapLabelFrame = 0;
+let viewportRefreshTimer = 0;
+let viewportRequestSerial = 0;
+let viewportRequest = null;
+let currentViewportKey = null;
+let lastViewportEnvelope = null;
 
 const map = L.map("map", {
   zoomControl: false,
@@ -108,14 +121,14 @@ try {
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
-map.on("moveend", scheduleMapLabelUpdate);
+map.on("moveend", handleMapMoveEnd);
 map.on("zoomend", handleMapZoomEnd);
 
 const categoryStrip = document.querySelector("#categoryStrip");
 const results = document.querySelector("#results");
 const resultTitle = document.querySelector("#resultTitle");
 const statusText = document.querySelector("#statusText");
-const radiusSelect = document.querySelector("#radiusSelect");
+
 const locateButton = document.querySelector("#locateButton");
 const manualLocationButton = document.querySelector("#manualLocationButton");
 const sourceText = document.querySelector("#sourceText");
@@ -133,7 +146,6 @@ const mapContextIcon = document.querySelector("#mapContextIcon");
 const mapContextLabel = document.querySelector("#mapContextLabel");
 const mapContextMeta = document.querySelector("#mapContextMeta");
 
-radiusSelect.value = String(prefs.radius);
 applySheetState("expanded");
 renderCategoryButtons();
 showState("empty", "Çevrendeki yerleri görmek için konumunu kullan veya haritadan bir nokta seç.");
@@ -160,11 +172,6 @@ sheetToggle.addEventListener("click", () => {
   if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
   else if (document.body.dataset.view === "map" && sheet.dataset.state === "expanded") collapseMapPanel();
   else cycleSheetState();
-});
-radiusSelect.addEventListener("change", () => {
-  prefs.radius = Number(radiusSelect.value);
-  persistPrefs();
-  if (userLocation && activeCategory.type !== "favorites") loadCategory(activeCategory);
 });
 
 if ("serviceWorker" in navigator) {
@@ -207,6 +214,7 @@ window.addEventListener("popstate", event => {
 });
 renderRoute();
 setView(isMobileLayout ? "map" : "list", isMobileLayout ? "half" : "expanded");
+bootstrapLocationDiscovery();
 function setView(view, panelState = "half") {
   const previousView = document.body.dataset.view;
   const historyView = history.state?.yakinimView;
@@ -229,10 +237,7 @@ function setView(view, panelState = "half") {
   if (view === "map") updateMapContext(renderedMapPlaces, activeCategory);
   requestAnimationFrame(() => {
     map.invalidateSize();
-    if (view === "map" && !mapHasFramedResults && activePlaces.length) {
-      fitResultsOnMap(activePlaces);
-      mapHasFramedResults = true;
-    }
+    if (view === "map") scheduleViewportRefresh();
   });
 }
 
@@ -263,22 +268,14 @@ function selectCategory(category) {
     pulseCategoryButton(category.id);
     return;
   }
-  if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") {
-    history.back();
-  } else {
-    closePlaceDetails(false);
-  }
-  mapHasFramedResults = false;
-  requestSerial += 1;
+  if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") history.back();
+  else closePlaceDetails(false);
+
   activeCategory = category;
   recordCategorySignal(category);
-  if (lastDiscoveryBundle) renderDiscoveryHub(lastDiscoveryBundle);
   searchTerm = "";
   document.querySelector("#placeSearch").value = "";
-  resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
-  activePlaces = [];
-  document.body.classList.add("map-results-updating");
-  updateMapContext([], category, "loading");
+  resultTitle.textContent = category.type === "all" ? "Görünen alandaki yerler" : category.label;
   prefs.category = category.id;
   persistPrefs();
   renderCategoryButtons();
@@ -288,31 +285,81 @@ function selectCategory(category) {
     loadFavorites();
     return;
   }
-
   if (!userLocation) {
+    activePlaces = [];
     document.body.classList.remove("map-results-updating");
     updateMapContext([], category, "empty");
-    showState("empty", "Yakındaki yerleri görmek için konumunu aç.");
+    showState("empty", "Yakındaki yerleri görmek için konumunu bir kez aç.");
+    return;
+  }
+  if (category.type === "duty") {
+    refreshDutyViewport({ force: true });
+    return;
+  }
+  if (lastDiscoveryBundle) renderActiveCategoryFromBundle("Kategori anında değiştirildi.");
+  else showState("loading", "Görünen alan hazırlanıyor…");
+  scheduleViewportRefresh();
+}
+
+async function locateUser({ forceFresh = false, background = false } = {}) {
+  if (!navigator.geolocation) {
+    if (!background) showLocationFailure("Bu tarayıcı konum özelliğini desteklemiyor.");
+    return;
+  }
+  const serial = ++locationAttemptSerial;
+  manualLocationMode = false;
+  document.body.classList.remove("is-selecting-location");
+  if (!background) {
+    locateButton.disabled = true;
+    locateButton.classList.add("is-loading");
+    manualLocationButton.hidden = true;
+    statusText.textContent = "Konum aranıyor…";
+    if (!activePlaces.length) showState("loading", "Konum hızlıca belirleniyor…");
+  }
+  const permissionState = await getGeolocationPermissionState();
+  if (serial !== locationAttemptSerial) return;
+  if (permissionState === "denied") {
+    if (!background) {
+      locateButton.disabled = false;
+      locateButton.classList.remove("is-loading");
+      showLocationFailure("Konum izni kapalı. Tarayıcı iznini açabilir veya haritadan konum seçebilirsin.");
+    }
     return;
   }
 
-  loadCategory(category);
-}
+  const fastPromise = settlePosition("fast", {
+    enableHighAccuracy: false,
+    timeout: FAST_LOCATION_TIMEOUT,
+    maximumAge: forceFresh ? 2 * 60 * 1000 : 15 * 60 * 1000,
+  });
+  const accuratePromise = settlePosition("accurate", {
+    enableHighAccuracy: true,
+    timeout: ACCURATE_LOCATION_TIMEOUT,
+    maximumAge: 0,
+  });
 
-async function locateUser({ forceFresh = false } = {}) {
-  if (!navigator.geolocation) { showLocationFailure("Bu tarayıcı konum özelliğini desteklemiyor."); return; }
-  const serial=++locationAttemptSerial;manualLocationMode=false;document.body.classList.remove("is-selecting-location");
-  locateButton.disabled=true;locateButton.classList.add("is-loading");manualLocationButton.hidden=true;
-  statusText.textContent="Konum aranıyor…";showState("loading","Konum hızlıca belirleniyor…");
-  const permissionState=await getGeolocationPermissionState();if(serial!==locationAttemptSerial)return;
-  if(permissionState==="denied"){locateButton.disabled=false;locateButton.classList.remove("is-loading");showLocationFailure("Konum izni kapalı. Tarayıcı iznini açabilir veya haritadan konum seçebilirsin.");return;}
-  const fastPromise=settlePosition("fast",{enableHighAccuracy:false,timeout:FAST_LOCATION_TIMEOUT,maximumAge:forceFresh?2*60*1000:15*60*1000});
-  const accuratePromise=settlePosition("accurate",{enableHighAccuracy:true,timeout:ACCURATE_LOCATION_TIMEOUT,maximumAge:0});
-  const first=await Promise.race([fastPromise,accuratePromise]);if(serial!==locationAttemptSerial)return;
-  if(first.position){applyUserPosition(first.position,{provisional:first.kind==="fast"});if(first.kind==="accurate")return;const refined=await accuratePromise;if(serial!==locationAttemptSerial)return;if(refined.position)refineUserPosition(refined.position);return;}
-  const second=await(first.kind==="fast"?accuratePromise:fastPromise);if(serial!==locationAttemptSerial)return;
-  if(second.position){applyUserPosition(second.position,{provisional:second.kind==="fast"});return;}
-  locateButton.disabled=false;locateButton.classList.remove("is-loading");showLocationFailure(locationErrorMessage(second.error||first.error));
+  const first = await Promise.race([fastPromise, accuratePromise]);
+  if (serial !== locationAttemptSerial) return;
+  if (first.position) {
+    applyUserPosition(first.position, { provisional: first.kind === "fast", background });
+    if (first.kind === "accurate") return;
+    const refined = await accuratePromise;
+    if (serial !== locationAttemptSerial) return;
+    if (refined.position) refineUserPosition(refined.position);
+    return;
+  }
+
+  const second = await (first.kind === "fast" ? accuratePromise : fastPromise);
+  if (serial !== locationAttemptSerial) return;
+  if (second.position) {
+    applyUserPosition(second.position, { provisional: second.kind === "fast", background });
+    return;
+  }
+
+  locateButton.disabled = false;
+  locateButton.classList.remove("is-loading");
+  if (!background && !userLocation) showLocationFailure(locationErrorMessage(second.error || first.error));
+  else if (userLocation) statusText.textContent = "Son bilinen konum kullanılıyor.";
 }
 
 function getCurrentPosition(options) {
@@ -336,26 +383,63 @@ async function getGeolocationPermissionState() {
   }
 }
 
-function applyUserPosition(position, { provisional = false } = {}) {
-  locateButton.disabled=false;locateButton.classList.remove("is-loading");manualLocationButton.hidden=true;
-  userLocation={lat:position.coords.latitude,lng:position.coords.longitude,accuracy:position.coords.accuracy,source:provisional?"gps-fast":"gps"};
-  document.querySelector("#welcome").hidden=true;document.body.classList.add("has-location");drawUserLocation();
-  map.flyTo([userLocation.lat,userLocation.lng],15,{animate:mapShouldAnimate,duration:provisional?0.45:0.6});
-  const accuracyText=Number.isFinite(userLocation.accuracy)?` · yaklaşık ${Math.round(userLocation.accuracy)} m doğruluk`:"";
-  statusText.textContent=provisional?`Hızlı konum bulundu${accuracyText} · doğruluk iyileştiriliyor…`:`Konum bulundu${accuracyText}`;
-  if(activeCategory.type==="favorites")loadFavorites();else loadCategory(activeCategory);
+function applyUserPosition(position, { provisional = false, background = false } = {}) {
+  locateButton.disabled = false;
+  locateButton.classList.remove("is-loading");
+  manualLocationButton.hidden = true;
+  userLocation = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    accuracy: position.coords.accuracy,
+    source: provisional ? "gps-fast" : "gps",
+  };
+  persistLastLocation();
+  document.querySelector("#welcome").hidden = true;
+  document.body.classList.add("has-location");
+  drawUserLocation();
+  const accuracyText = Number.isFinite(userLocation.accuracy) ? ` · yaklaşık ${Math.round(userLocation.accuracy)} m doğruluk` : "";
+  statusText.textContent = provisional
+    ? `Konum hazır${accuracyText} · doğruluk iyileştiriliyor…`
+    : `Konum hazır${accuracyText}`;
+  const targetZoom = Math.max(map.getZoom(), 15);
+  map.flyTo([userLocation.lat, userLocation.lng], targetZoom, {
+    animate: mapShouldAnimate && !background,
+    duration: background ? 0.35 : 0.55,
+  });
+  scheduleViewportRefresh({ force: true });
 }
 
 function refineUserPosition(position) {
-  if(!userLocation){applyUserPosition(position);return;}
-  const nextLocation={lat:position.coords.latitude,lng:position.coords.longitude,accuracy:position.coords.accuracy,source:"gps"};
-  const movedMeters=distanceBetween(userLocation.lat,userLocation.lng,nextLocation.lat,nextLocation.lng)*1000;
-  const previousAccuracy=Number(userLocation.accuracy),nextAccuracy=Number(nextLocation.accuracy);
-  const accuracyImproved=Number.isFinite(nextAccuracy)&&(!Number.isFinite(previousAccuracy)||nextAccuracy<previousAccuracy*0.75);
-  userLocation=nextLocation;drawUserLocation();
-  statusText.textContent=Number.isFinite(nextAccuracy)?`Konum netleştirildi · yaklaşık ${Math.round(nextAccuracy)} m doğruluk`:"Konum netleştirildi.";
-  if(movedMeters>=LOCATION_REFRESH_DISTANCE_M){map.flyTo([userLocation.lat,userLocation.lng],Math.max(map.getZoom(),15),{animate:mapShouldAnimate,duration:0.45});if(activeCategory.type==="favorites")loadFavorites();else loadCategory(activeCategory);return;}
-  if(accuracyImproved&&activePlaces.length){activePlaces=activePlaces.map(place=>({...place,distanceKm:distanceBetween(userLocation.lat,userLocation.lng,place.lat,place.lng)})).sort((a,b)=>a.distanceKm-b.distanceKm);renderPlaces(activePlaces,activeCategory);}
+  if (!userLocation) {
+    applyUserPosition(position);
+    return;
+  }
+  const nextLocation = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    accuracy: position.coords.accuracy,
+    source: "gps",
+  };
+  const movedMeters = distanceBetween(userLocation.lat, userLocation.lng, nextLocation.lat, nextLocation.lng) * 1000;
+  const previousAccuracy = Number(userLocation.accuracy);
+  const nextAccuracy = Number(nextLocation.accuracy);
+  const accuracyImproved = Number.isFinite(nextAccuracy) && (!Number.isFinite(previousAccuracy) || nextAccuracy < previousAccuracy * 0.75);
+  userLocation = nextLocation;
+  persistLastLocation();
+  drawUserLocation();
+  statusText.textContent = Number.isFinite(nextAccuracy)
+    ? `Konum netleştirildi · yaklaşık ${Math.round(nextAccuracy)} m doğruluk`
+    : "Konum netleştirildi.";
+
+  if (movedMeters >= LOCATION_REFRESH_DISTANCE_M) {
+    map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), {
+      animate: mapShouldAnimate,
+      duration: 0.45,
+    });
+    scheduleViewportRefresh({ force: true });
+    return;
+  }
+  if (accuracyImproved && lastDiscoveryBundle) renderActiveCategoryFromBundle("Konum doğruluğu güncellendi.");
 }
 function showLocationFailure(message) {
   statusText.textContent = message;
@@ -384,13 +468,30 @@ function enableManualLocationMode() {
 }
 
 function handleManualMapClick(event) {
-  if (!manualLocationMode) { if (document.body.dataset.view === "map") collapseMapPanel(); return; }
-  manualLocationMode=false;document.body.classList.remove("is-selecting-location");manualLocationButton.hidden=true;manualLocationButton.querySelector("span:last-child").textContent="Haritadan seç";
-  userLocation={lat:event.latlng.lat,lng:event.latlng.lng,accuracy:null,source:"manual"};
-  document.querySelector("#welcome").hidden=true;document.body.classList.add("has-location");drawUserLocation();
-  map.flyTo([userLocation.lat,userLocation.lng],Math.max(map.getZoom(),15),{animate:mapShouldAnimate,duration:0.6});
-  statusText.textContent="Konum haritadan seçildi.";
-  if(activeCategory.type==="favorites")loadFavorites();else loadCategory(activeCategory);
+  if (!manualLocationMode) {
+    if (document.body.dataset.view === "map") collapseMapPanel();
+    return;
+  }
+  manualLocationMode = false;
+  document.body.classList.remove("is-selecting-location");
+  manualLocationButton.hidden = true;
+  manualLocationButton.querySelector("span:last-child").textContent = "Haritadan seç";
+  userLocation = {
+    lat: event.latlng.lat,
+    lng: event.latlng.lng,
+    accuracy: null,
+    source: "manual",
+  };
+  persistLastLocation();
+  document.querySelector("#welcome").hidden = true;
+  document.body.classList.add("has-location");
+  drawUserLocation();
+  map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), {
+    animate: mapShouldAnimate,
+    duration: 0.5,
+  });
+  statusText.textContent = "Konum haritadan seçildi.";
+  scheduleViewportRefresh({ force: true });
 }
 
 function drawUserLocation() {
@@ -425,30 +526,292 @@ function drawUserLocation() {
 }
 
 
-async function refreshDiscoveryHub() {
-  if (!userLocation) {
-    discoveryHub.hidden = true;
+function persistLastLocation() {
+  if (!userLocation || !Number.isFinite(userLocation.lat) || !Number.isFinite(userLocation.lng)) return;
+  try {
+    localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({
+      lat: userLocation.lat,
+      lng: userLocation.lng,
+      accuracy: userLocation.accuracy,
+      source: userLocation.source,
+      savedAt: Date.now(),
+    }));
+  } catch {
+    // Location persistence is an optimization, not a requirement.
+  }
+}
+
+function restoreLastLocation() {
+  const saved = readJson(LAST_LOCATION_KEY, null);
+  if (!saved || !Number.isFinite(saved.lat) || !Number.isFinite(saved.lng)) return false;
+  if (!Number.isFinite(saved.savedAt) || Date.now() - saved.savedAt > LAST_LOCATION_MAX_AGE) return false;
+  userLocation = {
+    lat: saved.lat,
+    lng: saved.lng,
+    accuracy: Number.isFinite(saved.accuracy) ? saved.accuracy : null,
+    source: "stored",
+  };
+  document.querySelector("#welcome").hidden = true;
+  document.body.classList.add("has-location");
+  drawUserLocation();
+  map.setView([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), { animate: false });
+  statusText.textContent = "Son konum açıldı · çevre otomatik yenileniyor.";
+  scheduleViewportRefresh({ force: true });
+  return true;
+}
+
+async function bootstrapLocationDiscovery() {
+  const restored = restoreLastLocation();
+  const permissionState = await getGeolocationPermissionState();
+  if (permissionState === "granted") {
+    locateUser({ forceFresh: false, background: restored });
+  }
+}
+
+function handleMapMoveEnd() {
+  scheduleMapLabelUpdate();
+  if (!manualLocationMode) scheduleViewportRefresh();
+}
+
+function buildViewportEnvelope(bounds = map.getBounds()) {
+  if (!bounds || map.getZoom() < VIEWPORT_MIN_ZOOM) return null;
+  const padded = bounds.pad(0.3);
+  const snapDown = value => Math.floor(value / VIEWPORT_GRID_DEGREES) * VIEWPORT_GRID_DEGREES;
+  const snapUp = value => Math.ceil(value / VIEWPORT_GRID_DEGREES) * VIEWPORT_GRID_DEGREES;
+  const envelope = {
+    south: Number(snapDown(padded.getSouth()).toFixed(3)),
+    west: Number(snapDown(padded.getWest()).toFixed(3)),
+    north: Number(snapUp(padded.getNorth()).toFixed(3)),
+    east: Number(snapUp(padded.getEast()).toFixed(3)),
+  };
+  if (envelope.north <= envelope.south || envelope.east <= envelope.west) return null;
+  if (envelope.north - envelope.south > VIEWPORT_MAX_SPAN_DEGREES || envelope.east - envelope.west > VIEWPORT_MAX_SPAN_DEGREES) return null;
+  return envelope;
+}
+
+function viewportCacheKey(envelope) {
+  return VIEWPORT_CACHE_PREFIX + [envelope.south, envelope.west, envelope.north, envelope.east].join(":");
+}
+
+function isPlaceInVisibleMap(place) {
+  if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return false;
+  return map.getBounds().pad(0.06).contains([place.lat, place.lng]);
+}
+
+function decorateViewportPlaces(places) {
+  return (places || [])
+    .filter(isPlaceInVisibleMap)
+    .map(place => ({
+      ...place,
+      distanceKm: userLocation
+        ? distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng)
+        : place.distanceKm,
+    }))
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, MAX_VISIBLE_PLACES);
+}
+
+function bundleFromOsmPayload(payload) {
+  const origin = userLocation || map.getCenter();
+  const bundle = Object.fromEntries(osmCategories.map(category => [category.id, []]));
+  for (const element of payload.elements || []) {
+    const category = categoryForOsmElement(element);
+    if (!category) continue;
+    const place = normalizeOsmElement(element, category, origin);
+    if (Number.isFinite(place.lat) && Number.isFinite(place.lng)) bundle[category.id].push(place);
+  }
+  for (const category of osmCategories) bundle[category.id].sort((a, b) => a.distanceKm - b.distanceKm);
+  return bundle;
+}
+
+function visibleBundle(bundle = lastDiscoveryBundle) {
+  if (!bundle) return null;
+  return Object.fromEntries(osmCategories.map(category => [category.id, decorateViewportPlaces(bundle[category.id] || [])]));
+}
+
+function renderActiveCategoryFromBundle(statusMessage = "") {
+  if (!lastDiscoveryBundle || activeCategory.type === "favorites" || activeCategory.type === "duty") return;
+  const bundle = visibleBundle(lastDiscoveryBundle);
+  const places = activeCategory.type === "all"
+    ? Object.values(bundle).flat().sort((a, b) => a.distanceKm - b.distanceKm).slice(0, MAX_VISIBLE_PLACES)
+    : (bundle[activeCategory.id] || []);
+  activePlaces = places;
+  renderDiscoveryHub(lastDiscoveryBundle);
+  renderPlaces(places, activeCategory);
+  sourceText.textContent = "Veri: OpenStreetMap · görünen alan";
+  if (statusMessage) statusText.textContent = statusMessage;
+}
+
+function scheduleViewportRefresh({ force = false } = {}) {
+  if (!userLocation || activeCategory.type === "favorites") return;
+  clearTimeout(viewportRefreshTimer);
+  viewportRefreshTimer = setTimeout(() => {
+    if (activeCategory.type === "duty") refreshDutyViewport({ force });
+    else refreshViewportPlaces({ force });
+  }, force ? 40 : VIEWPORT_DEBOUNCE_MS);
+}
+
+async function refreshViewportPlaces({ force = false } = {}) {
+  if (!userLocation) return;
+  const envelope = buildViewportEnvelope();
+  if (!envelope) {
+    document.body.classList.remove("map-results-updating");
+    statusText.textContent = map.getZoom() < VIEWPORT_MIN_ZOOM
+      ? "Yakındaki yerleri görmek için haritada biraz yakınlaş."
+      : "Bu görünüm çok geniş; yakınlaştığında yerler otomatik akacak.";
+    return;
+  }
+  const key = viewportCacheKey(envelope);
+  lastViewportEnvelope = envelope;
+
+  if (!force && key === currentViewportKey && lastDiscoveryBundle) {
+    renderActiveCategoryFromBundle("Görünen alan güncel.");
     return;
   }
 
-  const serial = ++discoveryRequestSerial;
-  const location = { lat: userLocation.lat, lng: userLocation.lng };
-  discoveryHub.hidden = false;
-  discoverySummary.textContent = "Çevren taranıyor…";
-  discoveryCards.innerHTML = '<div class="discovery-skeleton" aria-hidden="true"></div><div class="discovery-skeleton" aria-hidden="true"></div><div class="discovery-skeleton" aria-hidden="true"></div>';
-
-  try {
-    const bundle = await fetchOsmBundle(location);
-    if (serial !== discoveryRequestSerial || !userLocation) return;
-    if (Math.abs(userLocation.lat - location.lat) > 0.000001 || Math.abs(userLocation.lng - location.lng) > 0.000001) return;
-    lastDiscoveryBundle = bundle;
-    renderDiscoveryHub(bundle);
-  } catch (error) {
-    if (serial !== discoveryRequestSerial) return;
-    console.warn("Discovery hub unavailable", error);
-    discoverySummary.textContent = "Keşif özeti şu an hazırlanamadı.";
-    discoveryCards.replaceChildren();
+  const fresh = readCache(key, VIEWPORT_CACHE_TTL);
+  if (fresh) {
+    currentViewportKey = key;
+    lastDiscoveryBundle = fresh;
+    renderActiveCategoryFromBundle("Görünen alan cihaz önbelleğinden anında açıldı.");
+    return;
   }
+
+  let hasPreview = false;
+  const stale = readCache(key, VIEWPORT_STALE_TTL);
+  if (stale) {
+    currentViewportKey = key;
+    lastDiscoveryBundle = stale;
+    renderActiveCategoryFromBundle("Son görünen alan gösteriliyor · arka planda yenileniyor…");
+    hasPreview = true;
+  } else if (!activePlaces.length) {
+    showState("loading", "Haritada görünen alan taranıyor…");
+  }
+
+  document.body.classList.add("map-results-updating");
+  updateMapContext(activePlaces, activeCategory, "loading");
+
+  const serial = ++viewportRequestSerial;
+  try {
+    const bundle = await fetchViewportBundle(envelope);
+    writeCache(key, bundle);
+    if (serial !== viewportRequestSerial) return;
+    const currentEnvelope = buildViewportEnvelope();
+    if (!currentEnvelope || viewportCacheKey(currentEnvelope) !== key) {
+      scheduleViewportRefresh();
+      return;
+    }
+    currentViewportKey = key;
+    lastDiscoveryBundle = bundle;
+    renderActiveCategoryFromBundle("Görünen alan yenilendi.");
+  } catch (error) {
+    if (serial !== viewportRequestSerial) return;
+    console.warn("Viewport discovery unavailable", error);
+    document.body.classList.remove("map-results-updating");
+    if (hasPreview || activePlaces.length) {
+      statusText.textContent = "Mevcut yerler gösteriliyor; yeni alan şu an yenilenemedi.";
+      updateMapContext(activePlaces, activeCategory);
+      return;
+    }
+    updateMapContext([], activeCategory, "error");
+    showState("error", "Bu alanın yer verisi şu an alınamadı. Haritayı biraz hareket ettirince otomatik yeniden denenecek.");
+  }
+}
+
+async function fetchViewportBundle(envelope) {
+  const key = viewportCacheKey(envelope);
+  if (viewportRequest?.key === key) return viewportRequest.promise;
+  const promise = (async () => bundleFromOsmPayload(await fetchViewportPayload(envelope)))();
+  viewportRequest = { key, promise };
+  try {
+    return await promise;
+  } finally {
+    if (viewportRequest?.promise === promise) viewportRequest = null;
+  }
+}
+
+async function fetchViewportPayload(envelope) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VIEWPORT_REQUEST_TIMEOUT);
+  const params = new URLSearchParams({
+    south: String(envelope.south),
+    west: String(envelope.west),
+    north: String(envelope.north),
+    east: String(envelope.east),
+  });
+  try {
+    const response = await fetch(`/api/viewport?${params}`, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`Viewport API ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload.elements)) throw new Error("Invalid viewport response");
+    return payload;
+  } catch (error) {
+    console.warn("Viewport proxy unavailable; trying browser source.", error);
+    const bbox = [envelope.south, envelope.west, envelope.north, envelope.east].join(",");
+    const query = `[out:json][timeout:5];(nwr[\"amenity\"~\"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$\"](${bbox});nwr[\"shop\"~\"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$\"](${bbox});nwr[\"leisure\"=\"park\"](${bbox}););out center tags qt;`;
+    const fallbackController = new AbortController();
+    const fallbackTimer = setTimeout(() => fallbackController.abort(), VIEWPORT_FALLBACK_TIMEOUT);
+    try {
+      const url = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
+      const fallback = await fetch(url, { signal: fallbackController.signal });
+      if (!fallback.ok) throw new Error(`Viewport fallback ${fallback.status}`);
+      const payload = await fallback.json();
+      if (!Array.isArray(payload.elements) || payload.remark) throw new Error("Invalid viewport fallback");
+      return payload;
+    } finally {
+      clearTimeout(fallbackTimer);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function viewportDutyRadius() {
+  const center = map.getCenter();
+  const bounds = map.getBounds();
+  const cornerDistance = distanceBetween(center.lat, center.lng, bounds.getNorth(), bounds.getEast()) * 1000;
+  return Math.min(7000, Math.max(1200, Math.ceil(cornerDistance * 1.35)));
+}
+
+async function refreshDutyViewport({ force = false } = {}) {
+  if (!userLocation) return;
+  sourceText.textContent = "Veri: Eczane Adresi · görünen alan";
+  const center = map.getCenter();
+  const radius = viewportDutyRadius();
+  const key = `${CACHE_PREFIX}duty-view:${center.lat.toFixed(2)}:${center.lng.toFixed(2)}:${Math.round(radius / 500) * 500}`;
+  const cached = !force ? readCache(key, 15 * 60 * 1000) : null;
+  if (cached) {
+    activePlaces = decorateViewportPlaces(cached);
+    renderPlaces(activePlaces, activeCategory);
+    statusText.textContent = "Nöbetçi eczaneler görünen alan için hazır.";
+    return;
+  }
+  document.body.classList.add("map-results-updating");
+  if (!activePlaces.length) showState("loading", "Görünen alandaki nöbetçi eczaneler aranıyor…");
+  try {
+    const rows = await fetchDutyPharmacies({ lat: center.lat, lng: center.lng }, radius);
+    writeCache(key, rows);
+    if (activeCategory.type !== "duty") return;
+    activePlaces = decorateViewportPlaces(rows);
+    renderPlaces(activePlaces, activeCategory);
+    statusText.textContent = "Nöbetçi eczaneler görünen alana göre yenilendi.";
+  } catch (error) {
+    document.body.classList.remove("map-results-updating");
+    console.warn("Duty viewport unavailable", error);
+    if (!activePlaces.length) showState("error", "Nöbetçi eczane verisi şu an alınamadı.");
+  }
+}
+
+
+async function refreshDiscoveryHub() {
+  if (!lastDiscoveryBundle) {
+    discoveryHub.hidden = true;
+    return;
+  }
+  renderDiscoveryHub(lastDiscoveryBundle);
 }
 
 function rankDiscoveryCategories(bundle, signals = { categoryViews: {}, lastCategory: null }, favoriteRows = []) {
@@ -474,15 +837,42 @@ function rankDiscoveryCategories(bundle, signals = { categoryViews: {}, lastCate
     .map((item) => item.category);
 }
 
-function renderDiscoveryHub(bundle, radius = Number(prefs.radius)) {
-  if(!userLocation||!bundle){discoveryHub.hidden=true;return;}
-  const visibleBundle=Object.fromEntries(osmCategories.map(category=>[category.id,filterPlacesForRadius(bundle[category.id]||[])]));
-  updateCategoryCounts(visibleBundle);const visibleCategories=rankDiscoveryCategories(visibleBundle,discoverySignals,favorites).slice(0,DISCOVERY_CARD_LIMIT);
-  if(!visibleCategories.length){discoveryHub.hidden=true;return;}discoveryHub.hidden=false;discoveryCards.replaceChildren();
-  const totalPlaces=Object.values(visibleBundle).reduce((total,places)=>total+places.length,0),radiusText=Number(radius)>=1000?(Number(radius)/1000)+" km":radius+" m";
-  discoverySummary.textContent=totalPlaces+" nokta · "+visibleCategories.length+" öne çıkan kategori · "+radiusText+" çevrende";
-  const hasPersonalSignals=Object.values(discoverySignals?.categoryViews||{}).some(count=>Number(count)>0)||favorites.length>0;
-  visibleCategories.forEach((category,index)=>{const places=visibleBundle[category.id]||[],nearest=places[0],card=document.createElement("button");card.type="button";card.className="discovery-card";card.dataset.category=category.id;card.style.setProperty("--card-delay",(index*45)+"ms");card.setAttribute("aria-label",category.label+" kategorisini aç");const personalizedBadge=index===0&&hasPersonalSignals?'<span class="personalized-badge">Sana göre</span>':"";card.innerHTML='<span class="discovery-icon" aria-hidden="true">'+categorySvg(category.id)+'</span><span class="discovery-copy"><span class="discovery-card-head"><strong>'+escapeHtml(category.label)+'</strong>'+personalizedBadge+'</span><span class="discovery-count">'+places.length+' yer</span><span class="discovery-nearest">'+(nearest?escapeHtml(nearest.name)+' · '+formatDistance(nearest.distanceKm):'Yakınında sonuç var')+'</span></span><span class="discovery-arrow" aria-hidden="true">›</span>';card.addEventListener("click",()=>selectCategory(category));discoveryCards.append(card);});
+function renderDiscoveryHub(bundle) {
+  if (!userLocation || !bundle) {
+    discoveryHub.hidden = true;
+    return;
+  }
+  const shown = visibleBundle(bundle);
+  updateCategoryCounts(shown);
+  const visibleCategories = rankDiscoveryCategories(shown, discoverySignals, favorites).slice(0, DISCOVERY_CARD_LIMIT);
+  if (!visibleCategories.length) {
+    discoveryHub.hidden = true;
+    return;
+  }
+  discoveryHub.hidden = false;
+  discoveryCards.replaceChildren();
+  const totalPlaces = Object.values(shown).reduce((total, places) => total + places.length, 0);
+  discoverySummary.textContent = totalPlaces + " nokta · " + visibleCategories.length + " kategori · haritada görünen alan";
+  const hasPersonalSignals = Object.values(discoverySignals?.categoryViews || {}).some(count => Number(count) > 0) || favorites.length > 0;
+  visibleCategories.forEach((category, index) => {
+    const places = shown[category.id] || [];
+    const nearest = places[0];
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "discovery-card";
+    card.dataset.category = category.id;
+    card.style.setProperty("--card-delay", (index * 45) + "ms");
+    card.setAttribute("aria-label", category.label + " kategorisini aç");
+    const personalizedBadge = index === 0 && hasPersonalSignals ? '<span class="personalized-badge">Sana göre</span>' : "";
+    card.innerHTML =
+      '<span class="discovery-icon" aria-hidden="true">' + categorySvg(category.id) + '</span>' +
+      '<span class="discovery-copy"><span class="discovery-card-head"><strong>' + escapeHtml(category.label) + '</strong>' + personalizedBadge + '</span>' +
+      '<span class="discovery-count">' + places.length + ' yer</span>' +
+      '<span class="discovery-nearest">' + (nearest ? escapeHtml(nearest.name) + ' · ' + formatDistance(nearest.distanceKm) : 'Görünen alanda sonuç var') + '</span></span>' +
+      '<span class="discovery-arrow" aria-hidden="true">›</span>';
+    card.addEventListener("click", () => selectCategory(category));
+    discoveryCards.append(card);
+  });
 }
 
 function recordCategorySignal(category) {
@@ -498,21 +888,23 @@ function recordCategorySignal(category) {
 }
 
 function placesFromBundle(bundle, category) {
-  const places=category.type==="all"?Object.values(bundle).flat().sort((a,b)=>a.distanceKm-b.distanceKm):(bundle[category.id]||[]);
-  return filterPlacesForRadius(places);
+  const shown = visibleBundle(bundle);
+  if (!shown) return [];
+  return category.type === "all"
+    ? Object.values(shown).flat().sort((a, b) => a.distanceKm - b.distanceKm).slice(0, MAX_VISIBLE_PLACES)
+    : (shown[category.id] || []);
 }
-async function loadCategory(category) {
-  const serial=++requestSerial,location={lat:userLocation.lat,lng:userLocation.lng},targetRadius=Number(prefs.radius);
-  resultTitle.textContent=category.type==="all"?"Yakınındaki yerler":category.label;sourceText.textContent=category.type==="duty"?"Veri: Eczane Adresi":"Veri: OpenStreetMap";
-  activePlaces=[];document.body.classList.add("map-results-updating");updateMapContext([],category,"loading");showState("loading",`${category.label==="Tümü"?"Yakınındaki yerler":category.label} aranıyor…`);
-  const cacheKey=buildCacheKey(category.id,location,targetRadius);let hasPreview=false;
-  try{
-    const cached=readCache(cacheKey,category.ttl);if(cached){const places=filterPlacesForRadius(cached);if(serial!==requestSerial)return;statusText.textContent="Yakındaki yerler cihaz önbelleğinden anında gösterildi.";activePlaces=places;renderPlaces(places,category);return;}
-    if(category.type==="duty"){const staleDuty=readCache(cacheKey,STALE_CACHE_MAX_AGE);if(staleDuty){activePlaces=filterPlacesForRadius(staleDuty);renderPlaces(activePlaces,category);statusText.textContent="Son nöbetçi eczane kaydı gösteriliyor · güncelleniyor…";hasPreview=true;}const allPlaces=await fetchDutyPharmacies(location,PREFETCH_RADIUS);if(serial!==requestSerial)return;writeCache(cacheKey,allPlaces);activePlaces=filterPlacesForRadius(allPlaces);statusText.textContent="Güncel nöbetçi eczane verisi alındı.";renderPlaces(activePlaces,category);return;}
-    const stalePlaces=readCache(cacheKey,STALE_CACHE_MAX_AGE);if(stalePlaces){activePlaces=filterPlacesForRadius(stalePlaces);renderPlaces(activePlaces,category);statusText.textContent="Son kayıt anında gösterildi · çevre güncelleniyor…";hasPreview=true;}
-    if(!hasPreview&&targetRadius>QUICK_DISCOVERY_RADIUS){try{const quickBundle=await fetchOsmBundle(location,QUICK_DISCOVERY_RADIUS);if(serial!==requestSerial)return;const quickPlaces=placesFromBundle(quickBundle,category);if(quickPlaces.length){lastDiscoveryBundle=quickBundle;renderDiscoveryHub(quickBundle,QUICK_DISCOVERY_RADIUS);activePlaces=quickPlaces;statusText.textContent="İlk 1 km sonuçları hazır · seçili alan genişletiliyor…";renderPlaces(activePlaces,category);hasPreview=true;}}catch(error){console.warn("Quick discovery unavailable; continuing with full radius.",error);}}
-    const bundle=await fetchOsmBundle(location,targetRadius);if(serial!==requestSerial)return;lastDiscoveryBundle=bundle;renderDiscoveryHub(bundle,targetRadius);const places=placesFromBundle(bundle,category);if(category.type==="all")writeCache(cacheKey,Object.values(bundle).flat());activePlaces=places;statusText.textContent=hasPreview?"Çevre taraması tamamlandı.":"OpenStreetMap verisi alındı.";renderPlaces(places,category);
-  }catch(error){if(serial!==requestSerial)return;console.error(error);if(hasPreview&&activePlaces.length){document.body.classList.remove("map-results-updating");statusText.textContent="Yakındaki sonuçlar gösteriliyor; geniş alan şu an güncellenemedi.";updateMapContext(activePlaces,category);return;}const stalePlaces=readCache(cacheKey,Number.POSITIVE_INFINITY);if(stalePlaces){activePlaces=filterPlacesForRadius(stalePlaces);statusText.textContent="Bağlantı kurulamadı; son kaydedilen veri gösteriliyor.";renderPlaces(activePlaces,category);return;}clearPlaceMarkers();renderedMapPlaces=[];document.body.classList.remove("map-results-updating");updateMapContext([],category,"error");showState("error","Veri kaynağına şu an ulaşılamadı. Bağlantını kontrol edip yeniden deneyebilirsin; kayıtlı favorilerin etkilenmez.");statusText.textContent="Veri servisleri şu an yanıt vermiyor.";const retry=document.createElement("button");retry.type="button";retry.className="retry-button";retry.textContent="Tekrar dene";retry.addEventListener("click",()=>loadCategory(activeCategory));results.querySelector(".error-state").append(retry);}
+function loadCategory(category = activeCategory) {
+  if (category.type === "favorites") {
+    loadFavorites();
+    return;
+  }
+  if (category.type === "duty") {
+    refreshDutyViewport({ force: true });
+    return;
+  }
+  if (lastDiscoveryBundle) renderActiveCategoryFromBundle();
+  scheduleViewportRefresh();
 }
 
 async function fetchDutyPharmacies(location, radius) {
@@ -554,9 +946,10 @@ function normalizeDutyPharmacy(row, location) {
   };
 }
 
-async function fetchOsmBundle(location, radius = Number(prefs.radius)) {
-  const requestKey=`${location.lat.toFixed(QUERY_LOCATION_PRECISION)}:${location.lng.toFixed(QUERY_LOCATION_PRECISION)}:${radius}`;if(osmBundleRequest?.key===requestKey)return osmBundleRequest.promise;
-  const promise=(async()=>{const payload=await fetchNearbyPayload(location,radius),bundle=Object.fromEntries(osmCategories.map(category=>[category.id,[]]));for(const element of payload.elements||[]){const category=categoryForOsmElement(element);if(!category)continue;const place=normalizeOsmElement(element,category,location);if(Number.isFinite(place.lat)&&Number.isFinite(place.lng))bundle[category.id].push(place);}for(const category of osmCategories){bundle[category.id].sort((a,b)=>a.distanceKm-b.distanceKm);writeCache(buildCacheKey(category.id,location,radius),bundle[category.id]);}return bundle;})();osmBundleRequest={key:requestKey,promise};try{return await promise;}finally{if(osmBundleRequest?.promise===promise)osmBundleRequest=null;}
+async function fetchOsmBundle() {
+  const envelope = buildViewportEnvelope();
+  if (!envelope) return Object.fromEntries(osmCategories.map(category => [category.id, []]));
+  return fetchViewportBundle(envelope);
 }
 
 function categoryForOsmElement(element) {
@@ -597,28 +990,23 @@ function normalizeOsmElement(element, category, location) {
 }
 
 function filterPlacesForRadius(places) {
-  const radiusKm = Number(prefs.radius) / 1000;
-  return places.map(place => ({ ...place, distanceKm: userLocation ? distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng) : place.distanceKm })).filter((place) => place.distanceKm <= radiusKm).sort((a,b) => a.distanceKm - b.distanceKm).slice(0, 60);
+  return decorateViewportPlaces(places);
 }
 
 function loadFavorites() {
   requestSerial += 1;
   activePlaces = [...favorites].sort((a, b) => {
     if (!userLocation) return a.name.localeCompare(b.name, "tr");
-    const aDistance = distanceBetween(userLocation.lat, userLocation.lng, a.lat, a.lng);
-    const bDistance = distanceBetween(userLocation.lat, userLocation.lng, b.lat, b.lng);
-    return aDistance - bDistance;
+    return distanceBetween(userLocation.lat, userLocation.lng, a.lat, a.lng) - distanceBetween(userLocation.lat, userLocation.lng, b.lat, b.lng);
   });
-
   if (userLocation) {
-    activePlaces = activePlaces.map((place) => ({
+    activePlaces = activePlaces.map(place => ({
       ...place,
       distanceKm: distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng),
     }));
   }
-
   resultTitle.textContent = "Favoriler";
-  updateCategoryCounts(lastDiscoveryBundle ? Object.fromEntries(osmCategories.map(category => [category.id, filterPlacesForRadius(lastDiscoveryBundle[category.id] || [])])) : null);
+  updateCategoryCounts(lastDiscoveryBundle ? visibleBundle(lastDiscoveryBundle) : null);
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
   sourceText.textContent = "Favoriler: cihaz içi kayıt";
   renderPlaces(activePlaces, activeCategory);
@@ -656,17 +1044,17 @@ function updateMapContext(places = renderedMapPlaces, category = activeCategory,
   mapContext.dataset.state = state;
   mapContext.dataset.category = contextCategory?.id || "all";
   mapContextIcon.innerHTML = categorySvg(contextCategory?.id || "all");
-  mapContextLabel.textContent = selected?.name || (contextCategory?.type === "all" ? "Çevrendeki yerler" : contextCategory?.label || "Çevreni keşfet");
+  mapContextLabel.textContent = selected?.name || (contextCategory?.type === "all" ? "Çevrende ne var?" : contextCategory?.label || "Çevreni keşfet");
   if (selected) {
     mapContextMeta.textContent = Number.isFinite(selected.distanceKm) ? `${formatDistance(selected.distanceKm)} uzakta · ayrıntı açık` : "Seçili yer · ayrıntı açık";
     return;
   }
-  if (!userLocation) { mapContextMeta.textContent = "Konumunu aç, çevren canlansın"; return; }
-  if (state === "loading") { mapContextMeta.textContent = "Çevren taranıyor…"; return; }
-  if (state === "error") { mapContextMeta.textContent = "Veri geçici olarak kullanılamıyor"; return; }
-  if (!places.length) { mapContextMeta.textContent = "Bu yarıçapta sonuç yok"; return; }
+  if (!userLocation) { mapContextMeta.textContent = "Konumunu bir kez aç · sonra haritayı gez"; return; }
+  if (state === "loading") { mapContextMeta.textContent = "Yeni alan yükleniyor…"; return; }
+  if (state === "error") { mapContextMeta.textContent = "Yeni alan geçici olarak alınamadı"; return; }
+  if (!places.length) { mapContextMeta.textContent = "Görünen alanda sonuç yok · haritayı hareket ettir"; return; }
   const nearest = places.find(place => Number.isFinite(place.distanceKm));
-  mapContextMeta.textContent = nearest ? `${places.length} yer · en yakın ${formatDistance(nearest.distanceKm)}` : `${places.length} yer`;
+  mapContextMeta.textContent = nearest ? `${places.length} yer · en yakın ${formatDistance(nearest.distanceKm)}` : `${places.length} yer · canlı alan`;
 }
 
 function scheduleMapLabelUpdate() {
@@ -765,7 +1153,11 @@ function renderPlaces(places, category) {
     renderedMapPlaces = [];
     document.body.classList.remove("map-results-updating");
     updateMapContext([], category, "empty");
-    showState("empty", category.type === "favorites" ? "Bir yeri kaydettiğinde burada görünecek." : searchTerm ? "Aramana uyan yer bulunamadı. Farklı bir isim dene." : "Bu yarıçapta sonuç bulunamadı. Yarıçapı büyütüp tekrar deneyebilirsin.");
+    showState("empty", category.type === "favorites"
+      ? "Bir yeri kaydettiğinde burada görünecek."
+      : searchTerm
+        ? "Aramana uyan yer bulunamadı. Farklı bir isim dene."
+        : "Görünen alanda bu kategoriye ait sonuç yok. Haritayı hareket ettir; çevre otomatik yenilenir.");
     return;
   }
   updateResultSummary(places);
@@ -777,7 +1169,6 @@ function renderPlaces(places, category) {
   results.append(resultFragment);
   renderMapPlaces(places);
   animateIn(results);
-  if (document.body.dataset.view === "map") { fitResultsOnMap(places); mapHasFramedResults = true; }
   if (selectedPlace) {
     if (places.some(place => place.id === selectedPlace.id)) markSelectedPlace();
     else closePlaceDetails(false);
@@ -1040,10 +1431,10 @@ function iconForCategory(categoryId) {
   return categories.find((item) => item.id === categoryId)?.icon || "•";
 }
 
-function buildCacheKey(categoryId, location = userLocation, radius = Number(prefs.radius)) {
-  const roundedLat = location.lat.toFixed(3);
-  const roundedLng = location.lng.toFixed(3);
-  return `${CACHE_PREFIX}${categoryId}:${roundedLat}:${roundedLng}:${radius}`;
+function buildCacheKey(categoryId, location = userLocation, scope = "legacy") {
+  const roundedLat = Number(location?.lat || 0).toFixed(3);
+  const roundedLng = Number(location?.lng || 0).toFixed(3);
+  return `${CACHE_PREFIX}${categoryId}:${roundedLat}:${roundedLng}:${scope}`;
 }
 
 function readCache(key, ttl) {
@@ -1079,13 +1470,12 @@ function showState(kind, message) {
 
 function updateResultSummary(places) {
   if (!places.length) {
-    resultSummary.textContent = "Bu yarıçapta sonuç yok";
+    resultSummary.textContent = "Görünen alanda sonuç yok";
     return;
   }
-
-  const nearest = places.find((place) => Number.isFinite(place.distanceKm));
+  const nearest = places.find(place => Number.isFinite(place.distanceKm));
   const nearestText = nearest ? ` · en yakın ${formatDistance(nearest.distanceKm)}` : "";
-  resultSummary.textContent = `${places.length} sonuç${nearestText}`;
+  resultSummary.textContent = `${places.length} sonuç · görünen alan${nearestText}`;
 }
 
 function applySheetState(state) {
@@ -1202,7 +1592,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-console.info(`Yakınımda v${APP_VERSION}`);
+console.info(`Yakınımda v${APP_VERSION} · viewport discovery`);
 
 
 function categorySvg(id) {
@@ -1226,9 +1616,8 @@ function categorySvg(id) {
   return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
 }
 
-async function fetchNearbyPayload(location, radius) {
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),NEARBY_REQUEST_TIMEOUT),queryLat=location.lat.toFixed(QUERY_LOCATION_PRECISION),queryLng=location.lng.toFixed(QUERY_LOCATION_PRECISION);
-  try{const params=new URLSearchParams({lat:queryLat,lng:queryLng,radius:String(radius)}),response=await fetch(`/api/nearby?${params}`,{signal:controller.signal,headers:{Accept:"application/json"}});if(!response.ok)throw new Error(`Nearby API ${response.status}`);const payload=await response.json();if(!Array.isArray(payload.elements))throw new Error("Invalid nearby response");return payload;}
-  catch(error){console.warn("Nearby proxy unavailable; trying browser source.",error);statusText.textContent="Yakın çevre için yedek veri kaynağı deneniyor…";const area=`around:${radius},${queryLat},${queryLng}`,query=`[out:json][timeout:6];(nwr(${area})[amenity~"^(cafe|restaurant|fast_food|pharmacy|atm|hospital|clinic|doctors|fuel|parking)$"];nwr(${area})[shop~"^(supermarket|convenience|greengrocer|bakery|mall|department_store|clothes)$"];nwr(${area})[leisure=park];);out center tags;`,fallbackController=new AbortController(),fallbackTimer=setTimeout(()=>fallbackController.abort(),NEARBY_FALLBACK_TIMEOUT);try{const url=`https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`,fallback=await fetch(url,{signal:fallbackController.signal});if(!fallback.ok)throw new Error(`Nearby fallback ${fallback.status}`);const payload=await fallback.json();if(!Array.isArray(payload.elements)||payload.remark)throw new Error("Invalid nearby fallback");return payload;}finally{clearTimeout(fallbackTimer);}}
-  finally{clearTimeout(timer);}
+async function fetchNearbyPayload() {
+  const envelope = buildViewportEnvelope();
+  if (!envelope) return { elements: [] };
+  return fetchViewportPayload(envelope);
 }
