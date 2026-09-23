@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.2.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -152,7 +152,7 @@ document.querySelector("#placeSearch").addEventListener("input", (event) => {
   searchTerm = event.target.value.trim().toLocaleLowerCase("tr");
   renderPlaces(activePlaces, activeCategory);
 });
-document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
+document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
 document.querySelector("#closeDetail").addEventListener("click", () => closePlaceDetails());
 document.querySelector("#detailFavorite").addEventListener("click", () => { if (selectedPlace) toggleFavorite(selectedPlace); });
 document.querySelector("#detailRoute").addEventListener("click", () => { if (selectedPlace) toggleRouteStop(selectedPlace); });
@@ -166,7 +166,7 @@ function setView(view) {
   closePlaceDetails(false);
   document.body.dataset.view = view;
   window.scrollTo(0, view === "list" ? listScrollY : 0);
-  document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
+  document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
   animateIn(sheet);
   requestAnimationFrame(() => { map.invalidateSize(); if (view === "map" && !mapHasFramedResults && activePlaces.length) { fitResultsOnMap(activePlaces); mapHasFramedResults = true; } });
 }
