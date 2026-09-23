@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.1\.1"/);
+assert.match(app, /APP_VERSION = "3\.1\.2"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -59,7 +59,6 @@ assert.match(app, /toggleRadioFavorite/);
 assert.match(app, /configureRadioMediaSession/);
 assert.match(app, /rememberRadioRecent/);
 assert.match(app, /toggleRadioPlayerExpanded/);
-assert.match(app, /fallbackCount/);
 assert.match(app, /resultCountLabel/);
 assert.match(app, /heading\.textContent = "Öne çıkanlar"/);
 assert.match(app, /supportsVectorBaseMap/);
@@ -80,6 +79,7 @@ assert.match(index, /id="recenterButton"/);
 assert.match(index, /id="mapQuickCard"/);
 assert.match(index, /id="quickShare"/);
 assert.match(index, /Öne çıkanlar/);
+assert.doesNotMatch(index, /data-radio-scope=/);
 for (const id of ["sectionNav","newsSection","newsList","radioSection","radioList","radioPlayer","radioSearch","radioLibraryTabs","radioPlayerAvatar","radioPlayerFavorite","radioPlayerShare","radioPlayerExpand","radioPrev","radioNext","radioVolume"]) assert.match(index, new RegExp(`id="${id}"`));
 assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
@@ -93,6 +93,7 @@ assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(styles, /v3\.0\.1 map-first global navigation/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.1\.1 radio mobile semantics \+ compact player/);
+assert.match(styles, /v3\.1\.2 radio single discovery feed/);
 assert.doesNotMatch(styles, /is-nearest\{[^}]*background:var\(--accent\)/s);
 assert.ok(styles.includes("leaflet-tile.base-map-tile"));
 assert.match(styles, /leaflet-placeLabels-pane/);
@@ -104,7 +105,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v38/);
+assert.match(sw, /yakinimda-shell-v39/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

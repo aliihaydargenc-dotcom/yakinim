@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 const { NEWS_FEEDS, parseRss, queryNews } = require("../lib/news.cjs");
-const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeStation, uniqueStations, stationMatchesScope, queryRadio } = require("../lib/radio.cjs");
+const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
 
 assert.ok(NEWS_FEEDS.gundem.url.includes("trthaber.com"));
 assert.ok(NEWS_FEEDS.teknoloji.url.includes("bilim_teknoloji"));
@@ -18,10 +18,11 @@ const fakeNewsFetch = async () => ({ ok: true, text: async () => sampleXml });
 assert.equal((await queryNews("gundem", fakeNewsFetch)).length, 1);
 await assert.rejects(() => queryNews("nope", fakeNewsFetch), /unsupported_category/);
 
-assert.ok(RADIO_SCOPES.antalya.state === "Antalya");
-const params = buildStationParams("antalya");
+assert.deepEqual(Object.keys(RADIO_SCOPES), ["turkiye"]);
+const params = buildStationParams("turkiye");
 assert.equal(params.get("countrycode"), "TR");
-assert.equal(params.get("state"), "Antalya");
+assert.equal(params.has("state"), false);
+assert.equal(params.has("tag"), false);
 assert.equal(params.get("hidebroken"), "true");
 
 const goodStation = normalizeStation({
@@ -43,32 +44,18 @@ assert.equal(goodStation.countryCode, "TR");
 assert.equal(goodStation.language, "turkish");
 assert.equal(goodStation.hls, true);
 assert.equal(cleanProviderText("UNKNOWN"), "");
-assert.equal(stationMatchesScope({ state: "Antalya" }, "antalya"), true);
-assert.equal(stationMatchesScope({ state: "İstanbul Bağcılar" }, "antalya"), false);
 assert.equal(normalizeStation({ ...goodStation, stationuuid: "x", url_resolved: "http://insecure", lastcheckok: 1 }), null);
 assert.equal(uniqueStations([
   { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },
   { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },
 ]).length, 1);
 
-const localRows = [
-  { stationuuid: "2-2222222222222222", name: "Antalya FM", url_resolved: "https://stream.example/antalya", lastcheckok: 1, state: "Antalya" },
-  { stationuuid: "3-3333333333333333", name: "Wrong City FM", url_resolved: "https://stream.example/wrong", lastcheckok: 1, state: "İstanbul Bağcılar" },
-];
 const nationalRows = [
-  { stationuuid: "4-4444444444444444", name: "Türkiye FM", url_resolved: "https://stream.example/turkiye", lastcheckok: 1, state: "Ankara" },
+  { stationuuid: "2-2222222222222222", name: "Türkiye FM", url_resolved: "https://stream.example/turkiye", lastcheckok: 1, state: "Ankara" },
 ];
-const fakeRadioFetch = async url => ({
-  ok: true,
-  json: async () => url.includes("state=Antalya") ? localRows : nationalRows,
-});
-const radio = await queryRadio("antalya", fakeRadioFetch);
-assert.equal(radio.localCount, 1);
-assert.equal(radio.fallbackCount, 1);
-assert.equal(radio.fallbackApplied, true);
-assert.equal(radio.stations[0].name, "Antalya FM");
-assert.equal(radio.stations[0].scopeSource, "local");
-assert.equal(radio.stations[1].name, "Türkiye FM");
-assert.equal(radio.stations[1].scopeSource, "fallback");
+const fakeRadioFetch = async () => ({ ok: true, json: async () => nationalRows });
+const radio = await queryRadio("turkiye", fakeRadioFetch);
+assert.equal(radio.stations.length, 1);
+assert.equal(radio.stations[0].name, "Türkiye FM");
 
 console.log("Media tests PASS: official RSS parsing and safe Radio Browser station normalization.");

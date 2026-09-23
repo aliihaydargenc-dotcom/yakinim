@@ -995,3 +995,8 @@ body:not([data-section=radio]) .radio-player-main{grid-template-columns:46px min
   .radio-player.is-expanded .radio-player-tools{padding-top:7px;margin-top:7px}
   .radio-player-tools>button,.radio-player-tools>a{min-height:32px}
 }
+
+
+/* v3.1.2 radio single discovery feed */
+.radio-scope-filter{display:none!important}
+.radio-library-tabs{padding-bottom:12px}

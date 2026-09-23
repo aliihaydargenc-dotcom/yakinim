@@ -69,6 +69,7 @@ assert.match(app, /parseDiscoveryQuery/);
 assert.match(app, /setSection/);
 assert.match(app, /loadNews/);
 assert.match(app, /loadRadio/);
+assert.doesNotMatch(index, /data-radio-scope=/);
 assert.match(app, /toggleRadioFavorite/);
 assert.match(app, /navigator\.mediaSession/);
 assert.match(app, /rememberRadioRecent/);

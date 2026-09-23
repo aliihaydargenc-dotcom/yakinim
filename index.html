@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.1.1" as="script" />
+    <link rel="preload" href="./app.js?v=3.1.2" as="script" />
     <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" as="script" crossorigin />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -29,7 +29,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.1.1" />
+    <link rel="stylesheet" href="./styles.css?v=3.1.2" />
   </head>
   <body data-view="list" data-section="nearby">
     <main class="app-shell">
@@ -188,13 +188,6 @@
           <button type="button" data-radio-library="recent" aria-pressed="false">Son dinlenenler</button>
         </div>
 
-        <div class="module-filter radio-scope-filter" aria-label="Radyo filtreleri">
-          <button type="button" data-radio-scope="antalya" aria-pressed="true">Antalya</button>
-          <button type="button" data-radio-scope="turkiye" aria-pressed="false">Türkiye</button>
-          <button type="button" data-radio-scope="pop" aria-pressed="false">Pop</button>
-          <button type="button" data-radio-scope="rock" aria-pressed="false">Rock</button>
-        </div>
-
         <p id="radioStatus" class="module-status">İstasyonlar yüklenmeye hazır.</p>
         <div id="radioList" class="radio-list" aria-live="polite"></div>
         <p class="module-source-note">İstasyon dizini: Radio Browser. Yayın erişilebilirliği istasyona göre değişebilir.</p>
@@ -259,6 +252,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.1.1" defer></script>
+    <script src="./app.js?v=3.1.2" defer></script>
   </body>
 </html>

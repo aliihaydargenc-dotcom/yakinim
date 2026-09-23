@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
   }
 
   const url = new URL(req.url, "https://yakinim.local");
-  const scope = url.searchParams.get("scope") || "antalya";
+  const scope = url.searchParams.get("scope") || "turkiye";
   if (!RADIO_SCOPES[scope]) return res.status(400).json({ error: "unsupported_scope" });
 
   const cached = memoryCache.get(scope);
@@ -34,8 +34,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { stations, localCount = stations.length, fallbackCount = 0, fallbackApplied = false } = await queryRadio(scope);
-    const payload = { scope, stations, localCount, fallbackCount, fallbackApplied, fetchedAt: new Date().toISOString() };
+    const { stations } = await queryRadio(scope);
+    const payload = { scope, stations, fetchedAt: new Date().toISOString() };
     memoryCache.set(scope, { savedAt: Date.now(), payload });
     res.setHeader("X-Yakinim-Radio-Cache", "MISS");
     res.setHeader("Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=1800");
