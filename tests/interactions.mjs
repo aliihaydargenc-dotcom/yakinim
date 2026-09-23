@@ -14,3 +14,9 @@ const strip={children:buttons,append:b=>buttons.push(b),querySelectorAll:()=>but
 const ctx2=vm.createContext({categoryStrip:strip,categories:[{id:'cafe',label:'Kafe'},{id:'market',label:'Market'}],activeCategory:{id:'cafe'},categorySvg:()=>'<svg/>',escapeHtml:s=>s,selectCategory:()=>{},document:{createElement(){created++;return{dataset:{},attrs:{},setAttribute(k,v){this.attrs[k]=v;},addEventListener(){}};}}});
 vm.runInContext(extract('renderCategoryButtons'),ctx2);vm.runInContext('renderCategoryButtons()',ctx2);const first=buttons[0];ctx2.activeCategory={id:'market'};vm.runInContext('renderCategoryButtons()',ctx2);assert.equal(created,2);assert.equal(buttons[0],first);assert.equal(buttons[1].attrs['aria-pressed'],'true');
 console.log('Interaction tests PASS: pin opens details without navigation; category controls retain identity.');
+const routeContext=vm.createContext({URLSearchParams});
+vm.runInContext(extract('buildRouteUrl'),routeContext);
+const url=vm.runInContext('buildRouteUrl([{lat:36.9,lng:30.7},{lat:36.91,lng:30.71},{lat:36.92,lng:30.72}])',routeContext);
+const params=new URL(url).searchParams;
+assert.equal(params.get('destination'),'36.92,30.72');
+assert.equal(params.get('waypoints'),'36.9,30.7|36.91,30.71');

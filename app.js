@@ -1,9 +1,10 @@
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.2.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
 const PREFS_KEY = "yakinimda:prefs:v1";
 const FAVORITES_KEY = "yakinimda:favorites:v1";
+const ROUTE_KEY = "yakinimda:route:v1";
 const DISCOVERY_SIGNALS_KEY = "yakinimda:discovery-signals:v1";
 const DISCOVERY_CARD_LIMIT = 6;
 const CACHE_PREFIX = "yakinimda:cache:v4:";
@@ -36,6 +37,7 @@ const mapShouldAnimate = !window.matchMedia("(pointer: coarse), (prefers-reduced
 
 const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
+let routeStops = readJson(ROUTE_KEY, []).filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lng)).slice(0, 4);
 let discoverySignals = readJson(DISCOVERY_SIGNALS_KEY, { categoryViews: {}, lastCategory: null });
 let userLocation = null;
 let activeCategory = categories.find((category) => category.id === prefs.category) || categories[0];
@@ -63,9 +65,24 @@ const map = L.map("map", {
   zoomSnap: 0.5,
 }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-L.maplibreGL({
-  style: MAP_STYLE_URL,
-}).addTo(map);
+try {
+  L.maplibreGL({ style: MAP_STYLE_URL }).addTo(map);
+} catch (error) {
+  console.warn("Vector map unavailable; loading raster map.", error);
+  document.body.classList.add("map-raster");
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(map);
+  L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
+  document.addEventListener("DOMContentLoaded", () => {
+    const attribution = document.querySelector(".osm-attribution");
+    if (attribution) {
+      attribution.href = "https://www.openstreetmap.org/copyright";
+      attribution.textContent = "Harita: © OpenStreetMap contributors";
+    }
+  });
+}
 
 L.control.zoom({ position: "topright" }).addTo(map);
 
@@ -134,8 +151,11 @@ document.querySelector("#placeSearch").addEventListener("input", (event) => {
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
 document.querySelector("#closeDetail").addEventListener("click", () => closePlaceDetails());
 document.querySelector("#detailFavorite").addEventListener("click", () => { if (selectedPlace) toggleFavorite(selectedPlace); });
+document.querySelector("#detailRoute").addEventListener("click", () => { if (selectedPlace) toggleRouteStop(selectedPlace); });
 document.querySelector("#detailMap").addEventListener("click", () => { if (selectedPlace) focusPlace(selectedPlace); });
+document.querySelector("#clearRoute").addEventListener("click", () => { routeStops = []; persistRoute(); renderRoute(); showToast("Rota temizlendi"); });
 document.addEventListener("keydown", event => { if (event.key === "Escape" && selectedPlace) closePlaceDetails(); });
+renderRoute();
 setView("list");
 function setView(view) {
   if (document.body.dataset.view === "list") listScrollY = window.scrollY;
@@ -732,6 +752,7 @@ function createResultCard(place, icon, isNearest = false, index = 0) {
   const metaEl = fragment.querySelector(".result-meta");
   const addressEl = fragment.querySelector(".result-address");
   const favoriteButton = fragment.querySelector(".favorite-button");
+  const routeButton = fragment.querySelector(".route-button");
   const directionsLink = fragment.querySelector(".directions-link");
   const phoneLink = fragment.querySelector(".phone-link");
 
@@ -750,6 +771,8 @@ function createResultCard(place, icon, isNearest = false, index = 0) {
 
   main.addEventListener("click", () => openPlaceDetails(place, main));
   favoriteButton.addEventListener("click", () => toggleFavorite(place));
+  routeButton.textContent = routeStops.some(stop => stop.id === place.id) ? "Rotadan çıkar" : "Rotaya ekle";
+  routeButton.addEventListener("click", () => toggleRouteStop(place));
 
   directionsLink.href = buildDirectionsUrl(place);
 
@@ -841,6 +864,7 @@ function openPlaceDetails(place, trigger = null) {
   const favorite = detail.querySelector("#detailFavorite");
   favorite.textContent = isFavorite(place.id) ? "Kaydedildi" : "Kaydet";
   favorite.setAttribute("aria-pressed", String(isFavorite(place.id)));
+  detail.querySelector("#detailRoute").textContent = routeStops.some(stop => stop.id === place.id) ? "Rotadan çıkar" : "Rotaya ekle";
   detail.querySelector("#detailMap").hidden = document.body.dataset.view === "map";
   detail.hidden = false;
   document.body.classList.add("has-place-detail");
@@ -874,6 +898,45 @@ function showToast(message) {
   toast.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toast.hidden = true; }, 2200);
+}
+
+function toggleRouteStop(place) {
+  if (routeStops.some(stop => stop.id === place.id)) {
+    routeStops = routeStops.filter(stop => stop.id !== place.id);
+    showToast("Rotadan çıkarıldı");
+  } else {
+    if (routeStops.length >= 4) { showToast("Bir rotaya en fazla 4 yer eklenebilir"); return; }
+    routeStops.push({ id: place.id, name: place.name, lat: place.lat, lng: place.lng });
+    showToast("Rotaya eklendi");
+  }
+  persistRoute();
+  renderRoute();
+  if (selectedPlace?.id === place.id) document.querySelector("#detailRoute").textContent = routeStops.some(stop => stop.id === place.id) ? "Rotadan çıkar" : "Rotaya ekle";
+  results.querySelectorAll(".result-card").forEach(card => {
+    const button = card.querySelector(".route-button");
+    button.textContent = routeStops.some(stop => stop.id === card.dataset.placeId) ? "Rotadan çıkar" : "Rotaya ekle";
+  });
+}
+
+function persistRoute() {
+  try { localStorage.setItem(ROUTE_KEY, JSON.stringify(routeStops)); } catch { /* Route remains usable this session. */ }
+}
+
+function buildRouteUrl(stops) {
+  if (!stops.length) return "";
+  const coordinates = place => `${place.lat},${place.lng}`;
+  const params = new URLSearchParams({ api: "1", destination: coordinates(stops.at(-1)) });
+  if (stops.length > 1) params.set("waypoints", stops.slice(0, -1).map(coordinates).join("|"));
+  return `https://www.google.com/maps/dir/?${params}`;
+}
+
+function renderRoute() {
+  const tray = document.querySelector("#routeTray");
+  tray.hidden = !routeStops.length;
+  document.body.classList.toggle("has-route", !!routeStops.length);
+  if (!routeStops.length) return;
+  document.querySelector("#routeStops").textContent = routeStops.map((stop, index) => `${index + 1}. ${stop.name}`).join("  →  ");
+  document.querySelector("#openRoute").href = buildRouteUrl(routeStops);
 }
 
 function clearPlaceMarkers() {
