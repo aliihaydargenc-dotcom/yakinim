@@ -55,6 +55,8 @@ assert.match(app, /direction: "top"/);
 assert.match(app, /hitsOtherPin/);
 assert.match(app, /placeMarkerById/);
 assert.match(app, /applyNearestMarkerState/);
+assert.match(app, /openMapQuickCard\(marker\.place/);
+assert.match(app, /syncMapControlOffset/);
 assert.match(app, /· en yakın/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
 assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail" \}/);

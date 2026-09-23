@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.8\.1"/);
+assert.match(app, /APP_VERSION = "2\.9\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -40,6 +40,10 @@ assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.match(app, /one authoritative geolocation request/);
 assert.match(app, /locationZoomForAccuracy/);
 assert.match(app, /applyNearestMarkerState/);
+assert.match(app, /openMapQuickCard/);
+assert.match(app, /recenterOnUser/);
+assert.match(app, /formatWalkingTime/);
+assert.match(app, /openingStatus/);
 assert.match(app, /supportsVectorBaseMap/);
 assert.ok(app.includes("window.maplibregl.supported"));
 assert.match(app, /switchToRasterBaseMap/);
@@ -53,10 +57,14 @@ assert.match(index, /OpenFreeMap/);
 assert.match(index, /viewport-live-hint/);
 assert.doesNotMatch(index, /id="radiusSelect"/);
 assert.doesNotMatch(index, /map-context-chevron/);
+assert.match(index, /id="mapSearch"/);
+assert.match(index, /id="recenterButton"/);
+assert.match(index, /id="mapQuickCard"/);
 assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
 assert.match(styles, /v2\.8 mobile vector basemap reliability/);
 assert.match(styles, /v2\.8\.1 final map state semantics/);
+assert.match(styles, /v2\.9 standard mobile map chrome \+ quick place card/);
 assert.doesNotMatch(styles, /is-nearest\{[^}]*background:var\(--accent\)/s);
 assert.ok(styles.includes("leaflet-tile.base-map-tile"));
 assert.match(styles, /leaflet-placeLabels-pane/);
@@ -68,7 +76,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v29/);
+assert.match(sw, /yakinimda-shell-v30/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);
