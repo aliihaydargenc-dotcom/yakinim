@@ -1,4 +1,4 @@
-const APP_VERSION = "3.0.1";
+const APP_VERSION = "3.1.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -10,6 +10,9 @@ const DISCOVERY_CARD_LIMIT = 4;
 const DISCOVERY_PERSONALIZATION_THRESHOLD = 5;
 const NEWS_CATEGORIES = ["gundem", "turkiye", "dunya", "ekonomi", "teknoloji", "yasam"];
 const RADIO_SCOPES = ["antalya", "turkiye", "pop", "rock"];
+const RADIO_FAVORITES_KEY = "yakinimda:radio-favorites:v1";
+const RADIO_RECENTS_KEY = "yakinimda:radio-recents:v1";
+const RADIO_VOLUME_KEY = "yakinimda:radio-volume:v1";
 const CATEGORY_QUERY_ALIASES = Object.freeze({
   cafe: ["kafe", "kahve", "coffee"],
   food: ["yemek", "restoran", "lokanta", "fast food"],
@@ -103,7 +106,14 @@ let lastDiscoveryInteraction = { placeId: null, at: 0 };
 let appSection = "nearby";
 let activeNewsCategory = "gundem";
 let activeRadioScope = "antalya";
+let activeRadioLibrary = "discover";
+let radioSearchTerm = "";
 let currentRadioStation = null;
+let lastRenderedRadioStations = [];
+let radioFavoriteStations = readJson(RADIO_FAVORITES_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 60);
+let radioRecentStations = readJson(RADIO_RECENTS_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 20);
+const savedRadioVolume = Number(localStorage.getItem(RADIO_VOLUME_KEY));
+let radioVolumeLevel = Number.isFinite(savedRadioVolume) ? Math.min(1, Math.max(0, savedRadioVolume)) : .8;
 const newsClientCache = new Map();
 const radioClientCache = new Map();
 let listScrollY = 0;
@@ -293,10 +303,20 @@ const newsStatus = document.querySelector("#newsStatus");
 const radioSection = document.querySelector("#radioSection");
 const radioList = document.querySelector("#radioList");
 const radioStatus = document.querySelector("#radioStatus");
+const radioSearch = document.querySelector("#radioSearch");
+const radioSearchClear = document.querySelector("#radioSearchClear");
+const radioLibraryTabs = document.querySelector("#radioLibraryTabs");
 const radioPlayer = document.querySelector("#radioPlayer");
+const radioPlayerAvatar = document.querySelector("#radioPlayerAvatar");
 const radioPlayerName = document.querySelector("#radioPlayerName");
 const radioPlayerMeta = document.querySelector("#radioPlayerMeta");
 const radioPlayToggle = document.querySelector("#radioPlayToggle");
+const radioPlayerFavorite = document.querySelector("#radioPlayerFavorite");
+const radioPlayerShare = document.querySelector("#radioPlayerShare");
+const radioPlayerHomepage = document.querySelector("#radioPlayerHomepage");
+const radioPrev = document.querySelector("#radioPrev");
+const radioNext = document.querySelector("#radioNext");
+const radioVolume = document.querySelector("#radioVolume");
 const radioPlayerClose = document.querySelector("#radioPlayerClose");
 const radioAudio = document.querySelector("#radioAudio");
 
@@ -360,16 +380,46 @@ quickDetails?.addEventListener("click", () => {
 });
 sectionNav?.querySelectorAll("[data-section]").forEach(button => button.addEventListener("click", () => setSection(button.dataset.section)));
 newsSection?.querySelectorAll("[data-news-category]").forEach(button => button.addEventListener("click", () => loadNews(button.dataset.newsCategory)));
-radioSection?.querySelectorAll("[data-radio-scope]").forEach(button => button.addEventListener("click", () => loadRadio(button.dataset.radioScope)));
+radioSection?.querySelectorAll("[data-radio-scope]").forEach(button => button.addEventListener("click", () => {
+  activeRadioLibrary = "discover";
+  syncRadioLibraryTabs();
+  loadRadio(button.dataset.radioScope);
+}));
+radioLibraryTabs?.querySelectorAll("[data-radio-library]").forEach(button => button.addEventListener("click", () => selectRadioLibrary(button.dataset.radioLibrary)));
+radioSearch?.addEventListener("input", event => {
+  radioSearchTerm = normalizeSearchValue(event.target.value);
+  if (radioSearchClear) radioSearchClear.hidden = !radioSearchTerm;
+  renderRadioStations(currentRadioPayload());
+});
+radioSearchClear?.addEventListener("click", () => {
+  radioSearchTerm = "";
+  if (radioSearch) {
+    radioSearch.value = "";
+    radioSearch.focus();
+  }
+  radioSearchClear.hidden = true;
+  renderRadioStations(currentRadioPayload());
+});
 radioPlayToggle?.addEventListener("click", toggleRadioPlayback);
+radioPlayerFavorite?.addEventListener("click", () => { if (currentRadioStation) toggleRadioFavorite(currentRadioStation); });
+radioPlayerShare?.addEventListener("click", () => { if (currentRadioStation) shareRadioStation(currentRadioStation); });
+radioPrev?.addEventListener("click", () => stepRadioStation(-1));
+radioNext?.addEventListener("click", () => stepRadioStation(1));
+radioVolume?.addEventListener("input", event => setRadioVolume(Number(event.target.value) / 100));
 radioPlayerClose?.addEventListener("click", closeRadioPlayer);
 radioAudio?.addEventListener("play", syncRadioPlayerState);
 radioAudio?.addEventListener("pause", syncRadioPlayerState);
 radioAudio?.addEventListener("ended", syncRadioPlayerState);
 radioAudio?.addEventListener("error", () => {
   syncRadioPlayerState();
-  if (currentRadioStation) radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
+  if (currentRadioStation) {
+    radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
+    radioPlayer.classList.add("has-error");
+  }
 });
+setRadioVolume(radioVolumeLevel);
+syncRadioLibraryTabs();
+configureRadioMediaSession();
 document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
 document.querySelector("#closeDetail").addEventListener("click", () => {
   if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") history.back();
@@ -435,7 +485,7 @@ function setSection(section, { pushHistory = true } = {}) {
     document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === "list")));
   }
 
-  if (previous === "radio" && next !== "radio" && radioAudio && !radioAudio.paused) radioAudio.pause();
+  // Radio intentionally keeps playing while the user moves between app sections.
 
   newsSection.hidden = next !== "news";
   radioSection.hidden = next !== "radio";
@@ -519,6 +569,252 @@ function formatRelativeTime(value, now = Date.now()) {
   return `${days} gün önce`;
 }
 
+function cleanRadioText(value) {
+  const text = String(value || "").trim();
+  if (!text || /^(unknown|n\/a|null|undefined|-+)$/i.test(text)) return "";
+  return text;
+}
+
+function titleCaseRadioText(value) {
+  const text = cleanRadioText(value);
+  if (!text) return "";
+  return text.toLocaleLowerCase("tr").replace(/(^|[\s-])([a-zçğıöşü])/g, (match, prefix, letter) => prefix + letter.toLocaleUpperCase("tr"));
+}
+
+function radioInitials(name) {
+  const words = String(name || "Radyo").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "R";
+  if (words.length === 1) return words[0].slice(0, 2).toLocaleUpperCase("tr");
+  return (words[0][0] + words[1][0]).toLocaleUpperCase("tr");
+}
+
+function createRadioAvatar(station, className = "radio-avatar") {
+  const avatar = document.createElement("span");
+  avatar.className = className;
+  const fallback = document.createElement("span");
+  fallback.className = "radio-avatar-fallback";
+  fallback.textContent = radioInitials(station?.name);
+  avatar.append(fallback);
+
+  if (station?.favicon) {
+    const image = document.createElement("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.decoding = "async";
+    image.addEventListener("load", () => image.classList.add("is-loaded"), { once: true });
+    image.addEventListener("error", () => image.remove(), { once: true });
+    image.src = station.favicon;
+    avatar.append(image);
+  }
+  return avatar;
+}
+
+function radioStationTags(station) {
+  return (station?.tags || [])
+    .map(tag => cleanRadioText(tag))
+    .filter(Boolean)
+    .filter((tag, index, rows) => rows.findIndex(item => item.toLocaleLowerCase("tr") === tag.toLocaleLowerCase("tr")) === index)
+    .slice(0, 3);
+}
+
+function radioStationMeta(station) {
+  const location = titleCaseRadioText(station?.state);
+  const codec = cleanRadioText(station?.codec);
+  const bitrate = Number(station?.bitrate) > 0 ? `${Number(station.bitrate)} kbps` : "";
+  return [location, codec, bitrate].filter(Boolean);
+}
+
+function radioStationForStorage(station) {
+  return {
+    id: station.id,
+    name: station.name,
+    streamUrl: station.streamUrl,
+    homepage: station.homepage || "",
+    favicon: station.favicon || "",
+    tags: Array.isArray(station.tags) ? station.tags.slice(0, 6) : [],
+    codec: station.codec || "",
+    bitrate: Number(station.bitrate) || 0,
+    state: station.state || "",
+    countryCode: station.countryCode || "TR",
+    language: station.language || "",
+    clickcount: Number(station.clickcount) || 0,
+    votes: Number(station.votes) || 0,
+  };
+}
+
+function currentRadioPayload() {
+  return radioClientCache.get(activeRadioScope) || { scope: activeRadioScope, stations: [] };
+}
+
+function isRadioFavorite(stationId) {
+  return radioFavoriteStations.some(station => station.id === stationId);
+}
+
+function persistRadioFavorites() {
+  try { localStorage.setItem(RADIO_FAVORITES_KEY, JSON.stringify(radioFavoriteStations.slice(0, 60))); } catch {}
+}
+
+function persistRadioRecents() {
+  try { localStorage.setItem(RADIO_RECENTS_KEY, JSON.stringify(radioRecentStations.slice(0, 20))); } catch {}
+}
+
+function toggleRadioFavorite(station) {
+  if (!station?.id) return;
+  if (isRadioFavorite(station.id)) {
+    radioFavoriteStations = radioFavoriteStations.filter(item => item.id !== station.id);
+    showToast("Radyo favorilerden çıkarıldı");
+  } else {
+    radioFavoriteStations = [radioStationForStorage(station), ...radioFavoriteStations.filter(item => item.id !== station.id)].slice(0, 60);
+    showToast("Radyo favorilere eklendi");
+  }
+  persistRadioFavorites();
+  syncRadioPlayerFavorite();
+  renderRadioStations(currentRadioPayload());
+}
+
+function rememberRadioRecent(station) {
+  if (!station?.id) return;
+  radioRecentStations = [radioStationForStorage(station), ...radioRecentStations.filter(item => item.id !== station.id)].slice(0, 20);
+  persistRadioRecents();
+}
+
+function selectRadioLibrary(mode) {
+  activeRadioLibrary = ["discover", "favorites", "recent"].includes(mode) ? mode : "discover";
+  syncRadioLibraryTabs();
+  renderRadioStations(currentRadioPayload());
+}
+
+function syncRadioLibraryTabs() {
+  radioLibraryTabs?.querySelectorAll("[data-radio-library]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.radioLibrary === activeRadioLibrary));
+  });
+}
+
+function radioStationsForView(payload) {
+  const source = activeRadioLibrary === "favorites"
+    ? radioFavoriteStations
+    : activeRadioLibrary === "recent"
+      ? radioRecentStations
+      : (Array.isArray(payload?.stations) ? payload.stations : []);
+
+  const query = radioSearchTerm;
+  const filtered = !query ? source : source.filter(station => {
+    const haystack = normalizeSearchValue([
+      station.name,
+      station.state,
+      station.codec,
+      station.language,
+      ...(station.tags || []),
+    ].join(" "));
+    return haystack.includes(query);
+  });
+
+  const unique = new Map();
+  filtered.forEach(station => { if (station?.id && !unique.has(station.id)) unique.set(station.id, station); });
+  return [...unique.values()];
+}
+
+function updateRadioStatus(stations) {
+  const count = stations.length;
+  if (radioSearchTerm) {
+    radioStatus.textContent = count ? `${count} eşleşme` : "Aramana uyan istasyon bulunamadı.";
+    return;
+  }
+  if (activeRadioLibrary === "favorites") {
+    radioStatus.textContent = count ? `${count} favori istasyon` : "Henüz favori istasyonun yok.";
+    return;
+  }
+  if (activeRadioLibrary === "recent") {
+    radioStatus.textContent = count ? `${count} son dinlenen istasyon` : "Henüz bir istasyon dinlemedin.";
+    return;
+  }
+  const scopeLabel = activeRadioScope === "antalya" ? "Antalya" : activeRadioScope === "turkiye" ? "Türkiye" : titleCaseRadioText(activeRadioScope);
+  radioStatus.textContent = count ? `${count} istasyon · ${scopeLabel}` : "Uygun yayın bulunamadı.";
+}
+
+function syncRadioPlayerFavorite() {
+  if (!radioPlayerFavorite) return;
+  const favorite = currentRadioStation && isRadioFavorite(currentRadioStation.id);
+  radioPlayerFavorite.textContent = favorite ? "★" : "☆";
+  radioPlayerFavorite.setAttribute("aria-pressed", String(Boolean(favorite)));
+  radioPlayerFavorite.setAttribute("aria-label", favorite ? "Radyoyu favorilerden çıkar" : "Radyoyu favorilere ekle");
+}
+
+function setRadioVolume(level) {
+  radioVolumeLevel = Math.min(1, Math.max(0, Number(level) || 0));
+  if (radioAudio) radioAudio.volume = radioVolumeLevel;
+  if (radioVolume) radioVolume.value = String(Math.round(radioVolumeLevel * 100));
+  try { localStorage.setItem(RADIO_VOLUME_KEY, String(radioVolumeLevel)); } catch {}
+}
+
+function updateRadioPlayer(station) {
+  if (!station) return;
+  radioPlayer.classList.remove("has-error");
+  radioPlayer.hidden = false;
+  radioPlayerName.textContent = station.name;
+  radioPlayerMeta.textContent = radioStationMeta(station).join(" · ") || "Canlı yayın";
+  radioPlayerAvatar?.replaceChildren(createRadioAvatar(station, "radio-player-avatar-inner"));
+  syncRadioPlayerFavorite();
+
+  if (radioPlayerHomepage) {
+    radioPlayerHomepage.hidden = !station.homepage;
+    if (station.homepage) radioPlayerHomepage.href = station.homepage;
+  }
+  setRadioVolume(radioVolumeLevel);
+}
+
+async function shareRadioStation(station) {
+  if (!station) return;
+  const target = station.homepage || location.href;
+  const text = `${station.name} · Yakınım Radyo`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: station.name, text, url: target });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+  const copied = await copyTextToClipboard(`${text}\n${target}`);
+  showToast(copied ? "Radyo bağlantısı kopyalandı" : "Paylaşım kullanılamıyor");
+}
+
+function stepRadioStation(direction) {
+  if (!lastRenderedRadioStations.length) return;
+  const currentIndex = currentRadioStation
+    ? lastRenderedRadioStations.findIndex(station => station.id === currentRadioStation.id)
+    : -1;
+  const start = currentIndex >= 0 ? currentIndex : 0;
+  const nextIndex = (start + direction + lastRenderedRadioStations.length) % lastRenderedRadioStations.length;
+  playRadioStation(lastRenderedRadioStations[nextIndex]);
+}
+
+function configureRadioMediaSession() {
+  if (!("mediaSession" in navigator)) return;
+  const safeHandler = (action, handler) => {
+    try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
+  };
+  safeHandler("play", () => radioAudio?.play().catch(() => {}));
+  safeHandler("pause", () => radioAudio?.pause());
+  safeHandler("stop", closeRadioPlayer);
+  safeHandler("previoustrack", () => stepRadioStation(-1));
+  safeHandler("nexttrack", () => stepRadioStation(1));
+}
+
+function updateRadioMediaSession(station) {
+  if (!("mediaSession" in navigator) || typeof MediaMetadata !== "function" || !station) return;
+  const artwork = station.favicon ? [{ src: station.favicon }] : [];
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: station.name,
+      artist: radioStationTags(station).join(" · ") || "Canlı radyo",
+      album: "Yakınım Radyo",
+      artwork,
+    });
+  } catch {}
+}
+
 async function loadRadio(scope = activeRadioScope, { force = false } = {}) {
   if (!RADIO_SCOPES.includes(scope)) scope = "antalya";
   activeRadioScope = scope;
@@ -527,6 +823,11 @@ async function loadRadio(scope = activeRadioScope, { force = false } = {}) {
   const cached = radioClientCache.get(scope);
   if (cached && !force) {
     renderRadioStations(cached);
+    return;
+  }
+
+  if (activeRadioLibrary !== "discover") {
+    renderRadioStations(currentRadioPayload());
     return;
   }
 
@@ -546,38 +847,72 @@ async function loadRadio(scope = activeRadioScope, { force = false } = {}) {
 }
 
 function renderRadioStations(payload) {
-  const stations = Array.isArray(payload?.stations) ? payload.stations : [];
-  radioStatus.textContent = stations.length ? `${stations.length} çalışan HTTPS yayın` : "Uygun yayın bulunamadı.";
+  const stations = radioStationsForView(payload);
+  lastRenderedRadioStations = stations;
+  updateRadioStatus(stations);
   radioList.replaceChildren();
+
+  if (!stations.length) {
+    const empty = document.createElement("div");
+    empty.className = "radio-empty";
+    empty.textContent = activeRadioLibrary === "favorites"
+      ? "Beğendiğin radyolarda ★ simgesine dokun; burada toplansın."
+      : activeRadioLibrary === "recent"
+        ? "Bir radyo dinlediğinde son dinlenenler burada görünür."
+        : "Bu filtrede uygun istasyon bulunamadı.";
+    radioList.append(empty);
+    return;
+  }
+
   stations.forEach(station => {
     const card = document.createElement("article");
     card.className = "radio-card";
-    const avatar = document.createElement("span");
-    avatar.className = "radio-avatar";
-    if (station.favicon) {
-      const image = document.createElement("img");
-      image.src = station.favicon;
-      image.alt = "";
-      image.loading = "lazy";
-      image.referrerPolicy = "no-referrer";
-      avatar.append(image);
-    } else {
-      avatar.textContent = "◉";
-    }
+    card.dataset.stationId = station.id;
+    card.classList.toggle("is-playing", currentRadioStation?.id === station.id && !radioAudio.paused);
+
+    const avatar = createRadioAvatar(station);
     const copy = document.createElement("div");
     copy.className = "radio-copy";
     const name = document.createElement("strong");
     name.textContent = station.name;
     const meta = document.createElement("span");
-    const details = [station.state, station.codec, station.bitrate ? station.bitrate + " kbps" : ""].filter(Boolean);
-    meta.textContent = details.join(" · ");
+    meta.className = "radio-meta";
+    meta.textContent = radioStationMeta(station).join(" · ") || "Canlı yayın";
     copy.append(name, meta);
+
+    const tags = radioStationTags(station);
+    if (tags.length) {
+      const tagRow = document.createElement("span");
+      tagRow.className = "radio-tags";
+      tags.slice(0, 2).forEach(tag => {
+        const chip = document.createElement("small");
+        chip.textContent = titleCaseRadioText(tag);
+        tagRow.append(chip);
+      });
+      copy.append(tagRow);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "radio-card-actions";
+
+    const favorite = document.createElement("button");
+    favorite.type = "button";
+    favorite.className = "radio-favorite";
+    favorite.textContent = isRadioFavorite(station.id) ? "★" : "☆";
+    favorite.setAttribute("aria-pressed", String(isRadioFavorite(station.id)));
+    favorite.setAttribute("aria-label", isRadioFavorite(station.id) ? "Favoriden çıkar" : "Favoriye ekle");
+    favorite.addEventListener("click", () => toggleRadioFavorite(station));
+
     const play = document.createElement("button");
     play.type = "button";
     play.className = "radio-play";
-    play.textContent = currentRadioStation?.id === station.id && !radioAudio.paused ? "Durdur" : "Dinle";
+    const playing = currentRadioStation?.id === station.id && !radioAudio.paused;
+    play.textContent = playing ? "Ⅱ" : "▶";
+    play.setAttribute("aria-label", playing ? `${station.name} yayınını duraklat` : `${station.name} yayınını dinle`);
     play.addEventListener("click", () => playRadioStation(station));
-    card.append(avatar, copy, play);
+
+    actions.append(favorite, play);
+    card.append(avatar, copy, actions);
     radioList.append(card);
   });
 }
@@ -590,9 +925,9 @@ async function playRadioStation(station) {
   }
 
   currentRadioStation = station;
-  radioPlayer.hidden = false;
-  radioPlayerName.textContent = station.name;
-  radioPlayerMeta.textContent = [station.state || "Türkiye", station.codec, station.bitrate ? station.bitrate + " kbps" : ""].filter(Boolean).join(" · ");
+  rememberRadioRecent(station);
+  updateRadioPlayer(station);
+  updateRadioMediaSession(station);
   if (radioAudio.src !== station.streamUrl) radioAudio.src = station.streamUrl;
 
   try {
@@ -604,24 +939,31 @@ async function playRadioStation(station) {
     }).catch(() => {});
   } catch {
     radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
+    radioPlayer.classList.add("has-error");
   }
   syncRadioPlayerState();
-  renderRadioStations(radioClientCache.get(activeRadioScope) || { stations: [] });
+  renderRadioStations(currentRadioPayload());
 }
 
 function toggleRadioPlayback() {
   if (!radioAudio || !currentRadioStation) return;
   if (radioAudio.paused) radioAudio.play().catch(() => {
     radioPlayerMeta.textContent = "Yayın şu an açılamıyor";
+    radioPlayer.classList.add("has-error");
   });
   else radioAudio.pause();
 }
 
 function syncRadioPlayerState() {
   if (!radioPlayToggle || !radioAudio) return;
-  radioPlayToggle.textContent = radioAudio.paused ? "▶" : "Ⅱ";
-  radioPlayToggle.setAttribute("aria-label", radioAudio.paused ? "Radyoyu oynat" : "Radyoyu duraklat");
-  if (appSection === "radio") renderRadioStations(radioClientCache.get(activeRadioScope) || { stations: [] });
+  const paused = radioAudio.paused;
+  radioPlayToggle.textContent = paused ? "▶" : "Ⅱ";
+  radioPlayToggle.setAttribute("aria-label", paused ? "Radyoyu oynat" : "Radyoyu duraklat");
+  radioPlayer?.classList.toggle("is-playing", !paused);
+  if ("mediaSession" in navigator) {
+    try { navigator.mediaSession.playbackState = paused ? "paused" : "playing"; } catch {}
+  }
+  if (appSection === "radio") renderRadioStations(currentRadioPayload());
 }
 
 function closeRadioPlayer() {
@@ -632,7 +974,14 @@ function closeRadioPlayer() {
   }
   currentRadioStation = null;
   radioPlayer.hidden = true;
-  if (appSection === "radio") renderRadioStations(radioClientCache.get(activeRadioScope) || { stations: [] });
+  radioPlayer.classList.remove("is-playing", "has-error");
+  if ("mediaSession" in navigator) {
+    try {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+    } catch {}
+  }
+  if (appSection === "radio") renderRadioStations(currentRadioPayload());
 }
 
 function setView(view, panelState = "half") {

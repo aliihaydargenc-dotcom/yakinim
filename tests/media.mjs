@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 const { NEWS_FEEDS, parseRss, queryNews } = require("../lib/news.cjs");
-const { RADIO_SCOPES, buildStationParams, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
+const { RADIO_SCOPES, buildStationParams, cleanProviderText, normalizeStation, uniqueStations, queryRadio } = require("../lib/radio.cjs");
 
 assert.ok(NEWS_FEEDS.gundem.url.includes("trthaber.com"));
 assert.ok(NEWS_FEEDS.teknoloji.url.includes("bilim_teknoloji"));
@@ -32,8 +32,17 @@ const goodStation = normalizeStation({
   tags: "pop,turkish",
   codec: "mp3",
   bitrate: 128,
+  state: "UNKNOWN",
+  countrycode: "TR",
+  language: "turkish",
+  hls: 1,
 });
 assert.equal(goodStation.name, "Test FM");
+assert.equal(goodStation.state, "");
+assert.equal(goodStation.countryCode, "TR");
+assert.equal(goodStation.language, "turkish");
+assert.equal(goodStation.hls, true);
+assert.equal(cleanProviderText("UNKNOWN"), "");
 assert.equal(normalizeStation({ ...goodStation, stationuuid: "x", url_resolved: "http://insecure", lastcheckok: 1 }), null);
 assert.equal(uniqueStations([
   { stationuuid: "1-1111111111111111", name: "A", url_resolved: "https://a.example/live", lastcheckok: 1 },
