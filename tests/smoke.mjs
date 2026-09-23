@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.2\.0"/);
+assert.match(app, /APP_VERSION = "3\.2\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -102,7 +102,7 @@ assert.match(styles, /v3\.0\.1 map-first global navigation/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.1\.1 radio mobile semantics \+ compact player/);
 assert.match(styles, /v3\.1\.2 radio single discovery feed/);
-assert.match(styles, /v3\.2 resilient media \+ multi-source news \+ section transitions/);
+assert.match(styles, /v3\.2 resilient media \+ multi-source news \+ section transitions/);\nassert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);\nassert.match(index, /class="radio-player-actions"/);\nassert.match(styles, /grid-template-columns:48px minmax\(96px,1fr\) auto!important/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools\{display:grid!important/);
 assert.doesNotMatch(styles, /is-nearest\{[^}]*background:var\(--accent\)/s);
 assert.ok(styles.includes("leaflet-tile.base-map-tile"));
@@ -115,7 +115,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v42/);
+assert.match(sw, /yakinimda-shell-v43/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

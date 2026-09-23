@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.2.0" as="script" />
+    <link rel="preload" href="./app.js?v=3.2.1" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.2.0" />
+    <link rel="stylesheet" href="./styles.css?v=3.2.1" />
   </head>
   <body data-view="list" data-section="nearby">
     <main class="app-shell">
@@ -205,9 +205,11 @@
             <strong id="radioPlayerName"></strong>
             <span id="radioPlayerMeta"></span>
           </div>
-          <button id="radioPlayerFavorite" class="radio-player-favorite" type="button" aria-pressed="false" aria-label="Radyoyu favorilere ekle">☆</button>
-          <button id="radioPlayToggle" type="button" class="radio-player-toggle" aria-label="Radyoyu oynat">▶</button>
-          <button id="radioPlayerExpand" class="radio-player-expand" type="button" aria-expanded="false" aria-label="Radyo kontrollerini genişlet">•••</button>
+          <div class="radio-player-actions">
+            <button id="radioPlayerFavorite" class="radio-player-favorite" type="button" aria-pressed="false" aria-label="Radyoyu favorilere ekle">☆</button>
+            <button id="radioPlayToggle" type="button" class="radio-player-toggle" aria-label="Radyoyu oynat">▶</button>
+            <button id="radioPlayerExpand" class="radio-player-expand" type="button" aria-expanded="false" aria-label="Radyo kontrollerini genişlet">•••</button>
+          </div>
         </div>
         <div class="radio-player-tools">
           <button id="radioPrev" type="button" aria-label="Önceki istasyon">‹</button>
@@ -257,6 +259,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.2.0" defer></script>
+    <script src="./app.js?v=3.2.1" defer></script>
   </body>
 </html>
