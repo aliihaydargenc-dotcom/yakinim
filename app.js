@@ -1,4 +1,4 @@
-const APP_VERSION = "2.3.1";
+const APP_VERSION = "2.4.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -11,6 +11,14 @@ const CACHE_PREFIX = "yakinimda:cache:v4:";
 const PREFETCH_RADIUS = 5000;
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const SHEET_STATES = ["peek", "half", "expanded"];
+const MOTION = Object.freeze({
+  fast: 160,
+  standard: 260,
+  slow: 420,
+  spring: "cubic-bezier(.16, 1, .3, 1)",
+});
+const MAP_CLUSTER_MIN_COUNT = 8;
+const MAP_CLUSTER_MAX_ZOOM = 14;
 
 const categories = [
   { id: "cafe", label: "Kafe", icon: "☕", type: "osm", filter: '[amenity=cafe]', ttl: 6 * 60 * 60 * 1000 },
@@ -33,7 +41,8 @@ const categories = [
 const categoryOrder = ["all", "cafe", "food", "market", "shopping", "park", "duty", "bakery", "greengrocer", "pharmacy", "atm", "hospital", "fuel", "parking", "favorites"];
 categories.sort((a,b) => categoryOrder.indexOf(a.id) - categoryOrder.indexOf(b.id));
 const osmCategories = categories.filter((category) => category.type === "osm");
-const mapShouldAnimate = !window.matchMedia("(pointer: coarse), (prefers-reduced-motion: reduce)").matches;
+const mapShouldAnimate = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isMobileLayout = window.matchMedia("(max-width: 759px)").matches;
 
 const prefs = readJson(PREFS_KEY, { radius: 3000, category: "all" });
 let favorites = readJson(FAVORITES_KEY, []);
@@ -57,6 +66,8 @@ let manualLocationMode = false;
 let osmBundleRequest = null;
 let lastDiscoveryBundle = null;
 let discoveryRequestSerial = 0;
+let renderedMapPlaces = [];
+let mapLabelFrame = 0;
 
 const map = L.map("map", {
   zoomControl: false,
@@ -89,7 +100,8 @@ try {
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
-map.on("moveend zoomend", updateMapLabels);
+map.on("moveend", scheduleMapLabelUpdate);
+map.on("zoomend", handleMapZoomEnd);
 
 const categoryStrip = document.querySelector("#categoryStrip");
 const results = document.querySelector("#results");
@@ -108,6 +120,10 @@ const resultTemplate = document.querySelector("#resultTemplate");
 const discoveryHub = document.querySelector("#discoveryHub");
 const discoveryCards = document.querySelector("#discoveryCards");
 const discoverySummary = document.querySelector("#discoverySummary");
+const mapContext = document.querySelector("#mapContext");
+const mapContextIcon = document.querySelector("#mapContextIcon");
+const mapContextLabel = document.querySelector("#mapContextLabel");
+const mapContextMeta = document.querySelector("#mapContextMeta");
 
 radiusSelect.value = String(prefs.radius);
 applySheetState("expanded");
@@ -116,6 +132,11 @@ showState("empty", "Çevrendeki yerleri görmek için konumunu kullan veya harit
 
 locateButton.addEventListener("click", () => locateUser({ forceFresh: true }));
 manualLocationButton.addEventListener("click", enableManualLocationMode);
+mapContext?.addEventListener("click", () => {
+  if (document.body.dataset.view !== "map") return;
+  if (sheet.dataset.state === "peek") expandMapPanel();
+  else if (sheet.dataset.state === "half") applySheetState("expanded");
+});
 map.on("click", handleManualMapClick);
 let sheetGestureStartY = null;
 let sheetGestureConsumed = false;
@@ -156,7 +177,10 @@ document.querySelector("#placeSearch").addEventListener("input", (event) => {
   renderPlaces(activePlaces, activeCategory);
 });
 document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
-document.querySelector("#closeDetail").addEventListener("click", () => closePlaceDetails());
+document.querySelector("#closeDetail").addEventListener("click", () => {
+  if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") history.back();
+  else closePlaceDetails();
+});
 document.querySelector("#detailFavorite").addEventListener("click", () => { if (selectedPlace) toggleFavorite(selectedPlace); });
 document.querySelector("#detailRoute").addEventListener("click", () => { if (selectedPlace) toggleRouteStop(selectedPlace); });
 document.querySelector("#detailMap").addEventListener("click", () => { if (selectedPlace) focusPlace(selectedPlace); });
@@ -166,17 +190,21 @@ history.replaceState({ ...history.state, yakinimView: "list" }, "", location.hre
 window.addEventListener("popstate", event => {
   const state = event.state?.yakinimView;
   closePlaceDetails(false);
-  document.body.dataset.view = state === "map-peek" || state === "map-open" ? "map" : "list";
-  applySheetState(state === "map-peek" ? "peek" : state === "map-open" ? "half" : "expanded");
+  const isMapState = state === "map-peek" || state === "map-open" || state === "map-detail";
+  document.body.dataset.view = isMapState ? "map" : "list";
+  applySheetState(state === "map-peek" ? "peek" : isMapState ? "half" : "expanded");
   document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === document.body.dataset.view)));
+  updateMapContext(renderedMapPlaces, activeCategory);
   requestAnimationFrame(() => map.invalidateSize());
 });
 renderRoute();
-setView("list");
+setView(isMobileLayout ? "map" : "list", isMobileLayout ? "half" : "expanded");
 function setView(view, panelState = "half") {
   const previousView = document.body.dataset.view;
-  if (view === "list" && previousView === "map" && history.state?.yakinimView?.startsWith("map-")) {
-    history.go(history.state.yakinimView === "map-open" ? -2 : -1);
+  const historyView = history.state?.yakinimView;
+  if (view === "list" && previousView === "map" && historyView?.startsWith("map-")) {
+    const steps = historyView === "map-detail" ? -3 : historyView === "map-open" ? -2 : -1;
+    history.go(steps);
     return;
   }
   if (document.body.dataset.view === "list") listScrollY = window.scrollY;
@@ -190,13 +218,23 @@ function setView(view, panelState = "half") {
   window.scrollTo(0, view === "list" ? listScrollY : 0);
   document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
   animateIn(sheet);
-  requestAnimationFrame(() => { map.invalidateSize(); if (view === "map" && !mapHasFramedResults && activePlaces.length) { fitResultsOnMap(activePlaces); mapHasFramedResults = true; } });
+  if (view === "map") updateMapContext(renderedMapPlaces, activeCategory);
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    if (view === "map" && !mapHasFramedResults && activePlaces.length) {
+      fitResultsOnMap(activePlaces);
+      mapHasFramedResults = true;
+    }
+  });
 }
 
 function animateIn(element) {
-  if (!mapShouldAnimate || !element.animate) return;
+  if (!mapShouldAnimate || !element?.animate) return;
   element.getAnimations().forEach(animation => animation.cancel());
-  element.animate([{ opacity: .55, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 240, easing: "cubic-bezier(.2,.8,.2,1)" });
+  element.animate(
+    [{ opacity: .45, transform: "translateY(10px) scale(.99)" }, { opacity: 1, transform: "translateY(0) scale(1)" }],
+    { duration: MOTION.standard, easing: MOTION.spring }
+  );
 }
 
 function renderCategoryButtons() {
@@ -205,7 +243,7 @@ function renderCategoryButtons() {
     button.type = "button";
     button.className = "category-button";
     button.dataset.category = category.id;
-    button.innerHTML = `<span aria-hidden="true">${categorySvg(category.id)}</span><span>${escapeHtml(category.label)}</span>`;
+    button.innerHTML = `<span aria-hidden="true">${categorySvg(category.id)}</span><span class="category-button-copy"><span>${escapeHtml(category.label)}</span><small class="category-count" hidden></small></span>`;
     button.addEventListener("click", () => selectCategory(category));
     categoryStrip.append(button);
   });
@@ -213,8 +251,15 @@ function renderCategoryButtons() {
 }
 
 function selectCategory(category) {
-  if (category.id === activeCategory.id && activePlaces.length) return;
-  closePlaceDetails(false);
+  if (category.id === activeCategory.id && activePlaces.length) {
+    pulseCategoryButton(category.id);
+    return;
+  }
+  if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") {
+    history.back();
+  } else {
+    closePlaceDetails(false);
+  }
   mapHasFramedResults = false;
   requestSerial += 1;
   activeCategory = category;
@@ -224,11 +269,12 @@ function selectCategory(category) {
   document.querySelector("#placeSearch").value = "";
   resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
   activePlaces = [];
-  clearPlaceMarkers();
-  if (sheet.dataset.state === "peek") expandMapPanel();
+  document.body.classList.add("map-results-updating");
+  updateMapContext([], category, "loading");
   prefs.category = category.id;
   persistPrefs();
   renderCategoryButtons();
+  pulseCategoryButton(category.id);
 
   if (category.type === "favorites") {
     loadFavorites();
@@ -236,6 +282,8 @@ function selectCategory(category) {
   }
 
   if (!userLocation) {
+    document.body.classList.remove("map-results-updating");
+    updateMapContext([], category, "empty");
     showState("empty", "Yakındaki yerleri görmek için konumunu aç.");
     return;
   }
@@ -322,6 +370,7 @@ function applyUserPosition(position) {
   };
 
   document.querySelector("#welcome").hidden = true;
+  document.body.classList.add("has-location");
   drawUserLocation();
   map.flyTo([userLocation.lat, userLocation.lng], 15, {
     animate: mapShouldAnimate,
@@ -384,6 +433,7 @@ function handleManualMapClick(event) {
   };
 
   document.querySelector("#welcome").hidden = true;
+  document.body.classList.add("has-location");
   drawUserLocation();
   map.flyTo([userLocation.lat, userLocation.lng], Math.max(map.getZoom(), 15), {
     animate: mapShouldAnimate,
@@ -488,6 +538,7 @@ function renderDiscoveryHub(bundle) {
   const visibleBundle = Object.fromEntries(
     osmCategories.map((category) => [category.id, filterPlacesForRadius(bundle[category.id] || [])]),
   );
+  updateCategoryCounts(visibleBundle);
   const visibleCategories = rankDiscoveryCategories(visibleBundle, discoverySignals, favorites).slice(0, DISCOVERY_CARD_LIMIT);
 
   if (!visibleCategories.length) {
@@ -552,7 +603,8 @@ async function loadCategory(category) {
   resultTitle.textContent = category.type === "all" ? "Yakınındaki yerler" : category.label;
   sourceText.textContent = category.type === "duty" ? "Veri: Eczane Adresi" : "Veri: OpenStreetMap";
   activePlaces = [];
-  clearPlaceMarkers();
+  document.body.classList.add("map-results-updating");
+  updateMapContext([], category, "loading");
   showState("loading", `${category.label === "Tümü" ? "Yakınındaki yerler" : category.label} aranıyor…`);
 
   try {
@@ -594,7 +646,10 @@ async function loadCategory(category) {
     }
 
     clearPlaceMarkers();
-    showState("error", "Veri kaynağına şu an ulaşılamadı. Biraz sonra tekrar dene; kayıtlı favorilerin etkilenmez.");
+    renderedMapPlaces = [];
+    document.body.classList.remove("map-results-updating");
+    updateMapContext([], category, "error");
+    showState("error", "Veri kaynağına şu an ulaşılamadı. Bağlantını kontrol edip yeniden deneyebilirsin; kayıtlı favorilerin etkilenmez.");
     statusText.textContent = "Veri servisleri şu an yanıt vermiyor.";
     const retry = document.createElement("button");
     retry.type = "button";
@@ -736,34 +791,164 @@ function loadFavorites() {
   }
 
   resultTitle.textContent = "Favoriler";
+  updateCategoryCounts(lastDiscoveryBundle ? Object.fromEntries(osmCategories.map(category => [category.id, filterPlacesForRadius(lastDiscoveryBundle[category.id] || [])])) : null);
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
   sourceText.textContent = "Favoriler: cihaz içi kayıt";
   renderPlaces(activePlaces, activeCategory);
 }
 
-function renderPlaces(places, category) {
-  if (searchTerm) places = places.filter(place => [place.name, place.address, categories.find(c => c.id === place.category)?.label].join(" ").toLocaleLowerCase("tr").includes(searchTerm));
-  clearPlaceMarkers();
-  results.replaceChildren();
-  updateNearestAction(places);
 
-  if (!places.length) {
-    showState("empty", category.type === "favorites" ? "Bir yeri yıldızlayınca burada görünecek." : searchTerm ? "Aramana uyan yer bulunamadı. Farklı bir isim dene." : "Bu yarıçapta sonuç bulunamadı. 5 km seçip tekrar deneyebilirsin.");
+function pulseCategoryButton(categoryId) {
+  const button = categoryStrip.querySelector(`button[data-category="${categoryId}"]`);
+  if (!button || !mapShouldAnimate || !button.animate) return;
+  button.animate(
+    [{ transform: "scale(.98)" }, { transform: "scale(1.035)" }, { transform: "scale(1)" }],
+    { duration: MOTION.standard, easing: MOTION.spring }
+  );
+}
+
+function updateCategoryCounts(bundle = null) {
+  const counts = {};
+  if (bundle) {
+    for (const [id, places] of Object.entries(bundle)) counts[id] = Array.isArray(places) ? places.length : 0;
+    counts.all = Object.values(bundle).reduce((total, places) => total + (Array.isArray(places) ? places.length : 0), 0);
+  }
+  counts.favorites = favorites.length;
+  categoryStrip.querySelectorAll(".category-button").forEach(button => {
+    const badge = button.querySelector(".category-count");
+    if (!badge) return;
+    const count = counts[button.dataset.category];
+    badge.hidden = !Number.isFinite(count) || count <= 0;
+    if (!badge.hidden) badge.textContent = String(count > 99 ? "99+" : count);
+  });
+}
+
+function updateMapContext(places = renderedMapPlaces, category = activeCategory, state = "ready", selected = null) {
+  if (!mapContext || !mapContextIcon || !mapContextLabel || !mapContextMeta) return;
+  const contextCategory = selected ? categories.find(item => item.id === selected.category) || category : category;
+  mapContext.dataset.state = state;
+  mapContext.dataset.category = contextCategory?.id || "all";
+  mapContextIcon.innerHTML = categorySvg(contextCategory?.id || "all");
+  mapContextLabel.textContent = selected?.name || (contextCategory?.type === "all" ? "Çevrendeki yerler" : contextCategory?.label || "Çevreni keşfet");
+  if (selected) {
+    mapContextMeta.textContent = Number.isFinite(selected.distanceKm) ? `${formatDistance(selected.distanceKm)} uzakta · ayrıntı açık` : "Seçili yer · ayrıntı açık";
     return;
   }
+  if (!userLocation) { mapContextMeta.textContent = "Konumunu aç, çevren canlansın"; return; }
+  if (state === "loading") { mapContextMeta.textContent = "Çevren taranıyor…"; return; }
+  if (state === "error") { mapContextMeta.textContent = "Veri geçici olarak kullanılamıyor"; return; }
+  if (!places.length) { mapContextMeta.textContent = "Bu yarıçapta sonuç yok"; return; }
+  const nearest = places.find(place => Number.isFinite(place.distanceKm));
+  mapContextMeta.textContent = nearest ? `${places.length} yer · en yakın ${formatDistance(nearest.distanceKm)}` : `${places.length} yer`;
+}
 
+function scheduleMapLabelUpdate() {
+  if (mapLabelFrame) cancelAnimationFrame(mapLabelFrame);
+  mapLabelFrame = requestAnimationFrame(() => { mapLabelFrame = 0; updateMapLabels(); });
+}
+
+function handleMapZoomEnd() {
+  if (renderedMapPlaces.length) renderMapPlaces(renderedMapPlaces);
+  else scheduleMapLabelUpdate();
+}
+
+function shouldClusterPlaces(places) {
+  return places.length >= MAP_CLUSTER_MIN_COUNT && map.getZoom() < MAP_CLUSTER_MAX_ZOOM;
+}
+
+function buildMapClusters(places) {
+  if (!shouldClusterPlaces(places)) return places.map(place => ({ places: [place] }));
+  const cellSize = map.getZoom() < 12 ? 92 : 76;
+  const buckets = new Map();
+  places.forEach(place => {
+    const point = map.latLngToLayerPoint([place.lat, place.lng]);
+    const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
+    const bucket = buckets.get(key) || [];
+    bucket.push(place);
+    buckets.set(key, bucket);
+  });
+  return [...buckets.values()].map(group => ({ places: group }));
+}
+
+function renderMapPlaces(places) {
+  renderedMapPlaces = [...places];
+  clearPlaceMarkers();
+  if (!places.length) {
+    updateMapContext([], activeCategory, "empty");
+    document.body.classList.remove("map-results-updating");
+    return;
+  }
+  const groups = buildMapClusters(places);
+  groups.forEach((group, index) => {
+    if (group.places.length > 1) addPlaceCluster(group.places, index);
+    else {
+      const place = group.places[0];
+      addPlaceMarker(place, iconForCategory(place.category), places[0]?.id === place.id, places.indexOf(place));
+    }
+  });
+  markSelectedPlace();
+  scheduleMapLabelUpdate();
+  updateMapContext(places, activeCategory);
+  document.body.classList.remove("map-results-updating");
+}
+
+function addPlaceCluster(places, index = 0) {
+  const lat = places.reduce((total, place) => total + place.lat, 0) / places.length;
+  const lng = places.reduce((total, place) => total + place.lng, 0) / places.length;
+  const firstCategory = places[0]?.category;
+  const sameCategory = places.every(place => place.category === firstCategory);
+  const categoryId = sameCategory ? firstCategory : "all";
+  const label = sameCategory ? (categories.find(category => category.id === categoryId)?.label || "Yer") : "Yakındaki yerler";
+  const marker = L.marker([lat, lng], {
+    title: `${places.length} ${label}`,
+    bubblingMouseEvents: false,
+    icon: L.divIcon({
+      className: "",
+      html: `<div data-category="${escapeHtml(categoryId)}" class="place-cluster" style="--marker-delay:${Math.min(index, 8) * 24}ms"><strong>${places.length}</strong><span>${escapeHtml(label)}</span></div>`,
+      iconSize: [58, 58],
+      iconAnchor: [29, 29],
+    }),
+  }).addTo(map);
+  marker.isCluster = true;
+  marker.on("click", () => {
+    const bounds = L.latLngBounds(places.map(place => [place.lat, place.lng]));
+    map.fitBounds(bounds, {
+      paddingTopLeft: [24, 110],
+      paddingBottomRight: [24, mapBottomPadding()],
+      maxZoom: 16,
+      animate: mapShouldAnimate,
+    });
+  });
+  markers.push(marker);
+}
+
+function mapBottomPadding() {
+  if (!isMobileLayout || document.body.dataset.view !== "map") return 40;
+  if (sheet.dataset.state === "peek") return 130;
+  const height = sheet.getBoundingClientRect?.().height || Math.round(window.innerHeight * .42);
+  return Math.min(Math.round(window.innerHeight * .74), Math.round(height + 38));
+}
+
+function renderPlaces(places, category) {
+  if (searchTerm) places = places.filter(place => [place.name, place.address, categories.find(c => c.id === place.category)?.label].join(" ").toLocaleLowerCase("tr").includes(searchTerm));
+  results.replaceChildren();
+  updateNearestAction(places);
+  if (!places.length) {
+    clearPlaceMarkers();
+    renderedMapPlaces = [];
+    document.body.classList.remove("map-results-updating");
+    updateMapContext([], category, "empty");
+    showState("empty", category.type === "favorites" ? "Bir yeri kaydettiğinde burada görünecek." : searchTerm ? "Aramana uyan yer bulunamadı. Farklı bir isim dene." : "Bu yarıçapta sonuç bulunamadı. Yarıçapı büyütüp tekrar deneyebilirsin.");
+    return;
+  }
   updateResultSummary(places);
-
   const resultFragment = document.createDocumentFragment();
-
   places.forEach((place, index) => {
     const icon = ["favorites", "all"].includes(category.type) ? iconForCategory(place.category) : category.icon;
-    addPlaceMarker(place, icon, index === 0, index);
     resultFragment.append(createResultCard(place, icon, index === 0, index));
   });
-
   results.append(resultFragment);
-  updateMapLabels();
+  renderMapPlaces(places);
   animateIn(results);
   if (document.body.dataset.view === "map") { fitResultsOnMap(places); mapHasFramedResults = true; }
   if (selectedPlace) {
@@ -827,16 +1012,15 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
   const marker = L.marker([place.lat, place.lng], {
     title: place.name,
     alt: place.name,
+    bubblingMouseEvents: false,
     icon: L.divIcon({
       className: "",
-      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker${isNearest ? " is-nearest" : ""}"><span>${categorySvg(place.category)}</span></div>`,
+      html: `<div data-category="${escapeHtml(place.category)}" class="place-marker${isNearest ? " is-nearest" : ""}" style="--marker-delay:${Math.min(index, 10) * 22}ms"><span>${categorySvg(place.category)}</span></div>`,
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     }),
-  })
-    .bindTooltip(escapeHtml(place.name), { direction: "right", offset: [12, 0], permanent: true, className: "place-label" })
-    .addTo(map);
-
+  }).bindTooltip(escapeHtml(place.name), { direction: "right", offset: [12, 0], permanent: true, opacity: 1, className: "place-label" }).addTo(map);
+  marker.isCluster = false;
   marker.placeId = place.id;
   marker.placeName = place.name;
   marker.labelPriority = index;
@@ -846,16 +1030,18 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
 }
 
 function updateMapLabels() {
-  const labelLimit = map.getZoom() >= 15 ? 14 : map.getZoom() >= 13 ? 9 : 5;
-  const occupied = [];
   const viewport = map.getSize();
+  const mobileViewport = viewport.x < 760;
+  const labelLimit = map.getZoom() >= 16 ? (mobileViewport ? 9 : 16) : map.getZoom() >= 14 ? (mobileViewport ? 6 : 11) : (mobileViewport ? 3 : 5);
+  const occupied = [];
   let visible = 0;
   markers.forEach(marker => {
+    if (marker.isCluster || !marker.placeId) return;
     const selected = marker.placeId === selectedPlace?.id;
     const point = map.latLngToContainerPoint(marker.getLatLng());
-    const width = Math.min(165, 20 + marker.placeName.length * 6.5);
-    const rect = { left: point.x + 29, right: point.x + 29 + width, top: point.y - 17, bottom: point.y + 17 };
-    const overlaps = occupied.some(other => rect.left < other.right + 7 && rect.right + 7 > other.left && rect.top < other.bottom + 7 && rect.bottom + 7 > other.top);
+    const width = Math.min(178, 24 + marker.placeName.length * 6.4);
+    const rect = { left: point.x + 28, right: point.x + 28 + width, top: point.y - 18, bottom: point.y + 18 };
+    const overlaps = occupied.some(other => rect.left < other.right + 8 && rect.right + 8 > other.left && rect.top < other.bottom + 8 && rect.bottom + 8 > other.top);
     const onScreen = rect.left < viewport.x && rect.right > 0 && rect.bottom > 0 && rect.top < viewport.y;
     const show = selected || (marker.hasSpecificName && visible < labelLimit && onScreen && !overlaps);
     if (show && !selected) visible++;
@@ -867,19 +1053,11 @@ function updateMapLabels() {
 
 function fitResultsOnMap(places) {
   if (!userLocation || !places.length || manualLocationMode) return;
-
-  const points = [
-    [userLocation.lat, userLocation.lng],
-    ...places.slice(0, 8).map((place) => [place.lat, place.lng]),
-  ];
+  const points = [[userLocation.lat, userLocation.lng], ...places.slice(0, 10).map((place) => [place.lat, place.lng])];
   const bounds = L.latLngBounds(points);
-  const mobileBottomPadding = window.matchMedia("(max-width: 759px)").matches
-    ? Math.min(270, Math.round(window.innerHeight * 0.32))
-    : 40;
-
   map.fitBounds(bounds, {
-    paddingTopLeft: [window.matchMedia("(min-width: 760px)").matches && document.body.dataset.view === "map" ? 450 : 24, 100],
-    paddingBottomRight: [24, mobileBottomPadding],
+    paddingTopLeft: [window.matchMedia("(min-width: 760px)").matches && document.body.dataset.view === "map" ? 450 : 24, 104],
+    paddingBottomRight: [24, mapBottomPadding()],
     maxZoom: 15.5,
     animate: mapShouldAnimate,
   });
@@ -903,6 +1081,9 @@ function scrollToResult(placeId) {
 
 function openPlaceDetails(place, trigger = null) {
   if (document.body.dataset.view === "map" && sheet.dataset.state === "peek") expandMapPanel();
+  if (document.body.dataset.view === "map" && history.state?.yakinimView !== "map-detail") {
+    history.pushState({ yakinimView: "map-detail" }, "", location.href);
+  }
   selectedPlace = place;
   detailTrigger = trigger || detailTrigger;
   const detail = document.querySelector("#placeDetail");
@@ -923,6 +1104,7 @@ function openPlaceDetails(place, trigger = null) {
   detail.hidden = false;
   document.body.classList.add("has-place-detail");
   markSelectedPlace();
+  updateMapContext(renderedMapPlaces, activeCategory, "selected", place);
   animateIn(detail);
   detail.querySelector("#closeDetail").focus({ preventScroll: true });
 }
@@ -934,17 +1116,20 @@ function closePlaceDetails(restoreFocus = true) {
   selectedPlace = null;
   document.body.classList.remove("has-place-detail");
   markSelectedPlace();
+  updateMapContext(renderedMapPlaces, activeCategory);
   if (restoreFocus && detailTrigger?.isConnected) detailTrigger.focus({ preventScroll: true });
   detailTrigger = null;
 }
 
 function markSelectedPlace() {
   markers.forEach(marker => {
+    if (marker.isCluster) return;
     const selected = marker.placeId === selectedPlace?.id;
     marker.getElement()?.classList.toggle("is-selected", selected);
+    marker.getTooltip?.()?.getElement?.()?.classList.toggle("is-selected-place-label", selected);
     marker.setZIndexOffset(selected ? 1200 : 0);
   });
-  updateMapLabels();
+  scheduleMapLabelUpdate();
 }
 
 function showToast(message) {
@@ -1057,10 +1242,12 @@ function persistPrefs() {
 }
 
 function showState(kind, message) {
+  const titles = { loading: "Çevren taranıyor", empty: "Burada henüz bir şey görünmüyor", error: "Veri şu an kullanılamıyor" };
+  const symbols = { loading: "⌁", empty: "⌖", error: "!" };
   resultSummary.textContent = kind === "loading" ? "Aranıyor…" : "Henüz sonuç yok";
   nearestAction.hidden = true;
   nearestAction.removeAttribute("href");
-  results.innerHTML = `<div class="${kind}-state">${escapeHtml(message)}</div>`;
+  results.innerHTML = `<div class="state-card ${kind}-state" role="${kind === "error" ? "alert" : "status"}"><span class="state-visual" aria-hidden="true">${symbols[kind] || "·"}</span><div><strong>${escapeHtml(titles[kind] || "Bilgi")}</strong><p>${escapeHtml(message)}</p></div></div>`;
 }
 
 function updateResultSummary(places) {
@@ -1079,14 +1266,10 @@ function applySheetState(state) {
   sheet.dataset.state = nextState;
   prefs.sheetState = nextState;
   persistPrefs();
-
-  const labels = {
-    peek: "Paneli aç",
-    half: "Paneli genişlet",
-    expanded: "Paneli küçült",
-  };
+  const labels = { peek: "Paneli aç", half: "Paneli genişlet", expanded: "Paneli küçült" };
   sheetToggle.setAttribute("aria-label", labels[nextState]);
   sheetToggle.setAttribute("aria-expanded", String(nextState !== "peek"));
+  if (document.body.dataset.view === "map") scheduleMapLabelUpdate();
 }
 
 function cycleSheetState() {
@@ -1097,6 +1280,10 @@ function cycleSheetState() {
 
 function collapseMapPanel() {
   if (document.body.dataset.view !== "map") return;
+  if (history.state?.yakinimView === "map-detail") {
+    history.go(-2);
+    return;
+  }
   closePlaceDetails(false);
   if (sheet.dataset.state === "peek") return;
   if (history.state?.yakinimView === "map-open") history.back();

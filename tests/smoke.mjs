@@ -12,7 +12,7 @@ const [app, index, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.3\.1"/);
+assert.match(app, /APP_VERSION = "2\.4\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -37,6 +37,10 @@ assert.match(app, /getGeolocationPermissionState/);
 assert.match(app, /enableManualLocationMode/);
 assert.match(app, /handleManualMapClick/);
 assert.match(app, /fitResultsOnMap/);
+assert.match(app, /MOTION = Object\.freeze/);
+assert.match(app, /buildMapClusters/);
+assert.match(app, /addPlaceCluster/);
+assert.match(app, /map-detail/);
 assert.match(app, /son kaydedilen veri gösteriliyor/);
 assert.match(app, /Veri: Eczane Adresi/);
 assert.match(index, /OpenFreeMap/);
@@ -47,6 +51,8 @@ assert.match(index, /OpenStreetMap/);
 assert.match(index, /rel="manifest"/);
 assert.match(index, /leaflet@1\.9\.4/);
 assert.match(index, /id="map"/);
+assert.match(index, /id="mapContext"/);
+assert.match(index, /id="mapContextLabel"/);
 assert.match(index, /id="results"/);
 assert.match(index, /id="sheetToggle"/);
 assert.match(index, /id="resultSummary"/);
@@ -68,7 +74,7 @@ assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
 assert.doesNotMatch(sw, /staleWhileRevalidate/);
 assert.match(sw, /LEAFLET_ORIGIN/);
-assert.match(sw, /yakinimda-shell-v20/);
+assert.match(sw, /yakinimda-shell-v21/);
 assert.doesNotMatch(sw, /tile\.openstreetmap\.org/);
 
 assert.ok(Array.isArray(vercel.headers));
