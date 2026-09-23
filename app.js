@@ -1,4 +1,4 @@
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.7.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -1249,13 +1249,17 @@ function shouldClusterPlaces(places) {
   return places.length > 1;
 }
 
-function placeDisplayPriority(place, index = 0) {
+function placeHasSpecificName(place) {
   const categoryLabel = categories.find(category => category.id === place.category)?.label || "";
+  return Boolean(place?.name && place.name !== categoryLabel);
+}
+
+function placeDisplayPriority(place, index = 0) {
   let score = 1000 - Math.min(index, 500);
   if (place.id === selectedPlace?.id) score += 10000;
   if (isFavorite(place.id)) score += 1200;
   if (routeStops.some(stop => stop.id === place.id)) score += 700;
-  if (place.name && place.name !== categoryLabel) score += 500;
+  if (placeHasSpecificName(place)) score += 650;
   if (activeCategory.type !== "all" && place.category === activeCategory.id) score += 300;
   if (Number.isFinite(place.distanceKm)) score += Math.max(0, 220 - Math.round(place.distanceKm * 35));
   return score;
@@ -1263,18 +1267,22 @@ function placeDisplayPriority(place, index = 0) {
 
 function markerCollisionDistancePx() {
   const zoom = map.getZoom();
-  if (zoom >= 17) return 42;
-  if (zoom >= 16) return 48;
-  if (zoom >= 15) return 54;
-  if (zoom >= 14) return 62;
-  return 76;
+  if (zoom >= 17) return 22;
+  if (zoom >= 16) return 27;
+  if (zoom >= 15) return 34;
+  if (zoom >= 14) return 42;
+  return 52;
 }
 
 
 function buildMapClusters(places) {
   if (!shouldClusterPlaces(places)) return places.map(place => ({ places: [place] }));
+  const zoom = map.getZoom();
   const radius = markerCollisionDistancePx();
   const radiusSquared = radius * radius;
+  const namedCollisionRadius = zoom >= 17 ? 12 : zoom >= 16 ? 16 : radius;
+  const namedCollisionSquared = namedCollisionRadius * namedCollisionRadius;
+  const maxClusterSize = zoom >= 16 ? 6 : zoom >= 15 ? 9 : 18;
   const ordered = [...places]
     .map((place, index) => ({ place, index, priority: placeDisplayPriority(place, index) }))
     .sort((a, b) => b.priority - a.priority);
@@ -1284,12 +1292,19 @@ function buildMapClusters(places) {
     const point = map.latLngToLayerPoint([item.place.lat, item.place.lng]);
     let target = null;
     for (const group of groups) {
+      if (group.places.length >= maxClusterSize) continue;
       const dx = point.x - group.x;
       const dy = point.y - group.y;
-      if (dx * dx + dy * dy <= radiusSquared) {
-        target = group;
-        break;
-      }
+      const distanceSquared = dx * dx + dy * dy;
+      if (distanceSquared > radiusSquared) continue;
+
+      const bothNamed = zoom >= 16 &&
+        placeHasSpecificName(item.place) &&
+        group.places.some(place => placeHasSpecificName(place));
+      if (bothNamed && distanceSquared > namedCollisionSquared) continue;
+
+      target = group;
+      break;
     }
     if (!target) {
       groups.push({ x: point.x, y: point.y, places: [item.place] });
@@ -1297,8 +1312,8 @@ function buildMapClusters(places) {
     }
     target.places.push(item.place);
     const count = target.places.length;
-    target.x = target.x + (point.x - target.x) / count;
-    target.y = target.y + (point.y - target.y) / count;
+    target.x += (point.x - target.x) / count;
+    target.y += (point.y - target.y) / count;
   }
 
   return groups.map(group => ({ places: group.places }));
@@ -1359,15 +1374,15 @@ function addPlaceCluster(places, index = 0) {
   const firstCategory = places[0]?.category;
   const sameCategory = places.every(place => place.category === firstCategory);
   const categoryId = sameCategory ? firstCategory : "all";
-  const label = sameCategory ? (categories.find(category => category.id === categoryId)?.label || "Yer") : "Yakındaki yerler";
+  const label = sameCategory ? (categories.find(category => category.id === categoryId)?.label || "yer") : "yakındaki yer";
   const marker = L.marker([lat, lng], {
     title: `${places.length} ${label}`,
     bubblingMouseEvents: false,
     icon: L.divIcon({
       className: "",
-      html: `<div data-category="${escapeHtml(categoryId)}" class="place-cluster" style="--marker-delay:${Math.min(index, 8) * 24}ms"><strong>${places.length}</strong><span>${escapeHtml(label)}</span></div>`,
-      iconSize: [50, 50],
-      iconAnchor: [25, 25],
+      html: `<div data-category="${escapeHtml(categoryId)}" class="place-cluster" style="--marker-delay:${Math.min(index, 8) * 18}ms"><strong>${places.length}</strong></div>`,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21],
     }),
   }).addTo(map);
   marker.isCluster = true;
@@ -1496,7 +1511,7 @@ function addPlaceMarker(place, icon, isNearest = false, index = 0) {
   marker.placeName = place.name;
   marker.place = place;
   marker.labelPriority = placeDisplayPriority(place, index);
-  marker.hasSpecificName = place.name !== (categories.find(category => category.id === place.category)?.label || "");
+  marker.hasSpecificName = placeHasSpecificName(place);
   marker.on("click", () => openPlaceDetails(marker.place, marker.getElement()));
   return marker;
 }

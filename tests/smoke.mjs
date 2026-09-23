@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.7\.0"/);
+assert.match(app, /APP_VERSION = "2\.7\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -43,6 +43,8 @@ assert.match(app, /Veri: OpenStreetMap · canlı harita havuzu/);
 assert.match(index, /OpenFreeMap/);
 assert.match(index, /viewport-live-hint/);
 assert.doesNotMatch(index, /id="radiusSelect"/);
+assert.doesNotMatch(index, /map-context-chevron/);
+assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
 assert.match(styles, /leaflet-placeLabels-pane/);
 assert.match(styles, /leaflet-tooltip-top\.place-label/);
@@ -53,7 +55,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v24/);
+assert.match(sw, /yakinimda-shell-v25/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

@@ -29,7 +29,7 @@ const context = vm.createContext({
   activeCategory: { id: "all", type: "all" },
   isFavorite: () => false,
 });
-for (const name of ["shouldClusterPlaces", "placeDisplayPriority", "markerCollisionDistancePx", "buildMapClusters"]) {
+for (const name of ["shouldClusterPlaces", "placeHasSpecificName", "placeDisplayPriority", "markerCollisionDistancePx", "buildMapClusters"]) {
   vm.runInContext(extract(name), context);
 }
 
@@ -44,7 +44,8 @@ assert.ok(groups.some(group => group.places.length === 2));
 
 map.zoom = 17;
 groups = vm.runInContext("buildMapClusters(places)", context);
-assert.ok(groups.some(group => group.places.length === 2), "Very close POIs still must not stack at high zoom");
+assert.ok(groups.some(group => group.places.length === 2), "Nearly identical POIs still must not stack at high zoom");
+assert.equal(vm.runInContext("markerCollisionDistancePx()", context), 22, "High zoom uses a much tighter cluster radius");
 
 assert.match(app, /map\.createPane\("placeLabels"\)/);
 assert.match(app, /pane: "placeLabels"/);
