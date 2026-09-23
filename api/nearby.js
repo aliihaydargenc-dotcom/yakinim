@@ -1,21 +1,3 @@
-const { queryNearby } = require('../lib/nearby.cjs');
-module.exports = async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'method_not_allowed' });
-  }
-  const params = new URL(req.url, 'https://yakinim.vercel.app').searchParams;
-  const lat = Number(params.get('lat'));
-  const lng = Number(params.get('lng'));
-  const radius = Number(params.get('radius'));
-  if (!params.get('lat')?.trim() || !params.get('lng')?.trim() || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || ![1000, 3000, 5000].includes(radius)) {
-    return res.status(400).json({ error: 'invalid_location_or_radius' });
-  }
-  try {
-    return res.status(200).json(await queryNearby({ lat, lng }, radius));
-  } catch (error) {
-    console.error('Nearby providers unavailable:', error.message);
-    return res.status(503).json({ error: 'nearby_unavailable' });
-  }
-};
+const {queryNearby}=require('../lib/nearby.cjs');const RESPONSE_CACHE_TTL_MS=2*60*1000,RESPONSE_CACHE_LIMIT=120,responseCache=new Map();
+function cacheKey(lat,lng,radius){return `${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;}function getCached(key){const cached=responseCache.get(key);if(!cached)return null;if(Date.now()-cached.savedAt>RESPONSE_CACHE_TTL_MS){responseCache.delete(key);return null;}return cached.data;}function setCached(key,data){if(responseCache.size>=RESPONSE_CACHE_LIMIT){const oldestKey=responseCache.keys().next().value;if(oldestKey)responseCache.delete(oldestKey);}responseCache.set(key,{savedAt:Date.now(),data});}
+module.exports=async function handler(req,res){if(req.method!=='GET'){res.setHeader('Cache-Control','no-store');res.setHeader('Allow','GET');return res.status(405).json({error:'method_not_allowed'});}const params=new URL(req.url,'https://yakinim.vercel.app').searchParams,lat=Number(params.get('lat')),lng=Number(params.get('lng')),radius=Number(params.get('radius'));if(!params.get('lat')?.trim()||!params.get('lng')?.trim()||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180||![1000,3000,5000].includes(radius)){res.setHeader('Cache-Control','no-store');return res.status(400).json({error:'invalid_location_or_radius'});}res.setHeader('Cache-Control','public, max-age=0, s-maxage=120, stale-while-revalidate=600');const key=cacheKey(lat,lng,radius),cached=getCached(key);if(cached){res.setHeader('X-Yakinim-Cache','HIT');return res.status(200).json(cached);}try{const payload=await queryNearby({lat,lng},radius);setCached(key,payload);res.setHeader('X-Yakinim-Cache','MISS');return res.status(200).json(payload);}catch(error){res.setHeader('Cache-Control','no-store');console.error('Nearby providers unavailable:',error.message);return res.status(503).json({error:'nearby_unavailable'});}};module.exports._cache=responseCache;module.exports._cacheKey=cacheKey;
