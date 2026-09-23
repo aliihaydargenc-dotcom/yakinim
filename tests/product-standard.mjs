@@ -83,6 +83,8 @@ assert.match(app, /hideSectionTransition/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools/);
 assert.match(styles, /radio-player\.is-expanded \.radio-player-tools\{display:grid!important/);
 assert.match(styles, /section-transition/);
+assert.match(index, /class="radio-player-actions"/);
+assert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);

@@ -1030,3 +1030,79 @@ body.radio-player-expanded[data-section=radio] .radio-section{padding-bottom:238
   .radio-player.is-expanded .radio-volume-control{grid-column:1/-1}
   .radio-player.is-expanded .radio-player-close{grid-column:1/-1}
 }
+
+
+/* v3.2.1 definitive mobile mini-player layout */
+.radio-player-main{
+  display:grid!important;
+  grid-template-columns:48px minmax(96px,1fr) auto!important;
+  align-items:center;
+  gap:10px!important;
+  width:100%;
+}
+.radio-player-copy{
+  display:flex!important;
+  flex-direction:column;
+  justify-content:center;
+  min-width:0!important;
+  overflow:hidden;
+  gap:3px;
+}
+.radio-player-copy strong,
+.radio-player-copy span{
+  display:block!important;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.radio-player-copy strong{color:var(--ink);font-size:12.5px;line-height:1.25}
+.radio-player-copy span{color:var(--muted);font-size:9px;line-height:1.25}
+.radio-player-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  flex:0 0 auto;
+}
+.radio-player-actions .radio-player-favorite,
+.radio-player-actions .radio-player-expand{flex:0 0 34px}
+.radio-player-actions .radio-player-toggle{flex:0 0 44px}
+body:not([data-section=radio]) .radio-player-main{
+  grid-template-columns:46px minmax(92px,1fr) auto!important;
+}
+body:not([data-section=radio]) .radio-player-actions .radio-player-expand{display:none}
+@media(max-width:759px){
+  .radio-player{
+    box-sizing:border-box;
+    width:calc(100vw - 20px);
+    max-width:none;
+    padding:9px 10px;
+    overflow:visible;
+  }
+  .radio-player-main{
+    grid-template-columns:46px minmax(86px,1fr) auto!important;
+    gap:8px!important;
+  }
+  .radio-player-avatar,
+  .radio-player-avatar-inner{width:46px;height:46px}
+  .radio-player-actions{gap:5px}
+  .radio-player-actions .radio-player-favorite,
+  .radio-player-actions .radio-player-expand{width:32px;height:32px;flex-basis:32px}
+  .radio-player-actions .radio-player-toggle{width:42px;height:42px;flex-basis:42px}
+  .radio-player-copy strong{font-size:12px}
+  .radio-player-copy span{font-size:8.5px}
+}
+@media(max-width:390px){
+  .radio-player-main{
+    grid-template-columns:42px minmax(72px,1fr) auto!important;
+    gap:6px!important;
+  }
+  .radio-player-avatar,
+  .radio-player-avatar-inner{width:42px;height:42px}
+  .radio-player-actions{gap:4px}
+  .radio-player-actions .radio-player-favorite,
+  .radio-player-actions .radio-player-expand{width:30px;height:30px;flex-basis:30px;font-size:17px}
+  .radio-player-actions .radio-player-toggle{width:40px;height:40px;flex-basis:40px}
+}
