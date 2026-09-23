@@ -70,6 +70,7 @@ assert.match(app, /setSection/);
 assert.match(app, /loadNews/);
 assert.match(app, /loadRadio/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
+assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list", isMobileLayout \? "peek"/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");

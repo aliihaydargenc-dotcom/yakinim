@@ -67,6 +67,7 @@ assert.match(app, /yakinimView: "map-place"/);
 assert.match(app, /keepSelectedPlaceVisible/);
 assert.match(app, /mobileViewport \? 10 : 22/);
 assert.match(styles, /has-location\[data-view=map\] \.map-context\{display:none!important\}/);
+assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);
 assert.match(app, /· en yakın/);
 assert.match(app, /setView\(isMobileLayout \? "map" : "list"/);
 assert.match(app, /history\.pushState\(\{ yakinimView: "map-detail", yakinimSection: "nearby" \}/);

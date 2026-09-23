@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.0\.0"/);
+assert.match(app, /APP_VERSION = "3\.0\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -84,6 +84,7 @@ assert.match(styles, /v2\.9\.1 map interaction stabilization/);
 assert.match(styles, /v2\.10 single-surface map interaction model/);
 assert.match(styles, /v2\.11 product-value pass: compact list \+ discovery brain/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
+assert.match(styles, /v3\.0\.1 map-first global navigation/);
 assert.doesNotMatch(styles, /is-nearest\{[^}]*background:var\(--accent\)/s);
 assert.ok(styles.includes("leaflet-tile.base-map-tile"));
 assert.match(styles, /leaflet-placeLabels-pane/);
@@ -95,7 +96,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v35/);
+assert.match(sw, /yakinimda-shell-v36/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

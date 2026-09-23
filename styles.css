@@ -859,3 +859,53 @@ body[data-section=news] .top-actions,body[data-section=radio] .top-actions{displ
   .news-card a{min-height:108px;padding:13px}
   .radio-card{grid-template-columns:42px minmax(0,1fr) auto;padding:10px}
 }
+
+
+/* v3.0.1 map-first global navigation */
+@media(max-width:759px){
+  body[data-section=nearby][data-view=map] .section-nav{
+    display:flex!important;
+    position:fixed;
+    z-index:638;
+    left:12px;
+    right:12px;
+    top:max(68px,calc(env(safe-area-inset-top) + 63px));
+    max-width:none;
+    margin:0;
+    padding:0;
+    gap:6px;
+    pointer-events:auto;
+    transition:opacity var(--motion-fast) ease,transform var(--motion-standard) var(--motion-spring);
+  }
+  body[data-section=nearby][data-view=map] .section-nav button{
+    flex:1 1 0;
+    min-width:0;
+    min-height:38px;
+    justify-content:center;
+    padding:0 8px;
+    border-color:#d8e3df;
+    border-radius:12px;
+    background:#fffffff0;
+    color:#536a61;
+    box-shadow:0 7px 20px #173c3220;
+    backdrop-filter:blur(14px);
+    font-size:10.5px;
+  }
+  body[data-section=nearby][data-view=map] .section-nav button span{
+    font-size:15px;
+  }
+  body[data-section=nearby][data-view=map] .section-nav button[aria-pressed=true]{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  body[data-section=nearby][data-view=map] .map-context{
+    top:max(116px,calc(env(safe-area-inset-top) + 111px));
+  }
+  body[data-view=map].has-map-quick-card .section-nav,
+  body[data-view=map].has-place-detail .section-nav{
+    opacity:0;
+    pointer-events:none;
+    transform:translateY(-5px);
+  }
+}
