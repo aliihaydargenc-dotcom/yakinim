@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "2\.7\.2"/);
+assert.match(app, /APP_VERSION = "2\.7\.3"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -36,8 +36,10 @@ for (const contract of [
 assert.match(app, /activeViewportRequest\?\.controller\.abort\(\)/);
 assert.match(app, /pane: "placeLabels"/);
 assert.match(app, /direction: "top"/);
-assert.match(app, /Do not gate geolocation behind Permissions API/);
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
+assert.match(app, /one authoritative geolocation request/);
+assert.match(app, /locationZoomForAccuracy/);
+assert.doesNotMatch(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)/);
 assert.doesNotMatch(app, /radiusSelect/);
 assert.match(app, /Veri: Eczane Adresi/);
 assert.match(app, /Veri: OpenStreetMap · canlı harita havuzu/);
@@ -57,7 +59,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v26/);
+assert.match(sw, /yakinimda-shell-v27/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

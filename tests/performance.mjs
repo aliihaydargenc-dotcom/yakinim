@@ -4,9 +4,11 @@ const app = readFileSync("app.js", "utf8");
 const api = readFileSync("api/viewport.js", "utf8");
 const lib = readFileSync("lib/viewport.cjs", "utf8");
 
-assert.match(app, /FAST_LOCATION_TIMEOUT = 2500/);
-assert.match(app, /ACCURATE_LOCATION_TIMEOUT = 7000/);
-assert.match(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)|Promise\.race\(\[fastPromise,accuratePromise\]\)/);
+assert.match(app, /FAST_LOCATION_TIMEOUT = 5000/);
+assert.match(app, /ACCURATE_LOCATION_TIMEOUT = 12000/);
+assert.doesNotMatch(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)/);
+assert.match(app, /const accurate = await settlePosition\("accurate"/);
+assert.match(app, /const fallback = await settlePosition\("fallback"/);
 assert.match(app, /LAST_LOCATION_MAX_AGE = 3 \* 24 \* 60 \* 60 \* 1000/);
 assert.match(app, /VIEWPORT_DEBOUNCE_MS = 280/);
 assert.match(app, /SPATIAL_CELL_DEGREES = 0\.01/);
@@ -25,7 +27,7 @@ assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.doesNotMatch(app, /radiusSelect/);
 assert.match(lib, /PROVIDER_TIMEOUT_MS = 2600/);
 assert.match(lib, /\[timeout:5\]/);
-assert.match(lib, /Yakinim\/2\.7\.2/);
+assert.match(lib, /Yakinim\/2\.7\.3/);
 assert.match(api, /s-maxage=180/);
 assert.match(api, /stale-while-revalidate=900/);
 

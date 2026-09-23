@@ -25,8 +25,10 @@ function extract(name) {
 }
 
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
-assert.match(app, /Do not gate geolocation behind Permissions API/);
 assert.match(app, /navigator\.geolocation\.getCurrentPosition/);
+assert.match(app, /const accurate = await settlePosition\("accurate"/);
+assert.match(app, /const fallback = await settlePosition\("fallback"/);
+assert.doesNotMatch(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)/);
 assert.match(app, /if \(restored \|\| permissionState === "granted"\)/);
 
 const errorContext = vm.createContext({});
@@ -60,4 +62,22 @@ vm.runInContext(extract("bootstrapLocationDiscovery"), firstVisitContext);
 await vm.runInContext("bootstrapLocationDiscovery()", firstVisitContext);
 assert.equal(backgroundCalls.length, 0, "First visit should wait for a user gesture while permission is prompt");
 
-console.log("Location tests PASS: iOS-safe permission advisory flow and stored-location background refresh.");
+const zoomContext = vm.createContext({
+  map: { getZoom: () => 10 },
+  Number,
+  Math,
+});
+vm.runInContext(extract("locationZoomForAccuracy"), zoomContext);
+assert.equal(vm.runInContext("locationZoomForAccuracy(40, 10)", zoomContext), 16);
+assert.equal(vm.runInContext("locationZoomForAccuracy(150, 10)", zoomContext), 15);
+assert.equal(vm.runInContext("locationZoomForAccuracy(900, 10)", zoomContext), 13);
+assert.equal(vm.runInContext("locationZoomForAccuracy(6000, 10)", zoomContext), 11);
+
+const positionContext = vm.createContext({ Number });
+vm.runInContext(extract("positionIsUsable"), positionContext);
+positionContext.good = { coords: { latitude: 36.9, longitude: 30.7 } };
+positionContext.bad = { coords: { latitude: 999, longitude: 30.7 } };
+assert.equal(vm.runInContext("positionIsUsable(good)", positionContext), true);
+assert.equal(vm.runInContext("positionIsUsable(bad)", positionContext), false);
+
+console.log("Location tests PASS: sequential iOS GPS flow, permission advisory behavior and accuracy-aware zoom.");
