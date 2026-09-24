@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.3.0" as="script" />
+    <link rel="preload" href="./app.js?v=3.4.0" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.3.0" />
+    <link rel="stylesheet" href="./styles.css?v=3.4.0" />
   </head>
   <body data-view="list" data-section="now">
     <main class="app-shell">
@@ -102,7 +102,7 @@
       <section id="nowSection" class="module-panel now-section" aria-labelledby="nowHeading">
         <div class="now-hero">
           <div class="now-hero-copy">
-            <p class="eyebrow">ŞİMDİ</p>
+            <div class="now-live-badge"><i aria-hidden="true"></i><span>CANLI ÇEVRE</span></div>
             <h2 id="nowHeading">Bugün yakınında</h2>
             <p id="nowContext">Çevren, gündem ve canlı radyo tek ekranda hazırlanıyor.</p>
           </div>
@@ -112,6 +112,17 @@
             <span><strong id="nowRouteStat">0</strong><small>rotada</small></span>
           </div>
         </div>
+
+        <section id="nowPulse" class="now-pulse" aria-labelledby="nowPulseHeading">
+          <div class="now-pulse-head">
+            <div>
+              <p class="eyebrow">ÇEVRE NABZI</p>
+              <h3 id="nowPulseHeading">Şu an yakınında</h3>
+            </div>
+            <button type="button" data-now-section="nearby">Canlı harita <span aria-hidden="true">↗</span></button>
+          </div>
+          <div id="nowPulseRail" class="now-pulse-rail" aria-live="polite"></div>
+        </section>
 
         <div id="nowQuickActions" class="now-quick-grid" aria-label="Hızlı ihtiyaçlar">
           <button type="button" data-now-category="market"><span aria-hidden="true">▱</span><strong>Market</strong><small>En yakını bul</small></button>
@@ -308,6 +319,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.3.0" defer></script>
+    <script src="./app.js?v=3.4.0" defer></script>
   </body>
 </html>

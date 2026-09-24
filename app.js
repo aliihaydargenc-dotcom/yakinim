@@ -1,4 +1,4 @@
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.4.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -310,6 +310,7 @@ const nowNearbyStat = document.querySelector("#nowNearbyStat");
 const nowSavedStat = document.querySelector("#nowSavedStat");
 const nowRouteStat = document.querySelector("#nowRouteStat");
 const nowNearbyList = document.querySelector("#nowNearbyList");
+const nowPulseRail = document.querySelector("#nowPulseRail");
 const nowNewsList = document.querySelector("#nowNewsList");
 const nowRadioList = document.querySelector("#nowRadioList");
 const nowQuickActions = document.querySelector("#nowQuickActions");
@@ -555,9 +556,84 @@ function nowPlaceCandidates() {
   return [...unique.values()].sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
 }
 
+function renderNowPulse(places = nowPlaceCandidates()) {
+  if (!nowPulseRail) return;
+  nowPulseRail.replaceChildren();
+
+  if (!userLocation) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "now-pulse-empty";
+    button.innerHTML = '<span class="now-pulse-locate" aria-hidden="true">◎</span><span><strong>Çevre nabzını aç</strong><small>Konumunla yakınındaki kategorileri canlı gör</small></span><b aria-hidden="true">↗</b>';
+    button.addEventListener("click", () => locateUser({ forceFresh: false }));
+    nowPulseRail.append(button);
+    return;
+  }
+
+  if (!places.length) {
+    nowPulseRail.innerHTML = '<div class="now-pulse-loading"><span class="module-spinner" aria-hidden="true"></span><span>Çevre taranıyor…</span></div>';
+    return;
+  }
+
+  const grouped = new Map();
+  places.forEach(place => {
+    const category = categories.find(item => item.id === place.category);
+    if (!category || ["all", "favorites"].includes(category.id)) return;
+    const current = grouped.get(category.id) || { category, count: 0, nearest: null };
+    current.count += 1;
+    if (!current.nearest || (place.distanceKm ?? Infinity) < (current.nearest.distanceKm ?? Infinity)) current.nearest = place;
+    grouped.set(category.id, current);
+  });
+
+  const ranked = [...grouped.values()]
+    .filter(item => item.nearest && Number.isFinite(item.nearest.distanceKm))
+    .sort((a, b) => (a.nearest.distanceKm ?? Infinity) - (b.nearest.distanceKm ?? Infinity))
+    .slice(0, 7);
+
+  if (!ranked.length) {
+    nowPulseRail.innerHTML = '<div class="now-pulse-loading"><span class="module-spinner" aria-hidden="true"></span><span>Yakın kategoriler hazırlanıyor…</span></div>';
+    return;
+  }
+
+  ranked.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "now-pulse-card";
+    button.dataset.pulseIndex = String(index);
+    button.setAttribute("aria-label", `${item.category.label}: ${item.count} yer, en yakını ${formatDistance(item.nearest.distanceKm)}`);
+
+    const top = document.createElement("span");
+    top.className = "now-pulse-top";
+
+    const icon = document.createElement("span");
+    icon.className = "now-pulse-icon";
+    icon.innerHTML = categorySvg(item.category.id);
+
+    const count = document.createElement("span");
+    count.className = "now-pulse-count";
+    count.textContent = `${item.count} yer`;
+    top.append(icon, count);
+
+    const label = document.createElement("strong");
+    label.textContent = item.category.label;
+
+    const meta = document.createElement("small");
+    meta.textContent = `En yakın ${formatDistance(item.nearest.distanceKm)} · ${formatWalkingTime(item.nearest.distanceKm)}`;
+
+    const arrow = document.createElement("b");
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "↗";
+
+    button.append(top, label, meta, arrow);
+    button.addEventListener("click", () => openNowCategory(item.category.id));
+    nowPulseRail.append(button);
+  });
+}
+
 function renderNowNearby() {
   if (!nowNearbyList) return;
   const places = nowPlaceCandidates();
+  renderNowPulse(places);
   if (nowNearbyStat) nowNearbyStat.textContent = userLocation ? String(Math.min(places.length, 99)) + (places.length > 99 ? "+" : "") : "—";
   if (nowSavedStat) nowSavedStat.textContent = String(favorites.length);
   if (nowRouteStat) nowRouteStat.textContent = String(routeStops.length);
