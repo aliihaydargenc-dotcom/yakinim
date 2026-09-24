@@ -1007,29 +1007,10 @@ function radioArtworkUrl(station) {
   return normalized;
 }
 
-function createRadioAvatar(station, className = "radio-avatar") {
+function createRadioAvatar(_station, className = "radio-avatar") {
   const avatar = document.createElement("span");
   avatar.className = className;
-  const fallback = document.createElement("span");
-  fallback.className = "radio-avatar-fallback";
-  fallback.textContent = radioInitials(station?.name);
-  avatar.append(fallback);
-
-  const artwork = radioArtworkUrl(station);
-  if (artwork) {
-    const image = document.createElement("img");
-    image.alt = "";
-    image.loading = "lazy";
-    image.referrerPolicy = "no-referrer";
-    image.decoding = "async";
-    image.addEventListener("load", () => image.classList.add("is-loaded"), { once: true });
-    image.addEventListener("error", () => {
-      failedRadioArtwork.add(artwork);
-      image.remove();
-    }, { once: true });
-    image.src = artwork;
-    avatar.append(image);
-  }
+  avatar.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="7" width="17" height="13" rx="4"/><path d="m8 7 8-4M7.5 12h5"/><circle cx="16.5" cy="14.5" r="2.5"/></svg>';
   return avatar;
 }
 
@@ -1055,7 +1036,6 @@ function radioStationForStorage(station) {
     streamUrl: station.streamUrl,
     streamCandidates: Array.isArray(station.streamCandidates) ? station.streamCandidates.slice(0, 4) : [],
     homepage: station.homepage || "",
-    favicon: normalizeRadioArtworkUrl(station.favicon),
     tags: Array.isArray(station.tags) ? station.tags.slice(0, 6) : [],
     codec: station.codec || "",
     bitrate: Number(station.bitrate) || 0,
@@ -1257,14 +1237,11 @@ function configureRadioMediaSession() {
 
 function updateRadioMediaSession(station) {
   if (!("mediaSession" in navigator) || typeof MediaMetadata !== "function" || !station) return;
-  const artworkUrl = radioArtworkUrl(station);
-  const artwork = artworkUrl ? [{ src: artworkUrl }] : [];
   try {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: station.name,
       artist: radioStationTags(station).join(" · ") || "Canlı radyo",
       album: "Yakınım Radyo",
-      artwork,
     });
   } catch {}
 }
