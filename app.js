@@ -1,4 +1,4 @@
-const APP_VERSION = "3.7.0";
+const APP_VERSION = "3.8.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -663,7 +663,7 @@ function renderNowNearby() {
     return;
   }
 
-  places.slice(0, 3).forEach(place => {
+  places.slice(0, 6).forEach(place => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "now-place-card";

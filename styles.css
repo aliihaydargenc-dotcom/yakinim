@@ -2276,3 +2276,262 @@ body[data-section=now] .top-actions{display:none}
     backdrop-filter:blur(12px);
   }
 }
+
+
+/* v3.8 — blue product theme + mobile nearby carousel */
+:root{
+  --ink:#17243b;
+  --muted:#6b7890;
+  --accent:#2563eb;
+  --accent-strong:#123b8f;
+  --accent-soft:#eaf2ff;
+  --line:#dce5f0;
+  --surface:#f7faff;
+  --surface-blue:#f2f7ff;
+}
+
+/* Global blue system */
+html,body{background:#f7faff}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline-color:#7aa7ff}
+.brand-mark{
+  background:linear-gradient(145deg,#123b8f,#2563eb);
+  box-shadow:0 7px 18px rgba(37,99,235,.22);
+}
+.location-button span:first-child{color:var(--accent)}
+.sheet{background:#f7faff}
+.welcome{
+  background:#eef4ff;
+  border-color:#dce8ff;
+}
+.welcome-actions button+button{border-color:#bfd2ff}
+.directions-link{
+  background:#f1f6ff;
+  border-color:#d8e5ff;
+}
+.user-location-dot{background:rgba(37,99,235,.16)}
+.user-location-dot span{background:#2563eb}
+
+/* Primary hero */
+.now-hero{
+  background:
+    radial-gradient(circle at 88% 12%,rgba(102,168,255,.28),transparent 30%),
+    linear-gradient(140deg,#0b2559 0%,#123b8f 47%,#2563eb 100%);
+  box-shadow:0 20px 48px rgba(15,52,128,.24);
+}
+.now-hero .eyebrow{color:#dbe8ff}
+.now-hero-copy>p:last-child{color:#eaf2ff}
+.now-stats small{color:#dbe8ff}
+.now-live-badge{
+  border-color:rgba(255,255,255,.24);
+  background:rgba(255,255,255,.10);
+}
+.now-live-badge i{
+  background:#9ec5ff;
+  box-shadow:0 0 0 5px rgba(158,197,255,.14);
+}
+
+/* Blue surfaces */
+.now-pulse-head .eyebrow,
+.now-block-head p,
+.module-heading .eyebrow,
+.explore-heading .eyebrow{color:var(--accent)}
+.now-pulse-head>button,
+.now-block-head>button{
+  background:#edf4ff;
+  color:#1f5ad7;
+}
+.now-quick-grid button,
+.now-block,
+.result-card,
+.news-card,
+.radio-card{
+  border-color:#e0e8f3;
+}
+.now-quick-grid button>span,
+.now-place-icon,
+.now-pulse-icon,
+.result-icon,
+.discovery-icon,
+.radio-avatar,
+.now-radio-avatar{
+  background:var(--accent-soft);
+  color:var(--accent);
+}
+.now-empty-action{
+  border-color:#cddcf7;
+  background:#f7faff;
+}
+.now-empty-action>span:first-child{background:var(--accent-soft);color:var(--accent)}
+.now-radio-item.is-playing{
+  border-color:#b8cffc;
+  background:#f1f6ff;
+}
+.module-filter button[aria-pressed=true]{
+  background:#eaf2ff;
+  border-color:#bfd2ff;
+  color:#1f5ad7;
+}
+.radio-play{
+  border-color:#cddcf7;
+  background:#edf4ff;
+  color:#1f5ad7;
+}
+.radio-player{
+  border-color:#cbdaf6;
+  box-shadow:0 12px 32px rgba(16,55,130,.16);
+}
+.radio-player-toggle,
+.now-radio-play{background:var(--accent)}
+.nearby-loading{
+  border-color:#cadbf8;
+  background:linear-gradient(135deg,rgba(234,242,255,.98),rgba(255,255,255,.97));
+  box-shadow:0 5px 16px rgba(37,99,235,.08);
+}
+.section-transition-spinner,.module-spinner{
+  border-color:#cbdaf6;
+  border-top-color:var(--accent);
+}
+
+/* Selected nav/category states */
+.section-nav button[aria-pressed=true],
+body[data-section=nearby][data-view=map] .section-nav button[aria-pressed=true]{
+  background:linear-gradient(180deg,#edf4ff,#e4efff)!important;
+  border-color:#c9dafd!important;
+  color:#1f5ad7!important;
+  box-shadow:inset 0 0 0 1px rgba(37,99,235,.08)!important;
+}
+.section-nav button[aria-pressed=true]:after{background:#2563eb}
+.category-button[aria-pressed=true]{
+  background:#1f5ad7;
+  border-color:#1f5ad7;
+  color:#fff;
+}
+.nearest-badge,.result-meta,.result-summary{color:#1f5ad7}
+.nearest-badge{background:#eaf2ff}
+
+/* Real horizontally scrollable "Hemen yakınında" rail */
+.now-nearby-list{
+  display:flex;
+  grid-template-columns:none;
+  gap:10px;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:2px 2px 9px;
+  scroll-snap-type:x mandatory;
+  overscroll-behavior-inline:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.now-nearby-list::-webkit-scrollbar{display:none}
+.now-nearby-list>.now-place-card{
+  flex:0 0 clamp(250px,72vw,320px);
+  width:clamp(250px,72vw,320px);
+  max-width:calc(100vw - 74px);
+  scroll-snap-align:start;
+  scroll-snap-stop:normal;
+}
+.now-place-card{
+  overflow:hidden;
+  background:#fbfdff;
+}
+.now-place-copy{
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+}
+.now-place-copy strong,
+.now-place-copy small{
+  display:block;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.now-place-card>b{color:#7d8aa3}
+
+/* Remove remaining obvious green-tinted chrome */
+.now-block-head>button,
+.now-pulse-head>button{border-color:#dbe7fb}
+.now-news-item>span,.news-source{
+  background:#eaf2ff;
+  color:#1f5ad7;
+}
+.place-cluster{
+  background:#123b8f;
+  box-shadow:0 9px 24px rgba(18,59,143,.28);
+}
+.leaflet-marker-icon.is-selected .place-marker{
+  box-shadow:0 13px 30px rgba(18,59,143,.30),0 0 0 6px rgba(255,255,255,.72);
+}
+.leaflet-tooltip.place-label.is-selected-place-label{
+  border-color:#bfd2ff!important;
+  color:#153873!important;
+  box-shadow:0 8px 24px rgba(18,59,143,.18)!important;
+}
+
+@keyframes nowLivePulse{
+  0%{box-shadow:0 0 0 0 rgba(158,197,255,.40)}
+  70%{box-shadow:0 0 0 7px rgba(158,197,255,0)}
+  100%{box-shadow:0 0 0 0 rgba(158,197,255,0)}
+}
+
+@media(max-width:759px){
+  body{
+    background:
+      radial-gradient(circle at 12% -8%,rgba(80,145,255,.12),transparent 30%),
+      radial-gradient(circle at 94% 20%,rgba(127,178,255,.10),transparent 29%),
+      linear-gradient(180deg,#f7faff 0%,#f3f7fc 100%);
+  }
+  body:before{
+    background:
+      radial-gradient(circle at 15% 28%,rgba(72,134,245,.055),transparent 22%),
+      radial-gradient(circle at 85% 62%,rgba(34,91,194,.045),transparent 24%);
+  }
+  .topbar{
+    border-color:#dde6f1;
+    box-shadow:0 10px 30px rgba(24,54,105,.09),inset 0 1px 0 rgba(255,255,255,.78);
+  }
+  .brand-mark{
+    background:linear-gradient(145deg,#123b8f,#2f6ff0);
+    box-shadow:0 7px 16px rgba(37,99,235,.22);
+  }
+  .now-hero{
+    background:
+      radial-gradient(circle at 87% 14%,rgba(116,177,255,.30),transparent 29%),
+      radial-gradient(circle at 10% 100%,rgba(53,111,224,.24),transparent 36%),
+      linear-gradient(145deg,#0a2254 0%,#123b8f 52%,#2563eb 100%);
+    box-shadow:0 20px 45px rgba(15,52,128,.24);
+  }
+  .now-pulse-card{
+    border-color:#dae5f4;
+    background:
+      radial-gradient(circle at 100% 0%,rgba(87,148,255,.16),transparent 46%),
+      linear-gradient(160deg,rgba(255,255,255,.99),rgba(247,250,255,.98));
+    box-shadow:0 10px 30px rgba(24,61,125,.08);
+  }
+  .now-pulse-card:before{
+    background:radial-gradient(circle,rgba(87,148,255,.18),rgba(87,148,255,0) 70%);
+  }
+  .now-quick-grid button,
+  .now-block{
+    border-color:#dfe7f2;
+    box-shadow:0 9px 24px rgba(25,55,105,.065);
+  }
+  .section-nav,
+  body[data-section=nearby][data-view=map] .section-nav{
+    border-color:#d8e2ef!important;
+    box-shadow:0 18px 48px rgba(20,48,98,.18),inset 0 1px 0 rgba(255,255,255,.92)!important;
+  }
+  .now-nearby-list{
+    margin-right:-12px;
+    padding-right:14px;
+  }
+  .now-nearby-list>.now-place-card{
+    flex-basis:min(76vw,292px);
+    width:min(76vw,292px);
+    max-width:min(76vw,292px);
+  }
+}

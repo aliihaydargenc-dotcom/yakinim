@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.7\.0"/);
+assert.match(app, /APP_VERSION = "3\.8\.0"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -119,6 +119,8 @@ assert.match(styles, /v3\.2 resilient media \+ multi-source news \+ section tran
 assert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);
 assert.match(styles, /v3\.3 mobile app shell \+ Now home/);
 assert.match(styles, /v3\.7 — unified icon language \+ explicit nearby loading/);
+assert.match(styles, /v3\.8 — blue product theme \+ mobile nearby carousel/);
+assert.match(app, /places\.slice\(0, 6\)/);
 assert.match(index, /data-section="now"/);
 assert.match(index, />Şimdi<\/b>/);
 assert.match(styles, /position:fixed!important;[\s\S]*bottom:max\(8px,env\(safe-area-inset-bottom\)\)!important/);
@@ -136,7 +138,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v50/);
+assert.match(sw, /yakinimda-shell-v51/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);
