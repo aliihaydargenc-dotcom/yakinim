@@ -3515,23 +3515,23 @@ function showState(kind, message) {
 
 function resultCountLabel(count) {
   const safeCount = Math.max(0, Number(count) || 0);
-  if (document.body.dataset.view === "list") {
-    if (activeCategory.type === "all" && safeCount >= MAX_ALL_LIST_PLACES) return `${MAX_ALL_LIST_PLACES}+ sonuç`;
-    return `${safeCount} sonuç`;
-  }
   return safeCount >= MAX_VISIBLE_PLACES ? `${MAX_VISIBLE_PLACES}+ sonuç` : `${safeCount} sonuç`;
 }
 
 function updateResultSummary(places) {
+  const listView = document.body.dataset.view === "list";
   if (!places.length) {
-    resultSummary.textContent = "Görünen alanda sonuç yok";
+    resultSummary.textContent = listView ? "Yakın çevrede sonuç yok" : "Görünen alanda sonuç yok";
     return;
   }
   const nearest = places.find(place => Number.isFinite(place.distanceKm));
   const nearestText = nearest
     ? ` · en yakın ${formatDistance(nearest.distanceKm)} · ${formatWalkingTime(nearest.distanceKm)}`
     : "";
-  resultSummary.textContent = `${resultCountLabel(places.length)} · görünen alan${nearestText}`;
+  const countText = listView
+    ? (activeCategory.type === "all" && places.length >= MAX_ALL_LIST_PLACES ? `${MAX_ALL_LIST_PLACES}+ sonuç` : `${places.length} sonuç`)
+    : resultCountLabel(places.length);
+  resultSummary.textContent = `${countText} · ${listView ? "yakın çevre" : "görünen alan"}${nearestText}`;
 }
 
 function applySheetState(state) {
