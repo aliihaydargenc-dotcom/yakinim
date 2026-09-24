@@ -2148,3 +2148,84 @@ body[data-section=now] .top-actions{display:none}
   .now-quick-grid small{font-size:8px}
   .news-card strong{font-size:12px}
 }
+
+
+/* v3.6 — mobile type scale reset: readable without losing density */
+@media(max-width:759px){
+  body{font-size:16px;line-height:1.48}
+
+  .topbar h1{font-size:18px}
+  .location-button{font-size:11px}
+
+  .section-nav button,
+  body[data-section=nearby][data-view=map] .section-nav button{
+    font-size:11px!important;
+    font-weight:800!important;
+  }
+
+  .now-live-badge{font-size:9px}
+  .now-hero-copy>p:last-child{font-size:13px;line-height:1.45}
+  .now-stats strong{font-size:17px}
+  .now-stats small{font-size:10.5px}
+  .now-pulse-head .eyebrow{font-size:9px}
+  .now-pulse-head h3{font-size:19px}
+  .now-pulse-head>button{font-size:10px}
+  .now-pulse-empty strong{font-size:14px}
+  .now-pulse-empty small{font-size:12px;line-height:1.4}
+  .now-pulse-count{font-size:9px}
+  .now-pulse-card>strong{font-size:15px}
+  .now-pulse-card>small{font-size:11.5px;line-height:1.4}
+  .now-quick-grid strong{font-size:14px}
+  .now-quick-grid small{font-size:12px;line-height:1.35}
+  .now-block-head p{font-size:9.5px}
+  .now-block-head h3{font-size:18px}
+  .now-block-head>button{font-size:10px}
+  .now-place-copy strong,.now-radio-copy strong{font-size:14px}
+  .now-place-copy small,.now-radio-copy small{font-size:11.5px;line-height:1.35}
+
+  .search-box input{font-size:16px}
+  .category-button{font-size:13px}
+  .category-count{font-size:10px}
+  .discovery-head h3{font-size:18px}
+  .discovery-summary{font-size:11px;line-height:1.35}
+  .discovery-card-head strong{font-size:14px}
+  .discovery-count{font-size:11px}
+  .discovery-nearest{font-size:11.5px}
+  .result-title{font-size:20px}
+  .result-summary{font-size:12.5px}
+  .result-name{font-size:16px;line-height:1.35}
+  .result-meta{font-size:12.5px}
+  .result-address{font-size:12px;line-height:1.4}
+  .nearest-badge{font-size:9.5px}
+  .favorite-button,.directions-link,.phone-link,.route-button{font-size:12px}
+
+  .module-heading .eyebrow{font-size:10px}
+  .module-heading h2{font-size:27px}
+  .module-heading>p:last-child{font-size:13px;line-height:1.5}
+  .module-status{font-size:11px}
+  .module-filter button{font-size:12px}
+  .news-source{font-size:10px}
+  .news-card strong{font-size:15px;line-height:1.38}
+  .news-time{font-size:11px}
+
+  .radio-search-wrap input{font-size:14px}
+  .radio-library-tabs button{font-size:12px}
+  .radio-copy strong{font-size:14px}
+  .radio-meta{font-size:11px}
+  .radio-rank{font-size:9px}
+  .radio-tags small{font-size:9px}
+  .radio-player-copy strong{font-size:13px}
+  .radio-player-copy span{font-size:11px}
+
+  .now-quick-grid button{min-height:76px}
+  .result-main{min-height:86px}
+  .radio-card{min-height:76px}
+  .news-card a{padding-top:13px;padding-bottom:13px}
+}
+@media(max-width:390px){
+  body{font-size:15.5px}
+  .now-hero-copy>p:last-child{font-size:12.5px}
+  .now-quick-grid strong{font-size:13.5px}
+  .now-quick-grid small{font-size:11.5px}
+  .news-card strong{font-size:14.5px}
+}
