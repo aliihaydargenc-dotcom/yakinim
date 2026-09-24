@@ -2569,3 +2569,71 @@ body[data-view=map] .leaflet-control-attribution a{
     opacity:.72;
   }
 }
+
+
+/* v3.8.3 — desktop map panel must not inherit mobile sheet collapse */
+@media(min-width:760px){
+  body[data-view=map] .sheet,
+  body[data-view=map] .sheet[data-state=peek],
+  body[data-view=map] .sheet[data-state=half],
+  body[data-view=map] .sheet[data-state=expanded]{
+    top:115px!important;
+    bottom:24px!important;
+    left:24px!important;
+    width:430px!important;
+    height:auto!important;
+    max-height:none!important;
+    padding:18px 20px 22px!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    border-radius:22px!important;
+  }
+
+  body[data-view=map] .sheet-toggle{
+    display:none!important;
+  }
+
+  body[data-view=map] .sheet[data-state=peek] :is(
+    .category-strip,
+    .section-toolbar,
+    .nearest-action,
+    .results,
+    .place-detail,
+    .discovery-hub
+  ){
+    display:revert!important;
+  }
+
+  body[data-view=map] .sheet[data-state=peek] .category-strip{
+    display:flex!important;
+  }
+  body[data-view=map] .sheet[data-state=peek] .section-toolbar{
+    display:flex!important;
+  }
+  body[data-view=map] .sheet[data-state=peek] .results{
+    display:grid!important;
+  }
+
+  body[data-view=map] .explore-heading{
+    margin-bottom:0;
+  }
+  body[data-view=map] .explore-heading .eyebrow{
+    margin-bottom:5px;
+  }
+  body[data-view=map] .explore-heading h2{
+    font-size:24px;
+    line-height:1.16;
+    letter-spacing:-.8px;
+  }
+  body[data-view=map] .search-box{
+    width:100%;
+    min-height:52px;
+    margin:14px 0 12px;
+    padding:0 14px;
+    flex:0 0 auto;
+  }
+  body[data-view=map] .search-box input{
+    min-height:48px;
+    font-size:15px;
+  }
+}

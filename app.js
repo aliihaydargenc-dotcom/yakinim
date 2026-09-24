@@ -1,4 +1,4 @@
-const APP_VERSION = "3.8.2";
+const APP_VERSION = "3.8.3";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -3488,7 +3488,8 @@ function updateResultSummary(places) {
 }
 
 function applySheetState(state) {
-  const nextState = SHEET_STATES.includes(state) ? state : "half";
+  const desktopMapPanel = !window.matchMedia("(max-width: 759px)").matches;
+  const nextState = desktopMapPanel ? "expanded" : (SHEET_STATES.includes(state) ? state : "half");
   sheet.dataset.state = nextState;
   document.body.dataset.sheetState = nextState;
   prefs.sheetState = nextState;
@@ -3510,6 +3511,10 @@ function cycleSheetState() {
 
 function collapseMapPanel() {
   if (document.body.dataset.view !== "map") return;
+  if (!window.matchMedia("(max-width: 759px)").matches) {
+    applySheetState("expanded");
+    return;
+  }
   if (history.state?.yakinimView === "map-place") {
     dismissMapQuickCard();
     return;
