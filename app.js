@@ -1,4 +1,5 @@
-const APP_VERSION = "3.8.5";
+const APP_VERSION = "3.9.0";
+const DESKTOP_DOCK_KEY = "yakinimda:desktop-dock-collapsed:v1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -296,6 +297,7 @@ const quickDetails = document.querySelector("#quickDetails");
 const quickShare = document.querySelector("#quickShare");
 const quickClose = document.querySelector("#quickClose");
 const sectionNav = document.querySelector("#sectionNav");
+const desktopDockToggle = document.querySelector("#desktopDockToggle");
 const nowSection = document.querySelector("#nowSection");
 const nowContext = document.querySelector("#nowContext");
 const nowNearbyStat = document.querySelector("#nowNearbyStat");
@@ -349,6 +351,15 @@ let sheetGestureConsumed = false;
 sheetToggle.addEventListener("pointerdown", startSheetGesture);
 sheetToggle.addEventListener("pointerup", endSheetGesture);
 sheetToggle.addEventListener("pointercancel", cancelSheetGesture);
+desktopDockToggle?.addEventListener("click", () => {
+  applyDesktopDockState(!document.body.classList.contains("desktop-dock-collapsed"));
+});
+
+window.addEventListener("resize", () => {
+  if (!isDesktopLayout()) document.body.classList.remove("desktop-dock-collapsed");
+  else if (document.body.dataset.view === "map") syncDesktopDockForView();
+});
+
 sheetToggle.addEventListener("click", () => {
   if (sheetGestureConsumed) {
     sheetGestureConsumed = false;
@@ -1592,6 +1603,7 @@ function setView(view, panelState = "half") {
   closeMapQuickCard({ clearSelection: false });
   closePlaceDetails(false);
   document.body.dataset.view = view;
+  syncDesktopDockForView();
   if (lastDiscoveryBundle && activeCategory.type !== "favorites" && activeCategory.type !== "duty") {
     renderActiveCategoryFromBundle();
   }
@@ -3483,6 +3495,29 @@ function updateResultSummary(places) {
     ? (activeCategory.type === "all" && places.length >= MAX_ALL_LIST_PLACES ? `${MAX_ALL_LIST_PLACES}+ sonuç` : `${places.length} sonuç`)
     : resultCountLabel(places.length);
   resultSummary.textContent = `${countText} · ${listView ? "yakın çevre" : "görünen alan"}${nearestText}`;
+}
+
+function isDesktopLayout() {
+  return !window.matchMedia("(max-width: 759px)").matches;
+}
+
+function applyDesktopDockState(collapsed, { persist = true } = {}) {
+  const active = Boolean(collapsed) && isDesktopLayout() && document.body.dataset.view === "map";
+  document.body.classList.toggle("desktop-dock-collapsed", active);
+  if (desktopDockToggle) {
+    desktopDockToggle.setAttribute("aria-expanded", String(!active));
+    desktopDockToggle.setAttribute("aria-label", active ? "Sol paneli aç" : "Sol paneli daralt");
+  }
+  if (persist) localStorage.setItem(DESKTOP_DOCK_KEY, active ? "1" : "0");
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    scheduleMapLabelUpdate();
+  });
+}
+
+function syncDesktopDockForView() {
+  const saved = localStorage.getItem(DESKTOP_DOCK_KEY) === "1";
+  applyDesktopDockState(saved, { persist: false });
 }
 
 function applySheetState(state) {
