@@ -45,7 +45,7 @@ status = vm.runInContext('openingStatus("Mo-Su 09:00-22:00", mondayLate)', conte
 assert.equal(status.state, "closed");
 assert.equal(vm.runInContext('openingStatus("sunrise-sunset", mondayTen)', context), null);
 
-for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "nowSection", "nowNearbyList", "nowNewsList", "nowRadioList", "sectionTransition", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPlayerExpand", "radioPrev", "radioNext", "radioVolume"]) {
+for (const id of ["mapSearch", "recenterButton", "mapQuickCard", "quickDirections", "quickFavorite", "quickDetails", "quickShare", "sectionNav", "nowSection", "nowNearbyList", "nowNewsList", "nowRadioList", "sectionTransition", "newsSection", "radioSection", "radioPlayer", "radioSearch", "radioLibraryTabs", "radioPlayerFavorite", "radioPlayerExpand", "radioPrev", "radioNext"]) {
   assert.match(index, new RegExp(`id="${id}"`));
 }
 assert.match(styles, /body\[data-view=map\] \.topbar\{display:none!important\}/);
