@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.6.0" as="script" />
+    <link rel="preload" href="./app.js?v=3.7.0" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.6.0" />
+    <link rel="stylesheet" href="./styles.css?v=3.7.0" />
   </head>
   <body data-view="list" data-section="now">
     <main class="app-shell">
@@ -87,10 +87,10 @@
       </header>
 
       <nav id="sectionNav" class="section-nav" aria-label="Uygulama bölümleri">
-        <button type="button" data-section="now" aria-pressed="true"><span aria-hidden="true">✦</span><b>Şimdi</b></button>
-        <button type="button" data-section="nearby" aria-pressed="false"><span aria-hidden="true">⌖</span><b>Yakınım</b></button>
-        <button type="button" data-section="news" aria-pressed="false"><span aria-hidden="true">▤</span><b>Haber</b></button>
-        <button type="button" data-section="radio" aria-pressed="false"><span aria-hidden="true">◉</span><b>Radyo</b></button>
+        <button type="button" data-section="now" aria-pressed="true"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.5 4.1L17.5 9l-4 1.6L12 15l-1.5-4.4L6.5 9l4-1.9L12 3Z"/><path d="m18.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/></svg></span><b>Şimdi</b></button>
+        <button type="button" data-section="nearby" aria-pressed="false"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><b>Yakınım</b></button>
+        <button type="button" data-section="news" aria-pressed="false"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><b>Haber</b></button>
+        <button type="button" data-section="radio" aria-pressed="false"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="17" height="13" rx="4"/><path d="m8 7 8-4M7.5 12h5"/><circle cx="16.5" cy="14.5" r="2.5"/></svg></span><b>Radyo</b></button>
       </nav>
       <div id="sectionTransition" class="section-transition" role="status" aria-live="polite" hidden>
         <div class="section-transition-card">
@@ -125,10 +125,10 @@
         </section>
 
         <div id="nowQuickActions" class="now-quick-grid" aria-label="Hızlı ihtiyaçlar">
-          <button type="button" data-now-category="market"><span aria-hidden="true">▱</span><strong>Market</strong><small>En yakını bul</small></button>
-          <button type="button" data-now-category="cafe"><span aria-hidden="true">☕</span><strong>Kafe</strong><small>Yakında otur</small></button>
-          <button type="button" data-now-category="duty"><span aria-hidden="true">+</span><strong>Nöbetçi</strong><small>Eczaneyi aç</small></button>
-          <button type="button" data-now-category="atm"><span aria-hidden="true">₺</span><strong>ATM</strong><small>Hızlıca bul</small></button>
+          <button type="button" data-now-category="market"><span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16l-1.5 9h-13L4 10Z"/><path d="m8 10 4-6 4 6M8 14.5v2M12 14.5v2M16 14.5v2"/></svg></span><strong>Market</strong><small>En yakını bul</small></button>
+          <button type="button" data-now-category="cafe"><span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12v6.5A4.5 4.5 0 0 1 11.5 19h-3A4.5 4.5 0 0 1 4 14.5V8Z"/><path d="M16 10h1.5a3 3 0 0 1 0 6H16M5 22h13M8 3.5v2M12 3.5v2"/></svg></span><strong>Kafe</strong><small>Yakında otur</small></button>
+          <button type="button" data-now-category="duty"><span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 7v10M7 12h10"/></svg></span><strong>Nöbetçi</strong><small>Eczaneyi aç</small></button>
+          <button type="button" data-now-category="atm"><span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6 9h12M7 15h4"/><circle cx="16.5" cy="14.5" r="1.8"/></svg></span><strong>ATM</strong><small>Hızlıca bul</small></button>
         </div>
 
         <section class="now-block now-nearby-block" aria-labelledby="nowNearbyHeading">
@@ -166,6 +166,10 @@
         </button>
 
         <div class="category-strip" id="categoryStrip" aria-label="Kategoriler"></div>
+        <div id="nearbyLoading" class="nearby-loading" role="status" aria-live="polite" hidden>
+          <span class="module-spinner" aria-hidden="true"></span>
+          <span id="nearbyLoadingText">Yakındaki yerler güncelleniyor…</span>
+        </div>
 
         <section id="welcome" class="welcome">
           <span class="welcome-symbol" aria-hidden="true">⌖</span><div><h3>Birkaç işi tek rotada hallet.</h3><p>Yakındaki yerleri bul, rotana ekle, sırayla yola çık.</p></div>
@@ -319,6 +323,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.6.0" defer></script>
+    <script src="./app.js?v=3.7.0" defer></script>
   </body>
 </html>

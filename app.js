@@ -1,4 +1,4 @@
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.7.0";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -56,6 +56,7 @@ const VIEWPORT_DEBOUNCE_MS = 280;
 const VIEWPORT_MIN_ZOOM = 13;
 const VIEWPORT_MAX_SPAN_DEGREES = 0.12;
 const MAX_VISIBLE_PLACES = 120;
+const MAX_ALL_LIST_PLACES = 500;
 const SPATIAL_CELL_DEGREES = 0.01;
 const SPATIAL_PREFETCH_PAD = 0.62;
 const SPATIAL_POOL_LIMIT = 1800;
@@ -284,6 +285,8 @@ const resultTemplate = document.querySelector("#resultTemplate");
 const discoveryHub = document.querySelector("#discoveryHub");
 const discoveryCards = document.querySelector("#discoveryCards");
 const discoverySummary = document.querySelector("#discoverySummary");
+const nearbyLoading = document.querySelector("#nearbyLoading");
+const nearbyLoadingText = document.querySelector("#nearbyLoadingText");
 const mapContext = document.querySelector("#mapContext");
 const mapContextIcon = document.querySelector("#mapContextIcon");
 const mapContextLabel = document.querySelector("#mapContextLabel");
@@ -865,7 +868,32 @@ function setSection(section, { pushHistory = true } = {}) {
     loadRadio(activeRadioScope);
   } else {
     animateIn(sheet);
-    requestAnimationFrame(() => map.invalidateSize());
+    requestAnimationFrame(() => {
+      map.invalidateSize();
+      if (!userLocation) {
+        setNearbyLoading(false);
+        return;
+      }
+      if (activeCategory.type === "favorites") {
+        setNearbyLoading(false);
+        loadFavorites();
+        return;
+      }
+      if (activeCategory.type === "duty") {
+        setNearbyLoading(true, "Nöbetçi eczaneler güncelleniyor…");
+        refreshDutyViewport({ force: false });
+        return;
+      }
+
+      setNearbyLoading(true, activeCategory.type === "all" ? "Tüm yakın yerler yükleniyor…" : `${activeCategory.label} yükleniyor…`);
+      if (lastDiscoveryBundle || spatialPoiPool.size) {
+        if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
+        renderActiveCategoryFromBundle();
+      } else if (!activePlaces.length) {
+        showState("loading", "Yakın çevre verisi hazırlanıyor…");
+      }
+      scheduleViewportRefresh({ force: activeCategory.type === "all" && !lastDiscoveryBundle });
+    });
     hideSectionTransition(240);
   }
 }
@@ -1608,6 +1636,9 @@ function setView(view, panelState = "half") {
   closeMapQuickCard({ clearSelection: false });
   closePlaceDetails(false);
   document.body.dataset.view = view;
+  if (lastDiscoveryBundle && activeCategory.type !== "favorites" && activeCategory.type !== "duty") {
+    renderActiveCategoryFromBundle();
+  }
   if (view === "map" && previousView !== "map") {
     history.pushState({ yakinimView: "map-peek", yakinimSection: "nearby" }, "", location.href);
     if (panelState !== "peek") history.pushState({ yakinimView: "map-open", yakinimSection: "nearby" }, "", location.href);
@@ -1632,6 +1663,12 @@ function animateIn(element) {
   );
 }
 
+function setNearbyLoading(active, message = "Yakındaki yerler güncelleniyor…") {
+  if (!nearbyLoading) return;
+  nearbyLoading.hidden = !active;
+  if (nearbyLoadingText) nearbyLoadingText.textContent = message;
+}
+
 function renderCategoryButtons() {
   if (!categoryStrip.children.length) categories.forEach((category) => {
     const button = document.createElement("button");
@@ -1646,8 +1683,25 @@ function renderCategoryButtons() {
 }
 
 function selectCategory(category) {
-  if (category.id === activeCategory.id && activePlaces.length) {
+  if (category.id === activeCategory.id) {
     pulseCategoryButton(category.id);
+    if (!userLocation) return;
+    if (category.type === "favorites") {
+      setNearbyLoading(false);
+      loadFavorites();
+      return;
+    }
+    if (category.type === "duty") {
+      setNearbyLoading(true, "Nöbetçi eczaneler güncelleniyor…");
+      refreshDutyViewport({ force: true });
+      return;
+    }
+    setNearbyLoading(true, category.type === "all" ? "Tüm yakın yerler yenileniyor…" : `${category.label} yenileniyor…`);
+    if (lastDiscoveryBundle || spatialPoiPool.size) {
+      if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
+      renderActiveCategoryFromBundle();
+    }
+    scheduleViewportRefresh({ force: true });
     return;
   }
   if (document.body.dataset.view === "map" && history.state?.yakinimView === "map-detail") history.back();
@@ -1667,10 +1721,12 @@ function selectCategory(category) {
   pulseCategoryButton(category.id);
 
   if (category.type === "favorites") {
+    setNearbyLoading(false);
     loadFavorites();
     return;
   }
   if (!userLocation) {
+    setNearbyLoading(false);
     activePlaces = [];
     document.body.classList.remove("map-results-updating");
     updateMapContext([], category, "empty");
@@ -1678,12 +1734,18 @@ function selectCategory(category) {
     return;
   }
   if (category.type === "duty") {
+    setNearbyLoading(true, "Nöbetçi eczaneler güncelleniyor…");
     refreshDutyViewport({ force: true });
     return;
   }
-  if (lastDiscoveryBundle) renderActiveCategoryFromBundle();
-  else showState("loading", "Görünen alan hazırlanıyor…");
-  scheduleViewportRefresh();
+  setNearbyLoading(true, category.type === "all" ? "Tüm yakın yerler yükleniyor…" : `${category.label} yükleniyor…`);
+  if (lastDiscoveryBundle || spatialPoiPool.size) {
+    if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
+    renderActiveCategoryFromBundle();
+  } else {
+    showState("loading", "Yakın çevre verisi hazırlanıyor…");
+  }
+  scheduleViewportRefresh({ force: category.type === "all" });
 }
 
 async function locateUser({ forceFresh = false, background = false } = {}) {
@@ -2222,13 +2284,36 @@ function visibleBundle(bundle = lastDiscoveryBundle) {
   return Object.fromEntries(osmCategories.map(category => [category.id, decorateViewportPlaces(bundle[category.id] || [])]));
 }
 
+function nearbyListBundle(bundle = lastDiscoveryBundle) {
+  if (!bundle) return null;
+  return Object.fromEntries(osmCategories.map(category => {
+    const places = (bundle[category.id] || [])
+      .filter(place => Number.isFinite(place.lat) && Number.isFinite(place.lng))
+      .map(place => ({
+        ...place,
+        distanceKm: userLocation
+          ? distanceBetween(userLocation.lat, userLocation.lng, place.lat, place.lng)
+          : place.distanceKm,
+      }))
+      .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    return [category.id, places];
+  }));
+}
+
+function bundleForCurrentView(bundle = lastDiscoveryBundle) {
+  return document.body.dataset.view === "map" ? visibleBundle(bundle) : nearbyListBundle(bundle);
+}
+
 function renderActiveCategoryFromBundle(statusMessage = "") {
   if (activeCategory.type === "favorites" || activeCategory.type === "duty") return;
   if (!lastDiscoveryBundle) refreshBundleFromSpatialPool();
-  const bundle = visibleBundle(lastDiscoveryBundle);
+  const bundle = bundleForCurrentView(lastDiscoveryBundle);
   if (!bundle) return;
+  const combined = activeCategory.type === "all"
+    ? Object.values(bundle).flat().sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
+    : null;
   const places = activeCategory.type === "all"
-    ? Object.values(bundle).flat().sort((a, b) => a.distanceKm - b.distanceKm).slice(0, MAX_VISIBLE_PLACES)
+    ? combined.slice(0, document.body.dataset.view === "map" ? MAX_VISIBLE_PLACES : MAX_ALL_LIST_PLACES)
     : (bundle[activeCategory.id] || []);
   activePlaces = places;
   renderDiscoveryHub(lastDiscoveryBundle);
@@ -2249,9 +2334,11 @@ function scheduleViewportRefresh({ force = false } = {}) {
 async function refreshViewportPlaces({ force = false } = {}) {
   if (!userLocation) return;
 
+  setNearbyLoading(true, activeCategory.type === "all" ? "Tüm yakın yerler güncelleniyor…" : `${activeCategory.label} güncelleniyor…`);
   const visibleEnvelope = buildViewportEnvelope();
   const prefetchEnvelope = buildSpatialPrefetchEnvelope();
   if (!visibleEnvelope || !prefetchEnvelope) {
+    setNearbyLoading(false);
     document.body.classList.remove("map-results-updating");
     statusText.textContent = map.getZoom() < VIEWPORT_MIN_ZOOM
       ? "Yakındaki yerleri görmek için haritada biraz yakınlaş."
@@ -2272,6 +2359,7 @@ async function refreshViewportPlaces({ force = false } = {}) {
   }
 
   if (!force && spatialCellsAreFresh(prefetchCells)) {
+    setNearbyLoading(false);
     document.body.classList.remove("map-results-updating");
     if (hasVisibleCoverage) statusText.textContent = "";
     return;
@@ -2312,6 +2400,7 @@ async function refreshViewportPlaces({ force = false } = {}) {
     updateMapContext([], activeCategory, "error");
     showState("error", "Bu alanın yer verisi şu an alınamadı. Haritayı hareket ettirince otomatik yeniden denenecek.");
   } finally {
+    setNearbyLoading(false);
     if (activeViewportRequest?.serial === serial) activeViewportRequest = null;
   }
 }
@@ -2392,6 +2481,7 @@ function viewportDutyRadius() {
 
 async function refreshDutyViewport({ force = false } = {}) {
   if (!userLocation) return;
+  setNearbyLoading(true, "Nöbetçi eczaneler güncelleniyor…");
   sourceText.textContent = "Veri: Eczane Adresi · görünen alan";
   const center = map.getCenter();
   const radius = viewportDutyRadius();
@@ -2401,6 +2491,7 @@ async function refreshDutyViewport({ force = false } = {}) {
     activePlaces = decorateViewportPlaces(cached);
     renderPlaces(activePlaces, activeCategory);
     statusText.textContent = "";
+    setNearbyLoading(false);
     return;
   }
   document.body.classList.add("map-results-updating");
@@ -2416,6 +2507,8 @@ async function refreshDutyViewport({ force = false } = {}) {
     document.body.classList.remove("map-results-updating");
     console.warn("Duty viewport unavailable", error);
     if (!activePlaces.length) showState("error", "Nöbetçi eczane verisi şu an alınamadı.");
+  } finally {
+    setNearbyLoading(false);
   }
 }
 
@@ -2548,7 +2641,7 @@ function renderDiscoveryHub(bundle) {
     return;
   }
 
-  const shown = visibleBundle(bundle);
+  const shown = bundleForCurrentView(bundle);
   updateCategoryCounts(shown);
   const recommendations = rankDiscoveryPlaces(shown, discoverySignals, favorites);
   if (!recommendations.length) {
@@ -2759,7 +2852,7 @@ function loadFavorites() {
     }));
   }
   resultTitle.textContent = "Favoriler";
-  updateCategoryCounts(lastDiscoveryBundle ? visibleBundle(lastDiscoveryBundle) : null);
+  updateCategoryCounts(lastDiscoveryBundle ? bundleForCurrentView(lastDiscoveryBundle) : null);
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
   sourceText.textContent = "Favoriler: cihaz içi kayıt";
   renderPlaces(activePlaces, activeCategory);
@@ -3016,7 +3109,7 @@ function renderPlaces(places, category) {
     resultFragment.append(createResultCard(place, icon, index === 0, index));
   });
   results.append(resultFragment);
-  renderMapPlaces(places);
+  renderMapPlaces(document.body.dataset.view === "map" ? places : places.slice(0, MAX_VISIBLE_PLACES));
   animateIn(results);
   if (selectedPlace) {
     if (places.some(place => place.id === selectedPlace.id)) markSelectedPlace();
@@ -3422,6 +3515,10 @@ function showState(kind, message) {
 
 function resultCountLabel(count) {
   const safeCount = Math.max(0, Number(count) || 0);
+  if (document.body.dataset.view === "list") {
+    if (activeCategory.type === "all" && safeCount >= MAX_ALL_LIST_PLACES) return `${MAX_ALL_LIST_PLACES}+ sonuç`;
+    return `${safeCount} sonuç`;
+  }
   return safeCount >= MAX_VISIBLE_PLACES ? `${MAX_VISIBLE_PLACES}+ sonuç` : `${safeCount} sonuç`;
 }
 
@@ -3941,23 +4038,23 @@ console.info(`Yakınımda v${APP_VERSION} · viewport discovery`);
 
 function categorySvg(id) {
   const paths = {
-    all: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
-    cafe: '<path d="M4 8h12v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM16 8h2a3 3 0 1 1 0 6h-2M3 22h16M7 2v3M12 2v3"/>',
-    food: '<path d="M5 3v6a3 3 0 0 0 6 0V3M8 3v19M19 3c-4 4-4 9 0 9v10M19 3v9"/>',
-    market: '<path d="M3 3h2l3 12h11l2-9H6M9 20h.01M18 20h.01"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>',
-    shopping: '<path d="M5 7h14l2 14H3zM9 7V5a3 3 0 0 1 6 0v2"/>',
-    park: '<path d="M12 3 6 10h3l-5 7h16l-5-7h3zM12 17v5"/>',
-    duty: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
-    pharmacy: '<path d="m8 16 8-8M5 19a5 5 0 0 1 0-7l7-7a5 5 0 0 1 7 7l-7 7a5 5 0 0 1-7 0z"/>',
-    bakery: '<path d="M5 11a4 4 0 0 1 0-8h14a4 4 0 0 1 0 8v9H5zM9 8v5M15 8v5"/>',
-    greengrocer: '<path d="M12 7c-9-5-12 8-5 13 2 2 3 0 5 0s3 2 5 0c7-5 4-18-5-13M12 7c0-4 2-5 5-5"/>',
-    atm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 15h3M15 14h2v3h-2z"/>',
-    hospital: '<path d="M5 22V4h14v18M2 22h20M9 22v-6h6v6M12 7v6M9 10h6"/>',
-    fuel: '<path d="M4 21V3h10v18M2 21h14M7 6h4v5H7zM14 12h2v5a2 2 0 0 0 4 0V8l-3-3"/>',
-    parking: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
-    favorites: '<path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>'
+    all: '<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.8"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.8"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.8"/><rect x="14" y="14" width="6.5" height="6.5" rx="1.8"/>',
+    cafe: '<path d="M4 8h12v6.5A4.5 4.5 0 0 1 11.5 19h-3A4.5 4.5 0 0 1 4 14.5V8Z"/><path d="M16 10h1.5a3 3 0 0 1 0 6H16M5 22h13M8 3.5v2M12 3.5v2"/>',
+    food: '<path d="M5 3v7a3 3 0 0 0 6 0V3M8 3v19M18.5 3v19M18.5 3c-3.5 3.5-3.5 8.5 0 9"/>',
+    market: '<path d="M4 10h16l-1.5 9h-13L4 10Z"/><path d="m8 10 4-6 4 6M8 14.5v2M12 14.5v2M16 14.5v2"/>',
+    shopping: '<path d="M5 8h14l1.5 13h-17L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+    park: '<path d="M12 3 7 10h3l-5 7h14l-5-7h3L12 3Z"/><path d="M12 17v5"/>',
+    duty: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 7v10M7 12h10"/><path d="M17.5 5.7c.8 1.7.2 3.4-1.4 4.2" opacity=".65"/>',
+    pharmacy: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 7v10M7 12h10"/>',
+    bakery: '<path d="M5 10c0-3.4 2.6-6 7-6s7 2.6 7 6v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-7Z"/><path d="M9 8.5v3M13 7.5v3M17 8.5v3"/>',
+    greengrocer: '<path d="M12 8c-4.5-3.2-9 0-8 5.5C5 18.5 8 21 12 21s7-2.5 8-7.5C21 8 16.5 4.8 12 8Z"/><path d="M12 8c.4-3.6 2.6-5.3 6-5M12 8c2.1.2 3.8-.4 5-1.8"/>',
+    atm: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6 9h12M7 15h4M16.5 13.2c-1.8-.7-3 .1-3 1.1 0 1 1.1 1.3 2.4 1.7 1.2.3 2.1.8 2.1 1.7M15.7 12v1.1"/>',
+    hospital: '<path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M3 21h18"/><path d="M12 7v7M8.5 10.5h7M9 21v-4h6v4"/>',
+    fuel: '<path d="M5 21V4h9v17M3 21h13M8 7h3v5H8Z"/><path d="M14 10h2v6.5a2 2 0 0 0 4 0V8l-2-2"/>',
+    parking: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
+    favorites: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>'
   };
-  return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.all}</svg>`;
 }
 
 async function fetchNearbyPayload() {

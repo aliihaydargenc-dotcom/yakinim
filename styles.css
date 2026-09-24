@@ -2229,3 +2229,50 @@ body[data-section=now] .top-actions{display:none}
   .now-quick-grid small{font-size:11.5px}
   .news-card strong{font-size:14.5px}
 }
+
+
+/* v3.7 — unified icon language + explicit nearby loading */
+.section-nav .nav-icon,
+.now-quick-grid .quick-icon{
+  display:grid;
+  place-items:center;
+}
+.section-nav .nav-icon svg{width:21px;height:21px}
+.now-quick-grid .quick-icon svg{width:21px;height:21px}
+.category-button>span:first-child svg{width:19px;height:19px}
+.result-icon svg,.detail-icon svg,.map-quick-icon svg{width:21px;height:21px}
+.now-pulse-icon svg,.now-place-icon svg{width:20px;height:20px}
+.place-marker svg{width:19px;height:19px}
+
+.nearby-loading{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:42px;
+  margin:0 0 10px;
+  padding:8px 11px;
+  border:1px solid #d7e6e0;
+  border-radius:13px;
+  background:linear-gradient(135deg,rgba(234,247,242,.96),rgba(255,255,255,.96));
+  color:var(--accent);
+  font-size:11px;
+  font-weight:800;
+  box-shadow:0 5px 16px rgba(24,71,57,.06);
+}
+.nearby-loading[hidden]{display:none!important}
+.nearby-loading .module-spinner{width:16px;height:16px;flex:0 0 16px}
+
+@media(max-width:759px){
+  .section-nav .nav-icon svg{width:20px;height:20px}
+  .now-quick-grid .quick-icon svg{width:22px;height:22px}
+  .category-button>span:first-child svg{width:18px;height:18px}
+  .nearby-loading{
+    position:sticky;
+    top:62px;
+    z-index:20;
+    min-height:40px;
+    margin:0 0 9px;
+    font-size:11.5px;
+    backdrop-filter:blur(12px);
+  }
+}
