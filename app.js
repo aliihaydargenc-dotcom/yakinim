@@ -1,4 +1,4 @@
-const APP_VERSION = "3.8.4";
+const APP_VERSION = "3.8.5";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";

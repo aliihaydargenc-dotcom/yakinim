@@ -2677,3 +2677,28 @@ body[data-view=map] .leaflet-control-attribution a{
     opacity:.82;
   }
 }
+
+
+/* v3.8.5 — restore visible desktop category scrollbar */
+@media(min-width:760px){
+  body[data-view=map] .category-strip{
+    scrollbar-width:thin!important;
+    scrollbar-color:#9fb9ea transparent!important;
+    mask-image:none!important;
+    padding-bottom:12px!important;
+  }
+  body[data-view=map] .category-strip::-webkit-scrollbar{
+    display:block!important;
+    height:6px!important;
+  }
+  body[data-view=map] .category-strip::-webkit-scrollbar-track{
+    background:transparent;
+  }
+  body[data-view=map] .category-strip::-webkit-scrollbar-thumb{
+    background:#a9bfe9;
+    border-radius:999px;
+  }
+  body[data-view=map] .category-strip::-webkit-scrollbar-thumb:hover{
+    background:#7fa1e3;
+  }
+}
