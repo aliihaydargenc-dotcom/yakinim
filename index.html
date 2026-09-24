@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.8.0" as="script" />
+    <link rel="preload" href="./app.js?v=3.8.1" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.8.0" />
+    <link rel="stylesheet" href="./styles.css?v=3.8.1" />
   </head>
   <body data-view="list" data-section="now">
     <main class="app-shell">
@@ -280,7 +280,6 @@
           <button id="radioNext" type="button" aria-label="Sonraki istasyon">›</button>
           <button id="radioPlayerShare" type="button" aria-label="Radyoyu paylaş">↗ Paylaş</button>
           <a id="radioPlayerHomepage" target="_blank" rel="noopener noreferrer" hidden>Site ↗</a>
-          <label class="radio-volume-control"><span aria-hidden="true">◖</span><input id="radioVolume" type="range" min="0" max="100" step="1" value="80" aria-label="Radyo ses seviyesi" /></label>
           <button id="radioPlayerClose" type="button" class="radio-player-close" aria-label="Radyo oynatıcısını kapat">× Kapat</button>
         </div>
         <audio id="radioAudio" preload="none"></audio>
@@ -323,6 +322,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.8.0" defer></script>
+    <script src="./app.js?v=3.8.1" defer></script>
   </body>
 </html>

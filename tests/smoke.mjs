@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.8\.0"/);
+assert.match(app, /APP_VERSION = "3\.8\.1"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -59,6 +59,9 @@ assert.match(app, /normalizeRadioArtworkUrl/);
 assert.match(app, /failedRadioArtwork/);
 assert.match(app, /toggleRadioFavorite/);
 assert.match(app, /configureRadioMediaSession/);
+assert.doesNotMatch(app, /RADIO_VOLUME_KEY/);
+assert.doesNotMatch(index, /id="radioVolume"/);
+assert.match(app, /radioAudio\.volume = 1/);
 assert.match(app, /rememberRadioRecent/);
 assert.match(app, /toggleRadioPlayerExpanded/);
 assert.match(app, /stationStreamCandidates/);
@@ -101,7 +104,7 @@ assert.match(index, /id="quickShare"/);
 assert.match(index, /Öne çıkanlar/);
 assert.doesNotMatch(index, /data-radio-scope=/);
 assert.doesNotMatch(index, /rel="preload" href="https:\/\/unpkg\.com\/leaflet@1\.9\.4\/dist\/leaflet\.js"/);
-for (const id of ["sectionNav","nowSection","nowContext","nowNearbyStat","nowSavedStat","nowRouteStat","nowNearbyList","nowNewsList","nowRadioList","nowQuickActions","nearbyLoading","nearbyLoadingText","sectionTransition","sectionTransitionLabel","newsSection","newsList","radioSection","radioList","radioPlayer","radioSearch","radioLibraryTabs","radioPlayerAvatar","radioPlayerFavorite","radioPlayerShare","radioPlayerExpand","radioPrev","radioNext","radioVolume"]) assert.match(index, new RegExp(`id="${id}"`));
+for (const id of ["sectionNav","nowSection","nowContext","nowNearbyStat","nowSavedStat","nowRouteStat","nowNearbyList","nowNewsList","nowRadioList","nowQuickActions","nearbyLoading","nearbyLoadingText","sectionTransition","sectionTransitionLabel","newsSection","newsList","radioSection","radioList","radioPlayer","radioSearch","radioLibraryTabs","radioPlayerAvatar","radioPlayerFavorite","radioPlayerShare","radioPlayerExpand","radioPrev","radioNext"]) assert.match(index, new RegExp(`id="${id}"`));
 assert.match(styles, /v2\.7\.1 mobile cartography density pass/);
 assert.match(styles, /v2\.7 spatial pool \+ collision-aware map labels/);
 assert.match(styles, /v2\.8 mobile vector basemap reliability/);
@@ -138,7 +141,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v51/);
+assert.match(sw, /yakinimda-shell-v52/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

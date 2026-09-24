@@ -77,6 +77,8 @@ assert.match(app, /failedRadioArtwork/);
 assert.match(app, /navigator\.mediaSession/);
 assert.match(app, /rememberRadioRecent/);
 assert.match(app, /toggleRadioPlayerExpanded/);
+assert.doesNotMatch(app, /RADIO_VOLUME_KEY/);
+assert.doesNotMatch(index, /id="radioVolume"/);
 assert.match(app, /recoverRadioStream/);
 assert.match(app, /attemptRadioCandidate/);
 assert.match(app, /radioCandidateNativePlayable/);

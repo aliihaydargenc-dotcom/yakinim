@@ -1,4 +1,4 @@
-const APP_VERSION = "3.8.0";
+const APP_VERSION = "3.8.1";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -12,7 +12,6 @@ const NEWS_CATEGORIES = ["gundem", "turkiye", "dunya", "ekonomi", "teknoloji", "
 const RADIO_SCOPES = ["turkiye"];
 const RADIO_FAVORITES_KEY = "yakinimda:radio-favorites:v1";
 const RADIO_RECENTS_KEY = "yakinimda:radio-recents:v1";
-const RADIO_VOLUME_KEY = "yakinimda:radio-volume:v1";
 const CATEGORY_QUERY_ALIASES = Object.freeze({
   cafe: ["kafe", "kahve", "coffee"],
   food: ["yemek", "restoran", "lokanta", "fast food"],
@@ -117,8 +116,6 @@ let radioStallTimer = 0;
 let lastRenderedRadioStations = [];
 let radioFavoriteStations = readJson(RADIO_FAVORITES_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 60);
 let radioRecentStations = readJson(RADIO_RECENTS_KEY, []).filter(station => station?.id && station?.streamUrl).slice(0, 20);
-const savedRadioVolume = Number(localStorage.getItem(RADIO_VOLUME_KEY));
-let radioVolumeLevel = Number.isFinite(savedRadioVolume) ? Math.min(1, Math.max(0, savedRadioVolume)) : .8;
 const newsClientCache = new Map();
 const radioClientCache = new Map();
 const failedRadioArtwork = new Set();
@@ -339,7 +336,6 @@ const radioPlayerShare = document.querySelector("#radioPlayerShare");
 const radioPlayerHomepage = document.querySelector("#radioPlayerHomepage");
 const radioPrev = document.querySelector("#radioPrev");
 const radioNext = document.querySelector("#radioNext");
-const radioVolume = document.querySelector("#radioVolume");
 const radioPlayerClose = document.querySelector("#radioPlayerClose");
 const radioAudio = document.querySelector("#radioAudio");
 
@@ -426,7 +422,6 @@ radioPlayerFavorite?.addEventListener("click", () => { if (currentRadioStation) 
 radioPlayerShare?.addEventListener("click", () => { if (currentRadioStation) shareRadioStation(currentRadioStation); });
 radioPrev?.addEventListener("click", () => stepRadioStation(-1));
 radioNext?.addEventListener("click", () => stepRadioStation(1));
-radioVolume?.addEventListener("input", event => setRadioVolume(Number(event.target.value) / 100));
 radioPlayerClose?.addEventListener("click", closeRadioPlayer);
 radioAudio?.addEventListener("play", syncRadioPlayerState);
 radioAudio?.addEventListener("playing", () => {
@@ -449,7 +444,6 @@ radioAudio?.addEventListener("error", () => {
   syncRadioPlayerState();
   if (currentRadioStation) recoverRadioStream("error");
 });
-setRadioVolume(radioVolumeLevel);
 syncRadioLibraryTabs();
 configureRadioMediaSession();
 document.querySelectorAll(".view-switch button[data-view]").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
@@ -1167,13 +1161,6 @@ function syncRadioPlayerFavorite() {
   radioPlayerFavorite.setAttribute("aria-label", favorite ? "Radyoyu favorilerden çıkar" : "Radyoyu favorilere ekle");
 }
 
-function setRadioVolume(level) {
-  radioVolumeLevel = Math.min(1, Math.max(0, Number(level) || 0));
-  if (radioAudio) radioAudio.volume = radioVolumeLevel;
-  if (radioVolume) radioVolume.value = String(Math.round(radioVolumeLevel * 100));
-  try { localStorage.setItem(RADIO_VOLUME_KEY, String(radioVolumeLevel)); } catch {}
-}
-
 function updateRadioPlayer(station) {
   if (!station) return;
   const wasHidden = radioPlayer.hidden;
@@ -1191,7 +1178,6 @@ function updateRadioPlayer(station) {
     radioPlayerHomepage.hidden = !station.homepage;
     if (station.homepage) radioPlayerHomepage.href = station.homepage;
   }
-  setRadioVolume(radioVolumeLevel);
 }
 
 async function shareRadioStation(station) {
@@ -1297,6 +1283,7 @@ function attemptRadioCandidate(candidate, serial, timeoutMs = 8000) {
     radioAudio.addEventListener("abort", onAbort);
     timer = setTimeout(() => finish(false, "timeout"), timeoutMs);
 
+    radioAudio.volume = 1;
     radioAudio.muted = false;
     radioAudio.src = candidate.url;
     radioAudio.load();
