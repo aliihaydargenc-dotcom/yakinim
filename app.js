@@ -1,4 +1,4 @@
-const APP_VERSION = "3.8.1";
+const APP_VERSION = "3.8.2";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -154,6 +154,7 @@ let baseMapLayer = null;
 let baseMapMode = "loading";
 let vectorLoadTimer = 0;
 let rasterTileErrorCount = 0;
+const mapAttributionControl = L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
 
 initializeBaseMap();
 
@@ -176,6 +177,7 @@ function initializeBaseMap() {
       baseMapMode = "vector";
       document.body.classList.add("map-vector");
       document.body.classList.remove("map-raster", "map-tile-degraded");
+      setMapAttributionForMode("vector");
 
       const glMap = vectorLayer.getMaplibreMap?.();
       if (glMap) {
@@ -240,24 +242,15 @@ function switchToRasterBaseMap(reason = "") {
 
   rasterLayer.addTo(map);
   baseMapLayer = rasterLayer;
-  L.control.attribution({ position: "bottomright", prefix: false }).addTo(map);
   setMapAttributionForMode("raster");
 }
 
 function setMapAttributionForMode(mode) {
-  const apply = () => {
-    const attribution = document.querySelector(".osm-attribution");
-    if (!attribution) return;
-    if (mode === "raster") {
-      attribution.href = "https://www.openstreetmap.org/copyright";
-      attribution.textContent = "Harita: © OpenStreetMap contributors";
-      return;
-    }
-    attribution.href = "https://openfreemap.org/";
-    attribution.textContent = "Harita: OpenFreeMap · OpenMapTiles · © OpenStreetMap";
-  };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", apply, { once: true });
-  else apply();
+  const container = mapAttributionControl.getContainer();
+  if (!container) return;
+  container.innerHTML = mode === "raster"
+    ? '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>'
+    : '<a href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OSM</a>';
 }
 
 L.control.zoom({ position: "topright" }).addTo(map);
@@ -272,7 +265,6 @@ const statusText = document.querySelector("#statusText");
 
 const locateButton = document.querySelector("#locateButton");
 const manualLocationButton = document.querySelector("#manualLocationButton");
-const sourceText = document.querySelector("#sourceText");
 const resultSummary = document.querySelector("#resultSummary");
 const sheet = document.querySelector(".sheet");
 const sheetToggle = document.querySelector("#sheetToggle");
@@ -2282,7 +2274,6 @@ function renderActiveCategoryFromBundle(statusMessage = "") {
   activePlaces = places;
   renderDiscoveryHub(lastDiscoveryBundle);
   renderPlaces(places, activeCategory);
-  sourceText.textContent = "Veri: OpenStreetMap · canlı harita havuzu";
   statusText.textContent = statusMessage;
 }
 
@@ -2446,7 +2437,6 @@ function viewportDutyRadius() {
 async function refreshDutyViewport({ force = false } = {}) {
   if (!userLocation) return;
   setNearbyLoading(true, "Nöbetçi eczaneler güncelleniyor…");
-  sourceText.textContent = "Veri: Eczane Adresi · görünen alan";
   const center = map.getCenter();
   const radius = viewportDutyRadius();
   const key = `${CACHE_PREFIX}duty-view:${center.lat.toFixed(2)}:${center.lng.toFixed(2)}:${Math.round(radius / 500) * 500}`;
@@ -2818,7 +2808,6 @@ function loadFavorites() {
   resultTitle.textContent = "Favoriler";
   updateCategoryCounts(lastDiscoveryBundle ? bundleForCurrentView(lastDiscoveryBundle) : null);
   statusText.textContent = favorites.length ? "Bu liste yalnız cihazında saklanıyor." : "Henüz favori eklemedin.";
-  sourceText.textContent = "Favoriler: cihaz içi kayıt";
   renderPlaces(activePlaces, activeCategory);
 }
 

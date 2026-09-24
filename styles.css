@@ -2535,3 +2535,37 @@ body[data-section=nearby][data-view=map] .section-nav button[aria-pressed=true]{
     max-width:min(76vw,292px);
   }
 }
+
+
+/* v3.8.2 — remove technical copy from product surfaces */
+.sheet-footer,
+.module-source-note{display:none!important}
+
+body[data-view=map] .leaflet-control-attribution{
+  display:block!important;
+  margin:0 8px 8px 0!important;
+  padding:3px 6px!important;
+  border:1px solid rgba(210,220,234,.72)!important;
+  border-radius:8px!important;
+  background:rgba(255,255,255,.78)!important;
+  color:#718096!important;
+  font-size:8px!important;
+  line-height:1.15!important;
+  box-shadow:0 2px 8px rgba(22,42,78,.06)!important;
+  backdrop-filter:blur(8px);
+}
+body[data-view=map] .leaflet-control-attribution a{
+  color:#718096!important;
+  text-decoration:none!important;
+}
+@media(max-width:759px){
+  body[data-view=map] .leaflet-bottom.leaflet-right{
+    bottom:auto!important;
+    top:118px!important;
+    right:6px!important;
+  }
+  body[data-view=map] .leaflet-control-attribution{
+    margin:0!important;
+    opacity:.72;
+  }
+}

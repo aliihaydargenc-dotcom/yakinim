@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.8\.1"/);
+assert.match(app, /APP_VERSION = "3\.8\.2"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -90,10 +90,12 @@ assert.match(app, /switchToRasterBaseMap/);
 assert.doesNotMatch(app, /pointer: coarse.*mobile raster mode/);
 assert.doesNotMatch(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)/);
 assert.doesNotMatch(app, /radiusSelect/);
-assert.match(app, /Veri: Eczane Adresi/);
-assert.match(app, /Veri: OpenStreetMap · canlı harita havuzu/);
 
-assert.match(index, /OpenFreeMap/);
+assert.match(app, /OpenFreeMap/);
+assert.match(app, /mapAttributionControl/);
+assert.doesNotMatch(index, /sheet-footer/);
+assert.doesNotMatch(index, /module-source-note/);
+assert.doesNotMatch(app, /sourceText/);
 assert.match(index, /viewport-live-hint/);
 assert.doesNotMatch(index, /id="radiusSelect"/);
 assert.doesNotMatch(index, /map-context-chevron/);
@@ -141,7 +143,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v52/);
+assert.match(sw, /yakinimda-shell-v53/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

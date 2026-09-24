@@ -18,7 +18,7 @@
     <link rel="dns-prefetch" href="//tiles.openfreemap.org" />
     <link rel="dns-prefetch" href="//overpass-api.de" />
     <link rel="dns-prefetch" href="//eczaneadresi.com" />
-    <link rel="preload" href="./app.js?v=3.8.1" as="script" />
+    <link rel="preload" href="./app.js?v=3.8.2" as="script" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link
@@ -28,7 +28,7 @@
       crossorigin=""
     />
     <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=3.8.1" />
+    <link rel="stylesheet" href="./styles.css?v=3.8.2" />
   </head>
   <body data-view="list" data-section="now">
     <main class="app-shell">
@@ -213,17 +213,11 @@
           <div class="detail-actions"><a id="detailDirections" target="_blank" rel="noopener noreferrer">Yol tarifi ↗</a><button id="detailFavorite" type="button" aria-pressed="false">Kaydet</button><button id="detailRoute" type="button">Rotaya ekle</button><a id="detailPhone" hidden>Ara</a></div>
           <button id="detailMap" type="button">Haritada göster</button>
         </section>
-        <footer class="sheet-footer">
-          <span id="sourceText">Veri kaynağı hazırlanıyor</span>
-          <a class="osm-attribution" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">Harita: OpenFreeMap · OpenMapTiles · © OpenStreetMap</a>
-          <span>Favoriler cihazında saklanır.</span>
-        </footer>
       </section>
       <section id="newsSection" class="module-panel news-section" aria-labelledby="newsHeading" hidden>
         <div class="module-heading">
           <p class="eyebrow">GÜNDEM</p>
           <h2 id="newsHeading">Haberler</h2>
-          <p>Başlıklar kaynak ve yayın zamanına göre gösterilir; kişiselleştirilmez.</p>
         </div>
         <div class="module-filter" aria-label="Haber kategorileri">
           <button type="button" data-news-category="gundem" aria-pressed="true">Gündem</button>
@@ -235,14 +229,12 @@
         </div>
         <p id="newsStatus" class="module-status">Güncel başlıklar yüklenmeye hazır.</p>
         <div id="newsList" class="news-list" aria-live="polite"></div>
-        <p class="module-source-note">TRT Haber, Habertürk, Anadolu Ajansı, BBC Türkçe ve DW Türkçe gibi RSS kaynakları birlikte kullanılır. Kaynak sırası kişiselleştirilmez; içerik uygulama içinde yeniden yayımlanmaz.</p>
       </section>
 
       <section id="radioSection" class="module-panel radio-section" aria-labelledby="radioHeading" hidden>
         <div class="module-heading">
           <p class="eyebrow">CANLI</p>
           <h2 id="radioHeading">Radyo</h2>
-          <p>İstasyonunu bul, favorile ve dinlemeye uygulamanın diğer bölümlerinde de devam et.</p>
         </div>
 
         <div class="radio-search-wrap" role="search">
@@ -259,7 +251,6 @@
 
         <p id="radioStatus" class="module-status">İstasyonlar yüklenmeye hazır.</p>
         <div id="radioList" class="radio-list" aria-live="polite"></div>
-        <p class="module-source-note">Sıralama önceliği: RİAK Mayıs 2026 ölçümü. Yayın adresleri Radio Browser kataloğundan alınır ve mümkün olduğunda canlı olarak doğrulanır.</p>
       </section>
 
       <div id="radioPlayer" class="radio-player" hidden>
@@ -322,6 +313,6 @@
     ></script>
     <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
-    <script src="./app.js?v=3.8.1" defer></script>
+    <script src="./app.js?v=3.8.2" defer></script>
   </body>
 </html>
