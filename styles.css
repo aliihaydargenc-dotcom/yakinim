@@ -2637,3 +2637,43 @@ body[data-view=map] .leaflet-control-attribution a{
     font-size:15px;
   }
 }
+
+
+/* v3.8.4 — desktop map polish */
+@media(min-width:760px){
+  body[data-view=map] .category-strip{
+    scrollbar-width:none!important;
+    -ms-overflow-style:none;
+    padding-bottom:10px;
+    mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);
+  }
+  body[data-view=map] .category-strip::-webkit-scrollbar{
+    display:none!important;
+    width:0!important;
+    height:0!important;
+  }
+
+  body[data-view=map] .section-toolbar{
+    margin-top:8px;
+    margin-bottom:12px;
+  }
+  body[data-view=map] .sheet-row{
+    margin-bottom:14px;
+  }
+
+  body[data-view=map] .status-text:empty{
+    display:none!important;
+  }
+
+  body[data-view=map] .leaflet-control-attribution{
+    margin:0 7px 7px 0!important;
+    padding:2px 5px!important;
+    border-radius:6px!important;
+    font-size:7px!important;
+    opacity:.52;
+    box-shadow:none!important;
+  }
+  body[data-view=map] .leaflet-control-attribution:hover{
+    opacity:.82;
+  }
+}

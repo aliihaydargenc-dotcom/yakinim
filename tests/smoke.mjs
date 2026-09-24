@@ -13,7 +13,7 @@ const [app, index, styles, sw, manifestText, vercelText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 const vercel = JSON.parse(vercelText);
 
-assert.match(app, /APP_VERSION = "3\.8\.3"/);
+assert.match(app, /APP_VERSION = "3\.8\.4"/);
 for (const id of ["duty", "market", "greengrocer", "bakery", "pharmacy", "atm", "hospital", "fuel", "parking", "food", "favorites"]) {
   assert.match(app, new RegExp(`id: "${id}"`));
 }
@@ -48,6 +48,7 @@ assert.match(app, /history\.pushState\(\{[\s\S]*yakinimView: "map-place"/);
 assert.match(app, /document\.body\.dataset\.sheetState = nextState/);
 assert.match(app, /desktopMapPanel \? "expanded"/);
 assert.match(styles, /v3\.8\.3 — desktop map panel must not inherit mobile sheet collapse/);
+assert.match(styles, /v3\.8\.4 — desktop map polish/);
 assert.match(app, /if \(document\.body\.dataset\.view === "map"\) openMapQuickCard\(place, main\)/);
 assert.match(app, /recenterOnUser/);
 assert.match(app, /formatWalkingTime/);
@@ -145,7 +146,7 @@ assert.equal(manifest.start_url, "./");
 
 assert.match(sw, /networkFirst/);
 assert.match(sw, /cache: "no-store"/);
-assert.match(sw, /yakinimda-shell-v54/);
+assert.match(sw, /yakinimda-shell-v55/);
 
 assert.ok(Array.isArray(vercel.headers));
 assert.ok(vercel.functions["api/viewport.js"]);

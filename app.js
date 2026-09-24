@@ -1,4 +1,4 @@
-const APP_VERSION = "3.8.3";
+const APP_VERSION = "3.8.4";
 const DEFAULT_CENTER = [39.0, 35.0];
 const DEFAULT_ZOOM = 6;
 const DUTY_ENDPOINT = "https://eczaneadresi.com/api/public/v1/nearest-pharmacies";
@@ -2295,9 +2295,7 @@ async function refreshViewportPlaces({ force = false } = {}) {
   if (!visibleEnvelope || !prefetchEnvelope) {
     setNearbyLoading(false);
     document.body.classList.remove("map-results-updating");
-    statusText.textContent = map.getZoom() < VIEWPORT_MIN_ZOOM
-      ? "Yakındaki yerleri görmek için haritada biraz yakınlaş."
-      : "Bu görünüm çok geniş; yakınlaştığında yerler otomatik akacak.";
+    statusText.textContent = "";
     return;
   }
 
