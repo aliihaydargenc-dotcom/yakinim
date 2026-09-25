@@ -26,7 +26,10 @@ function extract(name) {
 
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.match(app, /navigator\.geolocation\.getCurrentPosition/);
-assert.match(app, /const fallback = await settlePosition\("fallback"/);\nassert.match(app, /void settlePosition\("accurate"/);\nassert.match(app, /refineUserPosition\(accurate\.position\)/);\nassert.match(app, /requestAnimationFrame\(\(\) => scheduleViewportRefresh\(\{ force: true \}\)\)/);
+assert.match(app, /const fallback = await settlePosition\("fallback"/);
+assert.match(app, /void settlePosition\("accurate"/);
+assert.match(app, /refineUserPosition\(accurate\.position\)/);
+assert.match(app, /requestAnimationFrame\(\(\) => scheduleViewportRefresh\(\{ force: true \}\)\)/);
 assert.match(app, /if \(restored \|\| permissionState === "granted"\)/);
 
 const errorContext = vm.createContext({});
