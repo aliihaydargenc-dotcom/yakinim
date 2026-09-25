@@ -37,7 +37,7 @@ assert.match(app, /activeViewportRequest\?\.controller\.abort\(\)/);
 assert.match(app, /pane: "placeLabels"/);
 assert.match(app, /direction: "top"/);
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
-assert.match(app, /one authoritative geolocation request/);
+assert.match(app, /First paint should not wait up to 12 seconds/);\nassert.match(app, /void settlePosition\("accurate"/);\nassert.match(app, /requestAnimationFrame\(\(\) => scheduleViewportRefresh/);
 assert.match(app, /locationZoomForAccuracy/);
 assert.match(app, /applyNearestMarkerState/);
 assert.match(app, /openMapQuickCard/);
