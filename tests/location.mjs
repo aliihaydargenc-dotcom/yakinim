@@ -26,9 +26,7 @@ function extract(name) {
 
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.match(app, /navigator\.geolocation\.getCurrentPosition/);
-assert.match(app, /const accurate = await settlePosition\("accurate"/);
-assert.match(app, /const fallback = await settlePosition\("fallback"/);
-assert.doesNotMatch(app, /Promise\.race\(\[fastPromise, accuratePromise\]\)/);
+assert.match(app, /const fallback = await settlePosition\("fallback"/);\nassert.match(app, /void settlePosition\("accurate"/);\nassert.match(app, /refineUserPosition\(accurate\.position\)/);\nassert.match(app, /requestAnimationFrame\(\(\) => scheduleViewportRefresh\(\{ force: true \}\)\)/);
 assert.match(app, /if \(restored \|\| permissionState === "granted"\)/);
 
 const errorContext = vm.createContext({});
@@ -80,4 +78,4 @@ positionContext.bad = { coords: { latitude: 999, longitude: 30.7 } };
 assert.equal(vm.runInContext("positionIsUsable(good)", positionContext), true);
 assert.equal(vm.runInContext("positionIsUsable(bad)", positionContext), false);
 
-console.log("Location tests PASS: sequential iOS GPS flow, permission advisory behavior and accuracy-aware zoom.");
+console.log("Location tests PASS: fast-first discovery, background GPS refinement, permission advisory behavior and accuracy-aware zoom.");
