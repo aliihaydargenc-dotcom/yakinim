@@ -1734,9 +1734,39 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
     if (!activePlaces.length) showState("loading", "Telefonun gerçek konumu bekleniyor…");
   }
 
-  // iOS/Safari is more reliable with one authoritative geolocation request
-  // at a time. Ask for a fresh high-accuracy fix first; only fall back to a
-  // coarse position after that request actually fails.
+  // First paint should not wait up to 12 seconds for a GPS-quality fix.
+  // A coarse/cached position is enough to start nearby discovery; refine it
+  // immediately afterwards with the high-accuracy request.
+  const fallback = await settlePosition("fallback", {
+    enableHighAccuracy: false,
+    timeout: FAST_LOCATION_TIMEOUT,
+    maximumAge: forceFresh ? 60 * 1000 : 5 * 60 * 1000,
+  });
+
+  if (serial !== locationAttemptSerial) return;
+  if (fallback.position) {
+    applyUserPosition(fallback.position, { provisional: true, background });
+    void settlePosition("accurate", {
+      enableHighAccuracy: true,
+      timeout: ACCURATE_LOCATION_TIMEOUT,
+      maximumAge: forceFresh ? 0 : 30 * 1000,
+    }).then(accurate => {
+      if (serial !== locationAttemptSerial || !accurate.position) return;
+      refineUserPosition(accurate.position);
+    });
+    return;
+  }
+
+  if (fallback.error?.code === 1) {
+    locateButton.disabled = false;
+    locateButton.classList.remove("is-loading");
+    if (!background && !userLocation) showLocationFailure(locationErrorMessage(fallback.error));
+    else if (userLocation) statusText.textContent = "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı.";
+    return;
+  }
+
+  if (!background) statusText.textContent = "Yaklaşık konum alınamadı · hassas konum deneniyor…";
+
   const accurate = await settlePosition("accurate", {
     enableHighAccuracy: true,
     timeout: ACCURATE_LOCATION_TIMEOUT,
@@ -1749,31 +1779,9 @@ async function locateUser({ forceFresh = false, background = false } = {}) {
     return;
   }
 
-  if (accurate.error?.code === 1) {
-    locateButton.disabled = false;
-    locateButton.classList.remove("is-loading");
-    if (!background && !userLocation) showLocationFailure(locationErrorMessage(accurate.error));
-    else if (userLocation) statusText.textContent = "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı.";
-    return;
-  }
-
-  if (!background) statusText.textContent = "Hassas konum alınamadı · yaklaşık konum deneniyor…";
-
-  const fallback = await settlePosition("fallback", {
-    enableHighAccuracy: false,
-    timeout: FAST_LOCATION_TIMEOUT,
-    maximumAge: forceFresh ? 60 * 1000 : 5 * 60 * 1000,
-  });
-
-  if (serial !== locationAttemptSerial) return;
-  if (fallback.position) {
-    applyUserPosition(fallback.position, { provisional: true, background });
-    return;
-  }
-
   locateButton.disabled = false;
   locateButton.classList.remove("is-loading");
-  const error = chooseLocationError(accurate.error, fallback.error);
+  const error = chooseLocationError(fallback.error, accurate.error);
   if (!background && !userLocation) showLocationFailure(locationErrorMessage(error));
   else if (userLocation) statusText.textContent = error?.code === 1
     ? "Son bilinen konum kullanılıyor · tarayıcı konum izni kapalı."
@@ -1868,7 +1876,9 @@ function applyUserPosition(position, { provisional = false, background = false }
     animate: mapShouldAnimate && !background,
     duration: background ? 0.35 : 0.55,
   });
-  scheduleViewportRefresh({ force: true });
+  // Do not depend on Leaflet's later moveend/view toggles to begin loading.
+  // Kick discovery on the next frame after the location view is applied.
+  requestAnimationFrame(() => scheduleViewportRefresh({ force: true }));
 }
 
 function refineUserPosition(position) {
