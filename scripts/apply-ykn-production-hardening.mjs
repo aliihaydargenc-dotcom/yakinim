@@ -43,7 +43,12 @@ if (sw.includes(oldShell)) sw = sw.replace(oldShell, newShell);
 else if (!sw.includes(newShell)) throw new Error("service worker shell anchor not found");
 write("sw.js", sw);
 
-// 4) Test/version wiring.
+// 4) Keep smoke expectations aligned with the intentional service-worker cache bump.
+let smoke = read("tests/smoke.mjs");
+smoke = smoke.replace("assert.match(sw, /yakinimda-shell-v57/);", "assert.match(sw, /yakinimda-shell-v58/);");
+write("tests/smoke.mjs", smoke);
+
+// 5) Test/version wiring.
 const pkg = JSON.parse(read("package.json"));
 pkg.version = "3.12.0";
 let test = String(pkg.scripts?.test || "");
