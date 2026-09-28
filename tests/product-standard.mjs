@@ -103,6 +103,7 @@ assert.match(styles, /v3\.2\.1 definitive mobile mini-player layout/);
 assert.match(styles, /v3\.1 radio studio/);
 assert.match(styles, /v3\.0 lifestyle shell: nearby \+ news \+ radio/);
 assert.match(styles, /data-section=nearby\]\[data-view=map\] \.section-nav\{[\s\S]*display:flex!important/);
-assert.match(app, /if \(isMobileLayout\) \{[\s\S]*loadNowDashboard\(\)/);
+assert.doesNotMatch(app, /if \(isMobileLayout\) \{[\s\S]*loadNowDashboard\(\)/);
+assert.match(app, /setSection\("nearby", \{ pushHistory: false \}\);[\s\S]*setView\("list", "expanded"\);/);
 
 console.log("Product-standard tests PASS: compact map chrome, recenter, quick card, search, walking time and safe opening status.");
