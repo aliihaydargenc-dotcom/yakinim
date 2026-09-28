@@ -3,9 +3,18 @@
 
   const STYLE_ID = "yknSprint3Styles";
   const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const IOS_LOCATION_SELECTOR = "#locateButton,#startLocation,#recenterButton,.now-pulse-empty,.now-empty-action";
+  const IOS_LOCATION_TARGET_ACCURACY_M = 80;
+  const IOS_LOCATION_WATCH_MS = 24000;
   let detailReturnFocus = null;
   let urlSyncTimer = 0;
   let restoringUrl = false;
+  let iosLocationWatchId = null;
+  let iosLocationFallbackTimer = 0;
+  let iosLocationStopTimer = 0;
+  let iosLocationRequestSerial = 0;
+  let iosLocationHasFix = false;
+  let iosLocationBestAccuracy = Infinity;
 
   const css = `
     .network-state-banner{
@@ -223,6 +232,163 @@
     }
   }
 
+  function isIosWebKit() {
+    const ua = String(navigator.userAgent || "");
+    const platform = String(navigator.platform || "");
+    const iosDevice = /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return iosDevice && /AppleWebKit/i.test(ua);
+  }
+
+  function setIosLocationStatus(message) {
+    const status = document.getElementById("statusText");
+    if (status) status.textContent = message;
+  }
+
+  function stopIosLocationWatch() {
+    if (iosLocationWatchId !== null && navigator.geolocation) {
+      try { navigator.geolocation.clearWatch(iosLocationWatchId); } catch {}
+    }
+    iosLocationWatchId = null;
+    clearTimeout(iosLocationFallbackTimer);
+    clearTimeout(iosLocationStopTimer);
+    iosLocationFallbackTimer = 0;
+    iosLocationStopTimer = 0;
+  }
+
+  function positionLooksUsable(position) {
+    const lat = Number(position?.coords?.latitude);
+    const lng = Number(position?.coords?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  }
+
+  function acceptIosLocation(position, serial) {
+    if (serial !== iosLocationRequestSerial || !positionLooksUsable(position)) return;
+    const accuracy = Number(position.coords.accuracy);
+    const normalizedAccuracy = Number.isFinite(accuracy) && accuracy > 0 ? accuracy : Infinity;
+    const firstFix = !iosLocationHasFix;
+    const meaningfullyBetter = normalizedAccuracy + 5 < iosLocationBestAccuracy;
+    if (!firstFix && !meaningfullyBetter) return;
+
+    iosLocationHasFix = true;
+    iosLocationBestAccuracy = normalizedAccuracy;
+
+    try {
+      if (firstFix && typeof applyUserPosition === "function") {
+        applyUserPosition(position, { provisional: normalizedAccuracy > IOS_LOCATION_TARGET_ACCURACY_M, background: false });
+      } else if (typeof refineUserPosition === "function") {
+        refineUserPosition(position);
+      }
+    } catch (error) {
+      console.warn("iOS location apply failed", error);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      if (serial !== iosLocationRequestSerial) return;
+      if (normalizedAccuracy <= IOS_LOCATION_TARGET_ACCURACY_M) {
+        setIosLocationStatus(`Konum bulundu · yaklaşık ±${Math.round(normalizedAccuracy)} m`);
+      } else if (normalizedAccuracy <= 250) {
+        setIosLocationStatus(`Konum bulundu · GPS hassaslaştırılıyor… ±${Math.round(normalizedAccuracy)} m`);
+      } else if (Number.isFinite(normalizedAccuracy)) {
+        setIosLocationStatus(`Yaklaşık konum bulundu · Kesin Konum açık olmalı · ±${Math.round(normalizedAccuracy)} m`);
+      }
+    });
+
+    if (normalizedAccuracy <= IOS_LOCATION_TARGET_ACCURACY_M) stopIosLocationWatch();
+  }
+
+  function showIosLocationFailure(error) {
+    const code = Number(error?.code || 0);
+    if (code === 1) {
+      if (typeof showLocationFailure === "function") {
+        showLocationFailure("iPhone konum izni kapalı. Tarayıcı için Konum iznini ve Kesin Konum'u açıp yeniden dene.");
+      } else {
+        setIosLocationStatus("iPhone konum izni kapalı. Konum iznini ve Kesin Konum'u açıp yeniden dene.");
+      }
+      return;
+    }
+    if (code === 3) {
+      if (typeof showLocationFailure === "function") showLocationFailure("iPhone GPS yanıt vermedi. Açık alanda yeniden deneyebilir veya haritadan konum seçebilirsin.");
+      else setIosLocationStatus("iPhone GPS yanıt vermedi. Yeniden dene.");
+      return;
+    }
+    if (typeof showLocationFailure === "function") showLocationFailure("iPhone konumu alınamadı. Konum Servisleri ve Kesin Konum ayarını kontrol et.");
+    else setIosLocationStatus("iPhone konumu alınamadı. Konum Servisleri ayarını kontrol et.");
+  }
+
+  function requestIosFallback(serial) {
+    if (serial !== iosLocationRequestSerial || iosLocationHasFix || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      position => acceptIosLocation(position, serial),
+      error => {
+        if (serial !== iosLocationRequestSerial || iosLocationHasFix || Number(error?.code) === 1) return;
+        console.warn("iOS coarse location fallback failed", error);
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 },
+    );
+  }
+
+  function requestIosLocation() {
+    if (!navigator.geolocation) {
+      if (typeof showLocationFailure === "function") showLocationFailure("Bu iPhone tarayıcısı konum özelliğini kullanamıyor.");
+      return;
+    }
+
+    stopIosLocationWatch();
+    const serial = ++iosLocationRequestSerial;
+    iosLocationHasFix = false;
+    iosLocationBestAccuracy = Infinity;
+    setIosLocationStatus("iPhone GPS konumu alınıyor…");
+
+    try {
+      iosLocationWatchId = navigator.geolocation.watchPosition(
+        position => acceptIosLocation(position, serial),
+        error => {
+          if (serial !== iosLocationRequestSerial) return;
+          if (Number(error?.code) === 1) {
+            stopIosLocationWatch();
+            showIosLocationFailure(error);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    } catch (error) {
+      stopIosLocationWatch();
+      showIosLocationFailure(error);
+      return;
+    }
+
+    iosLocationFallbackTimer = window.setTimeout(() => requestIosFallback(serial), 5500);
+    iosLocationStopTimer = window.setTimeout(() => {
+      if (serial !== iosLocationRequestSerial) return;
+      const hadFix = iosLocationHasFix;
+      const bestAccuracy = iosLocationBestAccuracy;
+      stopIosLocationWatch();
+      if (!hadFix) {
+        showIosLocationFailure({ code: 3 });
+      } else if (Number.isFinite(bestAccuracy) && bestAccuracy > 250) {
+        setIosLocationStatus(`Yaklaşık konum kullanılıyor · Kesin Konum ayarını kontrol et · ±${Math.round(bestAccuracy)} m`);
+      }
+    }, IOS_LOCATION_WATCH_MS);
+  }
+
+  function bindIosLocationFix() {
+    if (!isIosWebKit()) return;
+    document.documentElement.classList.add("is-ios-webkit");
+
+    document.addEventListener("click", event => {
+      const target = event.target instanceof Element ? event.target.closest(IOS_LOCATION_SELECTOR) : null;
+      if (!target) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      requestIosLocation();
+    }, true);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopIosLocationWatch();
+    });
+  }
+
   function boot() {
     injectStyles();
     ensureNetworkBanner();
@@ -245,6 +411,7 @@
     }
 
     collapseMobileRadioPlayer();
+    bindIosLocationFix();
     bindUrlState();
     restoreUrlState();
   }
