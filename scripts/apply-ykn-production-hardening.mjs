@@ -43,10 +43,17 @@ if (sw.includes(oldShell)) sw = sw.replace(oldShell, newShell);
 else if (!sw.includes(newShell)) throw new Error("service worker shell anchor not found");
 write("sw.js", sw);
 
-// 4) Keep smoke expectations aligned with the intentional service-worker cache bump.
+// 4) Keep existing tests aligned with intentional product and cache changes.
 let smoke = read("tests/smoke.mjs");
 smoke = smoke.replace("assert.match(sw, /yakinimda-shell-v57/);", "assert.match(sw, /yakinimda-shell-v58/);");
 write("tests/smoke.mjs", smoke);
+
+let productStandard = read("tests/product-standard.mjs");
+productStandard = productStandard.replace(
+  'assert.match(app, /if \\(isMobileLayout\\) \\{[\\s\\S]*loadNowDashboard\\(\\)/);',
+  'assert.doesNotMatch(app, /if \\(isMobileLayout\\) \\{[\\s\\S]*loadNowDashboard\\(\\)/);\nassert.match(app, /setSection\\("nearby", \\{ pushHistory: false \\}\\);[\\s\\S]*setView\\("list", "expanded"\\);/);',
+);
+write("tests/product-standard.mjs", productStandard);
 
 // 5) Test/version wiring.
 const pkg = JSON.parse(read("package.json"));
