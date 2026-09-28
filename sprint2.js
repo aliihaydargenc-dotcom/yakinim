@@ -20,6 +20,13 @@
     .route-stop-tools button{display:grid;place-items:center;min-width:36px;min-height:36px!important;padding:0!important;border:1px solid rgba(15,23,42,.09)!important;border-radius:9px!important;background:#f8fafc!important;color:#334155!important;font-size:15px!important}
     .route-stop-tools button:disabled{opacity:.3;cursor:not-allowed}
     @media(max-width:759px){
+      #routeTray[data-mobile-open="true"]{left:10px!important;right:10px!important;width:auto!important;max-width:none!important;transform:none!important;box-sizing:border-box}
+      #routeTray[data-mobile-open="true"] .route-tray-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+      #routeTray[data-mobile-open="true"] .route-tray-head strong{grid-column:1/-1;margin-right:0;min-width:0}
+      #routeTray[data-mobile-open="true"] .route-optimize{width:100%;min-width:0;white-space:normal;line-height:1.15}
+      #routeTray[data-mobile-open="true"] #clearRoute{white-space:nowrap;padding:0 8px}
+      #routeTray[data-mobile-open="true"] .ykn-route-close{margin-left:0}
+      #routeTray[data-mobile-open="true"] #openRoute{width:100%;overflow-wrap:anywhere}
       .route-optimize{min-height:44px!important}
       .route-stop-item{grid-template-columns:32px minmax(0,1fr);padding:9px}
       .route-stop-tools{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr)}
