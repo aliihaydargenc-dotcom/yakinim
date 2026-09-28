@@ -1,9 +1,9 @@
 {
   "name": "yakinim",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "private": true,
   "description": "Mobil öncelikli günlük ihtiyaç haritası",
   "scripts": {
-    "test": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node tests/sprint2.mjs && node tests/sprint1.mjs && node tests/smoke.mjs && node tests/discovery.mjs && node tests/network.mjs && node tests/viewport.mjs && node tests/spatial.mjs && node tests/location.mjs && node tests/product-standard.mjs && node tests/interactions.mjs && node tests/mobile-discovery.mjs && node tests/performance.mjs && node tests/media.mjs"
+    "test": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node tests/sprint2.mjs && node --check sprint3.js && node tests/production-hardening.mjs && node tests/sprint1.mjs && node tests/smoke.mjs && node tests/discovery.mjs && node tests/network.mjs && node tests/viewport.mjs && node tests/spatial.mjs && node tests/location.mjs && node tests/product-standard.mjs && node tests/interactions.mjs && node tests/mobile-discovery.mjs && node tests/performance.mjs && node tests/media.mjs"
   }
 }

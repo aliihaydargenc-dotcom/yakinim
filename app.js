@@ -496,16 +496,8 @@ window.addEventListener("popstate", event => {
   requestAnimationFrame(() => map.invalidateSize());
 });
 renderRoute();
-if (isMobileLayout) {
-  document.body.dataset.view = "list";
-  nowSection.hidden = false;
-  newsSection.hidden = true;
-  radioSection.hidden = true;
-  loadNowDashboard();
-} else {
-  setSection("nearby", { pushHistory: false });
-  setView("list", "expanded");
-}
+setSection("nearby", { pushHistory: false });
+setView("list", "expanded");
 bootstrapLocationDiscovery();
 window.addEventListener("resize", syncMapControlOffset);
 syncMapControlOffset();
