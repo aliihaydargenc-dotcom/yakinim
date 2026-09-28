@@ -37,6 +37,11 @@
     .place-detail[role="dialog"]{outline:none}
     @media(max-width:759px){
       .network-state-banner{top:max(8px,env(safe-area-inset-top,0px));font-size:11px}
+      body[data-section="radio"] .radio-player-expand{display:none!important}
+      body[data-section="radio"] .radio-player-tools,
+      body[data-section="radio"] .radio-player.is-expanded .radio-player-tools{display:none!important}
+      body[data-section="radio"] .radio-player-actions{gap:8px!important}
+      body.radio-player-expanded[data-section="radio"] .radio-section{padding-bottom:calc(190px + var(--mobile-nav-h,68px) + env(safe-area-inset-bottom,0px))!important}
     }
   `;
 
@@ -207,6 +212,17 @@
     bodyObserver.observe(document.body, { attributes: true, attributeFilter: ["data-section", "data-view"] });
   }
 
+  function collapseMobileRadioPlayer() {
+    if (!window.matchMedia("(max-width: 759px)").matches) return;
+    document.getElementById("radioPlayer")?.classList.remove("is-expanded");
+    document.body.classList.remove("radio-player-expanded");
+    const expand = document.getElementById("radioPlayerExpand");
+    if (expand) {
+      expand.setAttribute("aria-hidden", "true");
+      expand.tabIndex = -1;
+    }
+  }
+
   function boot() {
     injectStyles();
     ensureNetworkBanner();
@@ -228,6 +244,7 @@
       syncBusyState();
     }
 
+    collapseMobileRadioPlayer();
     bindUrlState();
     restoreUrlState();
   }
