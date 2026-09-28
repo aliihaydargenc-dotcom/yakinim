@@ -28,6 +28,11 @@ assert.match(sprint3, /aria-busy/);
 assert.match(sprint3, /navigator\.onLine/);
 assert.match(sprint3, /URLSearchParams/);
 assert.match(sprint3, /searchParams\.set\("q"/);
+assert.match(sprint3, /watchPosition/);
+assert.match(sprint3, /enableHighAccuracy:\s*true/);
+assert.match(sprint3, /maximumAge:\s*0/);
+assert.match(sprint3, /stopImmediatePropagation/);
+assert.match(sprint3, /Kesin Konum/);
 assert.match(robots, /Sitemap: https:\/\/yakinim\.vercel\.app\/sitemap\.xml/);
 assert.match(sitemap, /<loc>https:\/\/yakinim\.vercel\.app\/<\/loc>/);
 
