@@ -5,6 +5,8 @@ const index = fs.readFileSync("index.html", "utf8");
 const app = fs.readFileSync("app.js", "utf8");
 const sw = fs.readFileSync("sw.js", "utf8");
 const sprint3 = fs.readFileSync("sprint3.js", "utf8");
+const mobileFlowJs = fs.readFileSync("mobile-flow.js", "utf8");
+const mobileFlowCss = fs.readFileSync("mobile-flow.css", "utf8");
 const robots = fs.readFileSync("robots.txt", "utf8");
 const sitemap = fs.readFileSync("sitemap.xml", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
@@ -33,6 +35,20 @@ assert.match(sprint3, /enableHighAccuracy:\s*true/);
 assert.match(sprint3, /maximumAge:\s*0/);
 assert.match(sprint3, /stopImmediatePropagation/);
 assert.match(sprint3, /Kesin Konum/);
+assert.match(sprint3, /mobile-flow\.css\?v=1\.0\.0/);
+assert.match(sprint3, /mobile-flow\.js\?v=1\.0\.0/);
+
+assert.doesNotThrow(() => new Function(mobileFlowJs), "mobile-flow.js must parse");
+assert.match(mobileFlowJs, /applySheetState\("half"\)/);
+assert.match(mobileFlowJs, /Yakındaki yerlerden ekle/);
+assert.match(mobileFlowJs, /route-pick-mode/);
+assert.match(mobileFlowJs, /data-mobile-destination='nearby'/);
+assert.match(mobileFlowCss, /--med-sea:#0b7f8f/);
+assert.match(mobileFlowCss, /body\[data-section="nearby"\] \.view-switch/);
+assert.match(mobileFlowCss, /\.sheet\[data-state="half"\] \.results/);
+assert.match(mobileFlowCss, /\.ykn-route-discover/);
+assert.match(mobileFlowCss, /yknMobileSurfaceIn/);
+
 assert.match(robots, /Sitemap: https:\/\/yakinim\.vercel\.app\/sitemap\.xml/);
 assert.match(sitemap, /<loc>https:\/\/yakinim\.vercel\.app\/<\/loc>/);
 
