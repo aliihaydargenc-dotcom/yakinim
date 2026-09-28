@@ -2,6 +2,8 @@
   "use strict";
 
   const STYLE_ID = "yknSprint3Styles";
+  const MOBILE_FLOW_STYLE_ID = "yknMobileFlowStylesheet";
+  const MOBILE_FLOW_SCRIPT_ID = "yknMobileFlowScript";
   const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   const IOS_LOCATION_SELECTOR = "#locateButton,#startLocation,#recenterButton,.now-pulse-empty,.now-empty-action";
   const IOS_LOCATION_TARGET_ACCURACY_M = 80;
@@ -18,26 +20,12 @@
 
   const css = `
     .network-state-banner{
-      position:fixed;
-      z-index:1400;
-      left:50%;
-      top:max(10px,env(safe-area-inset-top,0px));
-      transform:translateX(-50%);
-      display:flex;
-      align-items:center;
-      gap:8px;
-      width:min(560px,calc(100vw - 24px));
-      min-height:44px;
-      padding:10px 14px;
-      border:1px solid rgba(146,64,14,.18);
-      border-radius:14px;
-      background:rgba(255,251,235,.96);
-      color:#78350f;
-      box-shadow:0 12px 34px rgba(15,23,42,.12);
-      backdrop-filter:blur(14px);
-      -webkit-backdrop-filter:blur(14px);
-      font-size:12px;
-      line-height:1.35;
+      position:fixed;z-index:1400;left:50%;top:max(10px,env(safe-area-inset-top,0px));
+      transform:translateX(-50%);display:flex;align-items:center;gap:8px;
+      width:min(560px,calc(100vw - 24px));min-height:44px;padding:10px 14px;
+      border:1px solid rgba(146,64,14,.18);border-radius:14px;background:rgba(255,251,235,.96);
+      color:#78350f;box-shadow:0 12px 34px rgba(15,23,42,.12);backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);font-size:12px;line-height:1.35
     }
     .network-state-banner[hidden]{display:none!important}
     .network-state-banner strong{font-size:12px}
@@ -53,6 +41,23 @@
       body.radio-player-expanded[data-section="radio"] .radio-section{padding-bottom:calc(190px + var(--mobile-nav-h,68px) + env(safe-area-inset-bottom,0px))!important}
     }
   `;
+
+  function ensureMobileFlowAssets() {
+    if (!document.getElementById(MOBILE_FLOW_STYLE_ID)) {
+      const link = document.createElement("link");
+      link.id = MOBILE_FLOW_STYLE_ID;
+      link.rel = "stylesheet";
+      link.href = "./mobile-flow.css?v=1.0.0";
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById(MOBILE_FLOW_SCRIPT_ID)) {
+      const script = document.createElement("script");
+      script.id = MOBILE_FLOW_SCRIPT_ID;
+      script.src = "./mobile-flow.js?v=1.0.0";
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }
 
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -79,8 +84,7 @@
   function syncNetworkState() {
     const offline = navigator.onLine === false;
     document.body.classList.toggle("is-offline", offline);
-    const banner = ensureNetworkBanner();
-    banner.hidden = !offline;
+    ensureNetworkBanner().hidden = !offline;
   }
 
   function detailIsOpen() {
@@ -391,6 +395,7 @@
 
   function boot() {
     injectStyles();
+    ensureMobileFlowAssets();
     ensureNetworkBanner();
     syncNetworkState();
     window.addEventListener("online", syncNetworkState);
