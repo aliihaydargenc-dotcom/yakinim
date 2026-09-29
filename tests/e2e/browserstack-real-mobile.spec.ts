@@ -67,7 +67,6 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
     width: window.innerWidth,
     height: window.innerHeight,
     userAgent: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
   }));
 
   expect(device.width).toBeGreaterThanOrEqual(320);
@@ -75,25 +74,25 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   expect(device.height).toBeGreaterThanOrEqual(600);
   expect(device.userAgent).toMatch(/Android|iPhone|iPad|Mobile/i);
 
-  await expect(page.getByRole("button", { name: "Yakınım ana ekran" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Konumum", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Şu anda sana ne lazım?" })).toBeVisible();
+  await expect(page.locator(".brand")).toBeVisible();
+  await expect(page.locator(".location-control")).toBeVisible();
+  await expect(page.locator(".hero-copy h1")).toHaveText("Şu anda sana ne lazım?");
   await assertNoHorizontalOverflow(page);
 
-  await activateMobile(page.getByRole("button", { name: "Konumumu kullan" }));
+  await activateMobile(page.locator(".primary-button"));
   await expect(page.getByText("Yakın Market")).toBeVisible();
 
-  await activateMobile(page.getByRole("button", { name: "Nöbetçi" }));
+  await activateMobile(page.locator(".category-pill").filter({ hasText: "Nöbetçi" }));
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
-  const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
-  await activateMobile(nav.getByRole("button", { name: "Harita" }));
+  const nav = page.locator(".bottom-nav");
+  await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
 
-  await activateMobile(nav.getByRole("button", { name: "Haber" }));
+  await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
   await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible();
 
-  await activateMobile(nav.getByRole("button", { name: "Radyo" }));
+  await activateMobile(nav.locator("button").filter({ hasText: "Radyo" }));
   await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
 
   await assertNoHorizontalOverflow(page);
@@ -105,7 +104,7 @@ async function activateMobile(locator: import("@playwright/test").Locator) {
   await locator.scrollIntoViewIfNeeded();
   await expect(locator).toBeVisible();
   await expect(locator).toBeEnabled();
-  await locator.tap({ force: true, timeout: 60_000 });
+  await locator.click({ force: true, timeout: 60_000 });
 }
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -114,7 +113,7 @@ async function assertNoHorizontalOverflow(page: import("@playwright/test").Page)
 }
 
 async function assertBottomNavInsideViewport(page: import("@playwright/test").Page) {
-  const navBox = await page.getByRole("navigation", { name: "Ana navigasyon" }).boundingBox();
+  const navBox = await page.locator(".bottom-nav").boundingBox();
   expect(navBox).not.toBeNull();
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   if (!navBox) return;

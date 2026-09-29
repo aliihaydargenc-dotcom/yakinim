@@ -13,7 +13,7 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report-browserstack", open: "never" }],
   ],
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: "http://bs-local.com:4173",
     screenshot: "only-on-failure",
     trace: "off",
     video: "off",
