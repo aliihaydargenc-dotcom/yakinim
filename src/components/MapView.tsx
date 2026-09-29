@@ -65,7 +65,7 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       const el = document.createElement("button");
       el.type = "button";
       el.className = `place-marker marker-${place.category}`;
-      el.textContent = place.name.slice(0, 1).toLocaleUpperCase("tr");
+      renderPlaceMarker(el, place);
       el.setAttribute("aria-label", `${place.name} harita işareti`);
       el.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -101,7 +101,7 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       entry.element.style.display = "";
       entry.element.setAttribute("aria-hidden", "false");
       entry.element.classList.remove("is-cluster");
-      entry.element.textContent = entry.place.name.slice(0, 1).toLocaleUpperCase("tr");
+      renderPlaceMarker(entry.element, entry.place, entry.place.id === selectedPlace?.id);
       entry.element.setAttribute("aria-label", `${entry.place.name} harita işareti`);
       delete entry.element.dataset.clusterCount;
       delete entry.element.dataset.clusterLat;
@@ -175,6 +175,34 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
     {selectedPlace && <MapPlaceSheet place={selectedPlace} onClose={() => setSelectedPlace(null)} />}
   </div>;
+}
+
+function renderPlaceMarker(element: HTMLButtonElement, place: Place, selected = false) {
+  element.replaceChildren(document.createTextNode(place.name.slice(0, 1).toLocaleUpperCase("tr")));
+
+  const label = document.createElement("span");
+  label.textContent = place.name;
+  label.setAttribute("aria-hidden", "true");
+  label.style.position = "absolute";
+  label.style.left = "50%";
+  label.style.bottom = "40px";
+  label.style.transform = "translateX(-50%)";
+  label.style.maxWidth = "156px";
+  label.style.padding = selected ? "6px 9px" : "5px 8px";
+  label.style.border = selected ? "1px solid rgba(29,78,216,.35)" : "1px solid rgba(226,232,240,.96)";
+  label.style.borderRadius = "9px";
+  label.style.background = selected ? "rgba(238,244,255,.98)" : "rgba(255,255,255,.94)";
+  label.style.color = "#0f172a";
+  label.style.boxShadow = "0 4px 12px rgba(15,23,42,.14)";
+  label.style.fontSize = "11px";
+  label.style.fontWeight = selected ? "900" : "800";
+  label.style.lineHeight = "1.15";
+  label.style.whiteSpace = "nowrap";
+  label.style.overflow = "hidden";
+  label.style.textOverflow = "ellipsis";
+  label.style.pointerEvents = "none";
+  label.style.zIndex = selected ? "2" : "1";
+  element.appendChild(label);
 }
 
 function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }) {
