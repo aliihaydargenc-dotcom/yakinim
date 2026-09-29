@@ -7,8 +7,8 @@ buildIdentifier: '#${BUILD_NUMBER}'
 
 platforms:
   - browserName: safari
-    osVersion: 14
-    deviceName: iPhone 12 Pro
+    osVersion: 18
+    deviceName: iPhone 15 Pro Max
   - browserName: chrome
     osVersion: 16.0
     deviceName: Google Pixel 9

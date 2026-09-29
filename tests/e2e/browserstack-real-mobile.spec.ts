@@ -60,7 +60,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
 
   const device = await page.evaluate(() => ({
     width: window.innerWidth,

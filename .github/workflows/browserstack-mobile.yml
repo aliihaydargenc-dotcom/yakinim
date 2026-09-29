@@ -60,5 +60,7 @@ jobs:
           path: |
             playwright-report-browserstack/
             test-results/
+            browserstack-artifacts/
+            log/
           if-no-files-found: ignore
           retention-days: 7
