@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const duty = require('../api/duty.js');
-const { parsePageContext, parseRows, parseCoordinates, normalizeText, distanceMeters } = duty._private;
+const { parsePageContext, parseRows, parseCoordinates, normalizeText, distanceMeters, normalizePhone } = duty._private;
 
 const context = parsePageContext(`
   <body data-token="abc123">
@@ -16,13 +16,14 @@ assert.deepEqual(context.dates, ['29/09/2026', '30/09/2026']);
 
 const rows = parseRows(`
   <table id="searchTable"><tbody>
-    <tr><td>SERİK</td><td>Örnek Eczanesi</td><td>Kadriye Mah. No: 1</td><td>0242 000 00 00</td></tr>
+    <tr><td>SERİK</td><td>Örnek Eczanesi</td><td>Kadriye Mah. No: 1</td><td>0 - (242) 722 - 5565 <span>19:00 29/09/2026 08:30 30/09/2026</span></td></tr>
   </tbody></table>
 `);
 assert.equal(rows.length, 1);
 assert.equal(rows[0].district, 'SERİK');
 assert.equal(rows[0].name, 'Örnek Eczanesi');
-assert.equal(rows[0].phone, '02420000000');
+assert.equal(rows[0].phone, '02427225565');
+assert.equal(normalizePhone('0 - (242) 722 - 5565 19:00 29/09/2026'), '02427225565');
 
 assert.deepEqual(
   parseCoordinates('var latti = parseFloat(36.875); var longi = parseFloat(31.100);'),
