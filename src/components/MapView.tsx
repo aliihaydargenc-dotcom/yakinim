@@ -18,9 +18,6 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("click", (event) => {
-      if (picking) onPick({ lat: event.lngLat.lat, lng: event.lngLat.lng });
-    });
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, []);
@@ -31,7 +28,6 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
     const handler = (event: maplibregl.MapMouseEvent) => {
       if (picking) onPick({ lat: event.lngLat.lat, lng: event.lngLat.lng });
     };
-    map.off("click");
     map.on("click", handler);
     map.getCanvas().style.cursor = picking ? "crosshair" : "grab";
     return () => { map.off("click", handler); };
