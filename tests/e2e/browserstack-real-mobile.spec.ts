@@ -33,8 +33,8 @@ const radioPayload = {
   ],
 };
 
-test.beforeEach(async ({ context, page }) => {
-  await page.addInitScript(() => {
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((fixtures) => {
     const position = {
       coords: {
         latitude: 36.884,
@@ -47,6 +47,7 @@ test.beforeEach(async ({ context, page }) => {
       },
       timestamp: Date.now(),
     };
+
     Object.defineProperty(navigator, "geolocation", {
       configurable: true,
       value: {
@@ -58,13 +59,29 @@ test.beforeEach(async ({ context, page }) => {
         clearWatch: () => undefined,
       },
     });
-  });
 
-  await context.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
-  await context.route("**/api/overture?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(overturePayload) }));
-  await context.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
-  await context.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
-  await context.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const json = (payload: unknown) => new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (url.includes("/api/viewport?")) return json(fixtures.viewport);
+      if (url.includes("/api/overture?")) return json(fixtures.overture);
+      if (url.includes("/api/duty?")) return json(fixtures.duty);
+      if (url.includes("/api/news?")) return json(fixtures.news);
+      if (url.includes("/api/radio?")) return json(fixtures.radio);
+      return originalFetch(input, init);
+    };
+  }, {
+    viewport: viewportPayload,
+    overture: overturePayload,
+    duty: dutyPayload,
+    news: newsPayload,
+    radio: radioPayload,
+  });
 });
 
 test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
@@ -89,12 +106,13 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
 
   await activateMobile(page.locator(".primary-button"));
   await expect(page.locator(".results-section")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".places-list .place-card").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Yakın Market")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Overture Test Kafe")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".results-meta")).toContainText("sonuç", { timeout: 30_000 });
 
   await activateMobile(page.locator(".category-pill").filter({ hasText: "Nöbetçi" }));
   await expect(page.locator(".results-heading h2")).toHaveText("Nöbetçi eczaneler");
-  await expect(page.locator(".places-list .place-card").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible({ timeout: 30_000 });
 
   const nav = page.locator(".bottom-nav");
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
