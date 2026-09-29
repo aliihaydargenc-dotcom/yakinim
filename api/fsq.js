@@ -1,4 +1,4 @@
-const PMTILES_URL = "https://fsq-os-places-us-east-1.s3.us-east-1.amazonaws.com/release/vector-tiles/latest/fsq-os-places.pmtiles";
+const PMTILES_URL = "https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-09-23.1/places.pmtiles";
 const TILE_ZOOM = 14;
 const DEFAULT_RADIUS_M = 4500;
 const MAX_RADIUS_M = 5000;
@@ -11,7 +11,7 @@ let archivePromise;
 
 function cleanText(value) { return String(value || "").replace(/\s+/g, " ").trim(); }
 function normalizeCategoryText(properties = {}) {
-  return [properties.fsq_category_labels, properties.category_labels, properties.categories, properties.category]
+  return [properties.fsq_category_labels, properties.category_labels, properties.categories, properties.category, properties.basic_category, properties.taxonomy]
     .filter(Boolean).map(String).join(" ").toLocaleLowerCase("en-US");
 }
 function categoryFromFsqProperties(properties = {}) {
@@ -79,7 +79,7 @@ async function readTile(tile, origin, radiusM) {
     for (let index = 0; index < layer.length; index += 1) {
       const feature = layer.feature(index); const properties = feature.properties || {};
       if (cleanText(properties.date_closed)) continue;
-      const category = categoryFromFsqProperties(properties); const name = cleanText(properties.name);
+      const category = categoryFromFsqProperties(properties); const name = cleanText(properties.name || properties["@name"]);
       if (!category || !name) continue;
       const geojson = feature.toGeoJSON(tile.x, tile.y, tile.z);
       if (!geojson.geometry || geojson.geometry.type !== "Point") continue;
@@ -87,7 +87,7 @@ async function readTile(tile, origin, radiusM) {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const distanceM = Math.round(distanceMeters(origin.lat, origin.lng, lat, lng));
       if (distanceM > radiusM * 1.12) continue;
-      const placeId = cleanText(properties.fsq_place_id) || String(feature.id || `${tile.z}:${tile.x}:${tile.y}:${index}`);
+      const placeId = cleanText(properties.fsq_place_id || properties.id) || String(feature.id || `${tile.z}:${tile.x}:${tile.y}:${index}`);
       places.push({ id: `fsq:${placeId}`, name, category, lat, lng, address: addressFromProperties(properties), phone: cleanText(properties.tel || properties.phone) || undefined, distanceM, source: "fsq" });
     }
   }
@@ -114,13 +114,7 @@ async function queryFsqPlaces(lat, lng, radiusM = DEFAULT_RADIUS_M) {
 async function probeSource() {
   const response = await fetch(PMTILES_URL, { headers: { Range: "bytes=0-255" } });
   const bytes = new Uint8Array(await response.arrayBuffer());
-  return {
-    status: response.status,
-    contentRange: response.headers.get("content-range"),
-    acceptRanges: response.headers.get("accept-ranges"),
-    contentLength: response.headers.get("content-length"),
-    firstBytes: [...bytes.slice(0, 8)],
-  };
+  return { status: response.status, contentRange: response.headers.get("content-range"), acceptRanges: response.headers.get("accept-ranges"), contentLength: response.headers.get("content-length"), firstBytes: [...bytes.slice(0, 8)] };
 }
 async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
@@ -135,12 +129,12 @@ async function handler(req, res) {
   try {
     const result = await queryFsqPlaces(lat, lng, radius);
     res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=86400");
-    res.setHeader("X-Yakinim-Places-Source", "foursquare-os-places");
-    return res.status(200).json({ places: result.places, source: "Foursquare OS Places", tileCount: result.tileCount, successfulTiles: result.successfulTiles });
+    res.setHeader("X-Yakinim-Places-Source", "overture-places");
+    return res.status(200).json({ places: result.places, source: "Overture Places", tileCount: result.tileCount, successfulTiles: result.successfulTiles });
   } catch (error) {
-    console.warn("FSQ places unavailable:", error instanceof Error ? error.message : String(error));
+    console.warn("Supplemental places unavailable:", error instanceof Error ? error.message : String(error));
     res.setHeader("Cache-Control", "no-store");
-    return res.status(503).json({ error: "fsq_unavailable" });
+    return res.status(503).json({ error: "supplemental_unavailable" });
   }
 }
 
