@@ -94,6 +94,12 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
 
   await activateMobile(nav.locator("button").filter({ hasText: "Radyo" }));
   await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
+  await activateMobile(page.locator(".station-card").filter({ hasText: "Gerçek Cihaz Test Radyosu" }));
+  await expect(page.locator(".global-radio-player")).toBeVisible();
+
+  await activateMobile(nav.locator("button").filter({ hasText: "Yakınım" }));
+  await expect(page.locator(".hero-copy h1")).toHaveText("Şu anda sana ne lazım?");
+  await expect(page.locator(".global-radio-player")).toBeVisible();
 
   await assertNoHorizontalOverflow(page);
   await assertBottomNavInsideViewport(page);
