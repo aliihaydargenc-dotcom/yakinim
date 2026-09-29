@@ -103,6 +103,10 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await expect(page.locator(".place-marker")).toHaveCount(0);
   await assertNoHorizontalOverflow(page);
 
+  const requestCountBeforePan = viewportRequests.length;
+  await panMap(page);
+  await expect.poll(() => viewportRequests.length, { timeout: 15_000 }).toBeGreaterThan(requestCountBeforePan);
+
   await nav.getByRole("button", { name: "Yakınım", exact: true }).click();
   await page.getByRole("button", { name: "Nöbetçi", exact: true }).click();
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
@@ -146,6 +150,19 @@ function assertSegmentedNearbyCoverage(requestUrls: string[]) {
     expect(box.north - box.south).toBeLessThanOrEqual(0.031);
     expect(box.east - box.west).toBeLessThanOrEqual(0.038);
   });
+}
+
+async function panMap(page: import("@playwright/test").Page) {
+  const canvas = page.locator(".maplibregl-canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  const startX = box.x + box.width * 0.55;
+  const startY = box.y + box.height * 0.45;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX - Math.min(140, box.width * 0.35), startY, { steps: 10 });
+  await page.mouse.up();
 }
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
