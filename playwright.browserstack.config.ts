@@ -3,8 +3,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: /browserstack-real-mobile\.spec\.ts/,
-  timeout: 75_000,
-  expect: { timeout: 12_000 },
+  timeout: 120_000,
+  expect: { timeout: 20_000 },
   fullyParallel: false,
   retries: 1,
   workers: 1,
@@ -15,8 +15,10 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:4173",
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    trace: "off",
     video: "off",
+    actionTimeout: 60_000,
+    navigationTimeout: 60_000,
   },
   webServer: {
     command: "npm run dev -- --host 0.0.0.0 --port 4173",

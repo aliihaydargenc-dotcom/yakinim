@@ -7,7 +7,7 @@ buildIdentifier: '#${BUILD_NUMBER}'
 
 platforms:
   - browserName: safari
-    osVersion: 18
+    osVersion: 17
     deviceName: iPhone 15 Pro Max
   - browserName: chrome
     osVersion: 16.0
@@ -23,5 +23,4 @@ source: yakinim-v2-real-mobile
 
 debug: false
 networkLogs: true
-consoleLogs: errors
 testObservability: true

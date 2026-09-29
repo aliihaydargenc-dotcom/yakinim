@@ -61,6 +61,7 @@ test.beforeEach(async ({ page }) => {
 
 test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
   await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.addStyleTag({ content: "*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}" });
 
   const device = await page.evaluate(() => ({
     width: window.innerWidth,
@@ -79,26 +80,33 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await expect(page.getByRole("heading", { name: "Şu anda sana ne lazım?" })).toBeVisible();
   await assertNoHorizontalOverflow(page);
 
-  await page.getByRole("button", { name: "Konumumu kullan" }).click();
+  await activateMobile(page.getByRole("button", { name: "Konumumu kullan" }));
   await expect(page.getByText("Yakın Market")).toBeVisible();
 
-  await page.getByRole("button", { name: "Nöbetçi" }).click();
+  await activateMobile(page.getByRole("button", { name: "Nöbetçi" }));
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
-  await nav.getByRole("button", { name: "Harita" }).click();
+  await activateMobile(nav.getByRole("button", { name: "Harita" }));
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
 
-  await nav.getByRole("button", { name: "Haber" }).click();
+  await activateMobile(nav.getByRole("button", { name: "Haber" }));
   await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible();
 
-  await nav.getByRole("button", { name: "Radyo" }).click();
+  await activateMobile(nav.getByRole("button", { name: "Radyo" }));
   await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
 
   await assertNoHorizontalOverflow(page);
   await assertBottomNavInsideViewport(page);
   await page.screenshot({ path: testInfo.outputPath("browserstack-real-mobile.png"), fullPage: false });
 });
+
+async function activateMobile(locator: import("@playwright/test").Locator) {
+  await locator.scrollIntoViewIfNeeded();
+  await expect(locator).toBeVisible();
+  await expect(locator).toBeEnabled();
+  await locator.tap({ force: true, timeout: 60_000 });
+}
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

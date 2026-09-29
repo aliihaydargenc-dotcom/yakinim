@@ -49,6 +49,9 @@ jobs:
       - name: Install BrowserStack Node SDK
         run: npm install --no-save --no-audit --no-fund browserstack-node-sdk@latest
 
+      - name: Verify Playwright compatibility
+        run: npx playwright --version | grep "Version 1.59.0"
+
       - name: Run on real iOS Safari and Android Chrome
         run: npx browserstack-node-sdk playwright test --config=./playwright.browserstack.config.ts
 
