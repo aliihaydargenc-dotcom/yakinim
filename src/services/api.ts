@@ -14,10 +14,20 @@ type DutyResponse = { pharmacies?: Array<Record<string, unknown>> };
 type NewsResponse = { items?: NewsItem[] };
 type RadioResponse = { stations?: RadioStation[] };
 
-// Keep the first nearby load close to the old app's ~5 km discovery reach.
-// These spans stay below the server's 0.12 degree viewport ceiling after grid snapping.
+type ViewportBounds = {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+};
+
+// Keep the first nearby load close to the old app's ~5 km discovery reach,
+// but never send it to Overpass as one large dense query. Dense areas such as
+// Kadriye/Belek can time out when the whole envelope is requested at once.
 const NEARBY_LAT_SPAN = 0.045;
 const NEARBY_LNG_SPAN = 0.055;
+const VIEWPORT_GRID_SIZE = 3;
+const VIEWPORT_CONCURRENCY = 3;
 
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
   const amenity = tags.amenity || "";
@@ -103,15 +113,68 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function buildViewportGrid(location: Coordinates): ViewportBounds[] {
+  const south = location.lat - NEARBY_LAT_SPAN;
+  const north = location.lat + NEARBY_LAT_SPAN;
+  const west = location.lng - NEARBY_LNG_SPAN;
+  const east = location.lng + NEARBY_LNG_SPAN;
+  const latStep = (north - south) / VIEWPORT_GRID_SIZE;
+  const lngStep = (east - west) / VIEWPORT_GRID_SIZE;
+  const cells: ViewportBounds[] = [];
+
+  for (let row = 0; row < VIEWPORT_GRID_SIZE; row += 1) {
+    for (let column = 0; column < VIEWPORT_GRID_SIZE; column += 1) {
+      cells.push({
+        south: south + row * latStep,
+        north: row === VIEWPORT_GRID_SIZE - 1 ? north : south + (row + 1) * latStep,
+        west: west + column * lngStep,
+        east: column === VIEWPORT_GRID_SIZE - 1 ? east : west + (column + 1) * lngStep,
+      });
+    }
+  }
+
+  // Start from the center cell so the most relevant nearby data is requested first.
+  const centerIndex = Math.floor(cells.length / 2);
+  return [cells[centerIndex], ...cells.slice(0, centerIndex), ...cells.slice(centerIndex + 1)];
+}
+
+async function fetchViewportElements(location: Coordinates): Promise<OsmElement[]> {
+  const cells = buildViewportGrid(location);
+  const elements: OsmElement[] = [];
+  let successCount = 0;
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < cells.length) {
+      const cell = cells[cursor];
+      cursor += 1;
+      const params = new URLSearchParams({
+        south: String(cell.south),
+        west: String(cell.west),
+        north: String(cell.north),
+        east: String(cell.east),
+      });
+      try {
+        const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`);
+        successCount += 1;
+        elements.push(...(payload.elements || []));
+      } catch {
+        // A failed cell must not discard the data returned by the other cells.
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: VIEWPORT_CONCURRENCY }, () => worker()));
+  if (!successCount) throw new Error("viewport_unavailable");
+
+  const unique = new Map<string, OsmElement>();
+  for (const element of elements) unique.set(`${element.type}:${element.id}`, element);
+  return [...unique.values()];
+}
+
 export async function fetchViewport(location: Coordinates): Promise<Place[]> {
-  const params = new URLSearchParams({
-    south: String(location.lat - NEARBY_LAT_SPAN),
-    west: String(location.lng - NEARBY_LNG_SPAN),
-    north: String(location.lat + NEARBY_LAT_SPAN),
-    east: String(location.lng + NEARBY_LNG_SPAN),
-  });
-  const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`);
-  const places = (payload.elements || []).flatMap((element) => {
+  const elements = await fetchViewportElements(location);
+  const places = elements.flatMap((element) => {
     const lat = Number(element.lat ?? element.center?.lat);
     const lng = Number(element.lon ?? element.center?.lon);
     const category = categoryFromTags(element.tags);
