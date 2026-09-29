@@ -12,6 +12,7 @@ import { useAppStore } from "./store";
 import type { Coordinates, Place, RadioStation, Section } from "./types";
 
 type SortMode = "distance" | "name";
+const MAX_LIST_RESULTS = 200;
 
 export default function App() {
   const section = useAppStore((s) => s.section);
@@ -112,7 +113,7 @@ export default function App() {
           {loadingPlaces && <SkeletonResults />}
           {errorPlaces && <div className="state-card"><strong>Yakındaki yerler alınamadı</strong><p>Bağlantıyı kontrol edip tekrar dene veya haritada başka bir alan seç.</p></div>}
           {!loadingPlaces && !errorPlaces && places.length === 0 && <div className="state-card"><strong>Bu alanda sonuç yok</strong><p>Başka bir kategori seç veya haritada biraz uzaklaş.</p></div>}
-          <div className="places-list">{places.slice(0, 60).map((place) => <PlaceCard key={place.id} place={place} saved={savedIds.includes(place.id)} onToggleSaved={() => toggleSaved(place.id)} />)}</div>
+          <div className="places-list">{places.slice(0, MAX_LIST_RESULTS).map((place) => <PlaceCard key={place.id} place={place} saved={savedIds.includes(place.id)} onToggleSaved={() => toggleSaved(place.id)} />)}</div>
         </section>}
       </main>}
 
