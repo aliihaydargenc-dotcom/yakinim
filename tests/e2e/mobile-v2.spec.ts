@@ -12,6 +12,13 @@ const viewportPayload = {
   ],
 };
 
+const fsqPayload = {
+  places: [
+    { id: "fsq:1", name: "FSQ Ek Kafe", category: "cafe", lat: 36.8854, lng: 30.7061, address: "Kadriye", distanceM: 180 },
+    { id: "fsq:2", name: "Migros", category: "market", lat: 36.88802, lng: 30.70802, address: "Serik Caddesi", distanceM: 520 },
+  ],
+};
+
 const dutyPayload = {
   pharmacies: [
     { id: "duty-1", name: "Merkez Nöbetçi Eczane", address: "Kadriye Mahallesi", phone: "02420000000", latitude: 36.8855, longitude: 30.7065, distance_m: 420 },
@@ -38,6 +45,7 @@ const EXPECTED_VIEWPORTS: Record<string, { width: number; height: number }> = {
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
+  await page.route("**/api/fsq?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fsqPayload) }));
   await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
   await page.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
   await page.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
@@ -46,10 +54,7 @@ test.beforeEach(async ({ page }) => {
 test("mobile layout and core flows stay inside the device viewport", async ({ page }, testInfo) => {
   await page.goto("/");
 
-  const viewport = await page.evaluate(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }));
+  const viewport = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const expected = EXPECTED_VIEWPORTS[testInfo.project.name];
   expect(expected, `Unknown mobile project: ${testInfo.project.name}`).toBeTruthy();
   expect(viewport).toEqual(expected);
@@ -64,14 +69,19 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await page.screenshot({ path: testInfo.outputPath("mobile-home.png"), fullPage: false });
 
   const viewportRequests: string[] = [];
+  const fsqRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/viewport?")) viewportRequests.push(request.url());
+    if (request.url().includes("/api/fsq?")) fsqRequests.push(request.url());
   });
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
   await expect.poll(() => viewportRequests.length).toBe(9);
+  await expect.poll(() => fsqRequests.length).toBe(1);
   assertSegmentedNearbyCoverage(viewportRequests);
+  expect(new URL(fsqRequests[0]).searchParams.get("radius")).toBe("4500");
 
   await expect(page.getByText("Yakın Market")).toBeVisible();
+  await expect(page.getByText("FSQ Ek Kafe")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Market", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Migros", exact: true })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Otopark", exact: true })).toHaveCount(1);
@@ -79,7 +89,7 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   const sortGroup = page.getByRole("group", { name: "Sonuç sıralaması" });
   await sortGroup.getByRole("button", { name: "A-Z" }).click();
   await expect(sortGroup.getByRole("button", { name: "A-Z" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".place-card h3").first()).toHaveText("Migros");
+  await expect(page.locator(".place-card h3").first()).toHaveText("FSQ Ek Kafe");
   await sortGroup.getByRole("button", { name: "Yakın" }).click();
   await expect(sortGroup.getByRole("button", { name: "Yakın" })).toHaveAttribute("aria-pressed", "true");
 
@@ -126,14 +136,8 @@ function assertSegmentedNearbyCoverage(requestUrls: string[]) {
   expect(requestUrls).toHaveLength(9);
   const boxes = requestUrls.map((requestUrl) => {
     const url = new URL(requestUrl);
-    return {
-      south: Number(url.searchParams.get("south")),
-      west: Number(url.searchParams.get("west")),
-      north: Number(url.searchParams.get("north")),
-      east: Number(url.searchParams.get("east")),
-    };
+    return { south: Number(url.searchParams.get("south")), west: Number(url.searchParams.get("west")), north: Number(url.searchParams.get("north")), east: Number(url.searchParams.get("east")) };
   });
-
   expect(Math.max(...boxes.map((box) => box.north)) - Math.min(...boxes.map((box) => box.south))).toBeGreaterThanOrEqual(0.089);
   expect(Math.max(...boxes.map((box) => box.east)) - Math.min(...boxes.map((box) => box.west))).toBeGreaterThanOrEqual(0.109);
   boxes.forEach((box) => {
@@ -159,9 +163,6 @@ async function assertBottomNavInsideViewport(page: import("@playwright/test").Pa
 
 async function assertCategoryRailIsMobileScrollable(page: import("@playwright/test").Page) {
   const rail = page.locator(".category-rail");
-  const metrics = await rail.evaluate((element) => ({
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-  }));
+  const metrics = await rail.evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
 }
