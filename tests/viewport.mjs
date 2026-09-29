@@ -7,6 +7,8 @@ const {
   buildViewportQuery,
   queryViewport,
   PROVIDER_TIMEOUT_MS,
+  PROVIDER_HEDGE_MS,
+  ENDPOINTS,
 } = require("../lib/viewport.cjs");
 const handler = require("../api/viewport.js");
 
@@ -18,7 +20,9 @@ assert.match(query, /36\.88,30\.69,36\.91,30\.73/);
 assert.match(query, /supermarket\|convenience/);
 assert.match(query, /restaurant\|fast_food/);
 assert.match(query, /out center tags qt/);
-assert.equal(PROVIDER_TIMEOUT_MS, 2600);
+assert.equal(PROVIDER_TIMEOUT_MS, 5000);
+assert.equal(PROVIDER_HEDGE_MS, 350);
+assert.ok(ENDPOINTS.some(endpoint => endpoint.includes("maps.mail.ru")));
 assert.throws(() => canonicalizeViewport({ south: 36, west: 30, north: 36.5, east: 30.5 }), /bbox_too_large/);
 
 let calls = 0;
@@ -26,6 +30,18 @@ const ok = elements => ({ ok: true, json: async () => ({ elements }) });
 const result = await queryViewport(viewport, async () => { calls += 1; return ok([{ id: 1 }]); });
 assert.equal(result.elements.length, 1);
 assert.equal(calls, 1);
+
+let hedgedCalls = 0;
+const hedgedResult = await queryViewport(viewport, async endpoint => {
+  hedgedCalls += 1;
+  if (endpoint === ENDPOINTS[0]) {
+    await new Promise(resolve => setTimeout(resolve, PROVIDER_HEDGE_MS + 120));
+    throw new Error("slow primary");
+  }
+  return ok([{ id: 2 }]);
+});
+assert.equal(hedgedResult.elements[0].id, 2);
+assert.ok(hedgedCalls >= 2);
 
 const res = () => ({
   headers: {},
@@ -45,7 +61,8 @@ try {
   await handler({ method: "GET", url: "/api/viewport?south=36.8841&west=30.6922&north=36.9062&east=30.7241" }, response);
   assert.equal(response.code, 200);
   assert.equal(response.headers["X-Yakinim-Viewport-Cache"], "MISS");
-  assert.match(response.headers["Cache-Control"], /s-maxage=180/);
+  assert.match(response.headers["Cache-Control"], /s-maxage=900/);
+  assert.equal(response.headers["X-Yakinim-Viewport-Provider"], "overpass.private.coffee");
 
   const cached = res();
   await handler({ method: "GET", url: "/api/viewport?south=36.8842&west=30.6923&north=36.9061&east=30.7240" }, cached);
@@ -56,4 +73,4 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-console.log("Viewport tests PASS: snapped visible-area queries, fast provider path and shared cache.");
+console.log("Viewport tests PASS: snapped queries, hedged providers and longer shared cache.");
