@@ -24,7 +24,7 @@ assert.match(query, /restaurant\|fast_food/);
 assert.match(query, /out center tags qt/);
 assert.equal(PROVIDER_TIMEOUT_MS, 5000);
 assert.equal(PROVIDER_HEDGE_MS, 350);
-assert.equal(QUALITY_WAIT_MS, 1200);
+assert.equal(QUALITY_WAIT_MS, 3500);
 assert.equal(MIN_GOOD_ELEMENT_COUNT, 12);
 assert.ok(ENDPOINTS.some(endpoint => endpoint.includes("maps.mail.ru")));
 assert.throws(() => canonicalizeViewport({ south: 36, west: 30, north: 36.5, east: 30.5 }), /bbox_too_large/);
