@@ -14,6 +14,11 @@ type DutyResponse = { pharmacies?: Array<Record<string, unknown>> };
 type NewsResponse = { items?: NewsItem[] };
 type RadioResponse = { stations?: RadioStation[] };
 
+// Keep the first nearby load close to the old app's ~5 km discovery reach.
+// These spans stay below the server's 0.12 degree viewport ceiling after grid snapping.
+const NEARBY_LAT_SPAN = 0.045;
+const NEARBY_LNG_SPAN = 0.055;
+
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
   const amenity = tags.amenity || "";
   const shop = tags.shop || "";
@@ -46,11 +51,18 @@ function displayNameFromTags(tags: Record<string, string> = {}) {
   );
 }
 
+function fallbackInfrastructureName(category: Exclude<CategoryId, "all" | "duty"> | null) {
+  if (category === "atm") return "ATM";
+  if (category === "parking") return "Otopark";
+  if (category === "park") return "Park";
+  return "";
+}
+
 function addressFromTags(tags: Record<string, string> = {}) {
   return [
     [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" "),
     tags["addr:suburb"] || tags["addr:district"] || tags["addr:neighbourhood"],
-  ].filter(Boolean).join(", ") || tags.address || "Adres bilgisi yok";
+  ].filter(Boolean).join(", ") || tags["addr:full"] || tags.address || "Adres bilgisi yok";
 }
 
 function distanceMeters(a: Coordinates, b: Coordinates) {
@@ -92,13 +104,11 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export async function fetchViewport(location: Coordinates): Promise<Place[]> {
-  const latSpan = 0.025;
-  const lngSpan = 0.03;
   const params = new URLSearchParams({
-    south: String(location.lat - latSpan),
-    west: String(location.lng - lngSpan),
-    north: String(location.lat + latSpan),
-    east: String(location.lng + lngSpan),
+    south: String(location.lat - NEARBY_LAT_SPAN),
+    west: String(location.lng - NEARBY_LNG_SPAN),
+    north: String(location.lat + NEARBY_LAT_SPAN),
+    east: String(location.lng + NEARBY_LNG_SPAN),
   });
   const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`);
   const places = (payload.elements || []).flatMap((element) => {
@@ -106,7 +116,7 @@ export async function fetchViewport(location: Coordinates): Promise<Place[]> {
     const lng = Number(element.lon ?? element.center?.lon);
     const category = categoryFromTags(element.tags);
     const tags = element.tags || {};
-    const name = displayNameFromTags(tags);
+    const name = displayNameFromTags(tags) || fallbackInfrastructureName(category);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !category || !name) return [];
     return [{
       id: `osm:${element.type}:${element.id}`,
