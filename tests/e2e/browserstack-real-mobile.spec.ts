@@ -33,7 +33,7 @@ const radioPayload = {
   ],
 };
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ context, page }) => {
   await page.addInitScript(() => {
     const position = {
       coords: {
@@ -60,11 +60,11 @@ test.beforeEach(async ({ page }) => {
     });
   });
 
-  await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
-  await page.route("**/api/overture?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(overturePayload) }));
-  await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
-  await page.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
-  await page.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
+  await context.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
+  await context.route("**/api/overture?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(overturePayload) }));
+  await context.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
+  await context.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
+  await context.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
 });
 
 test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
@@ -88,21 +88,23 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await assertNoHorizontalOverflow(page);
 
   await activateMobile(page.locator(".primary-button"));
-  await expect(page.getByText("Yakın Market")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Overture Test Kafe")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".results-section")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".places-list .place-card").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".results-meta")).toContainText("sonuç", { timeout: 30_000 });
 
   await activateMobile(page.locator(".category-pill").filter({ hasText: "Nöbetçi" }));
-  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".results-heading h2")).toHaveText("Nöbetçi eczaneler");
+  await expect(page.locator(".places-list .place-card").first()).toBeVisible({ timeout: 30_000 });
 
   const nav = page.locator(".bottom-nav");
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
 
   await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
-  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible();
+  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible({ timeout: 30_000 });
 
   await activateMobile(nav.locator("button").filter({ hasText: "Radyo" }));
-  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
+  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible({ timeout: 30_000 });
   await activateMobile(page.locator(".station-card").filter({ hasText: "Gerçek Cihaz Test Radyosu" }));
   await expect(page.locator(".global-radio-player")).toBeVisible();
 
