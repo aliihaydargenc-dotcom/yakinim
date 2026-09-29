@@ -67,13 +67,17 @@ async function getArchive() {
   if (!archivePromise) archivePromise = loadModules().then(([pmtiles]) => new pmtiles.PMTiles(PMTILES_URL));
   return archivePromise;
 }
-async function readTile(tile, origin, radiusM) {
+async function decodeTile(tile) {
   const [[, vectorTileModule, pbfModule], archive] = await Promise.all([loadModules(), getArchive()]);
   const response = await archive.getZxy(tile.z, tile.x, tile.y);
-  if (!response || !response.data) return { ok: true, places: [] };
+  if (!response || !response.data) return null;
   const Reader = pbfModule.PbfReader || pbfModule.default;
   if (!Reader) throw new Error("pbf_reader_unavailable");
-  const parsed = new vectorTileModule.VectorTile(new Reader(new Uint8Array(response.data)));
+  return new vectorTileModule.VectorTile(new Reader(new Uint8Array(response.data)));
+}
+async function readTile(tile, origin, radiusM) {
+  const parsed = await decodeTile(tile);
+  if (!parsed) return { ok: true, places: [] };
   const places = [];
   for (const layer of Object.values(parsed.layers || {})) {
     for (let index = 0; index < layer.length; index += 1) {
@@ -116,12 +120,39 @@ async function probeSource() {
   const bytes = new Uint8Array(await response.arrayBuffer());
   return { status: response.status, contentRange: response.headers.get("content-range"), acceptRanges: response.headers.get("accept-ranges"), contentLength: response.headers.get("content-length"), firstBytes: [...bytes.slice(0, 8)] };
 }
+async function probeTile() {
+  const lat = 36.884, lng = 31.0;
+  const tile = { z: TILE_ZOOM, x: lonToTileX(lng, TILE_ZOOM), y: latToTileY(lat, TILE_ZOOM) };
+  const parsed = await decodeTile(tile);
+  if (!parsed) return { tile, layers: [] };
+  const layers = [];
+  for (const [name, layer] of Object.entries(parsed.layers || {})) {
+    const samples = [];
+    for (let index = 0; index < Math.min(layer.length, 5); index += 1) {
+      const feature = layer.feature(index);
+      const properties = feature.properties || {};
+      samples.push({ keys: Object.keys(properties).sort(), properties });
+    }
+    layers.push({ name, count: layer.length, samples });
+  }
+  return { tile, layers };
+}
+async function probeSample() {
+  const result = await queryFsqPlaces(36.884, 31.0, 4500);
+  const breakdown = {};
+  for (const place of result.places) breakdown[place.category] = (breakdown[place.category] || 0) + 1;
+  return { count: result.places.length, tileCount: result.tileCount, successfulTiles: result.successfulTiles, breakdown, sample: result.places.slice(0, 12) };
+}
 async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
   const requestUrl = new URL(req.url, "https://yakinim.local");
-  if (requestUrl.searchParams.get("probe") === "1") {
-    try { return res.status(200).json(await probeSource()); }
-    catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : String(error) }); }
+  const probe = requestUrl.searchParams.get("probe");
+  if (probe) {
+    try {
+      if (probe === "1") return res.status(200).json(await probeSource());
+      if (probe === "tile") return res.status(200).json(await probeTile());
+      if (probe === "sample") return res.status(200).json(await probeSample());
+    } catch (error) { return res.status(500).json({ error: error instanceof Error ? error.message : String(error) }); }
   }
   const lat = Number(requestUrl.searchParams.get("lat")); const lng = Number(requestUrl.searchParams.get("lng"));
   const radius = Math.max(500, Math.min(MAX_RADIUS_M, Number(requestUrl.searchParams.get("radius")) || DEFAULT_RADIUS_M));
