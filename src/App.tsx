@@ -5,10 +5,11 @@ import { CategoryRail } from "./components/CategoryRail";
 import { MapView } from "./components/MapView";
 import { NewsView } from "./components/NewsView";
 import { PlaceCard } from "./components/PlaceCard";
+import { RadioPlayer } from "./components/RadioPlayer";
 import { RadioView } from "./components/RadioView";
 import { fetchDuty, fetchViewport } from "./services/api";
 import { useAppStore } from "./store";
-import type { Coordinates, Place, Section } from "./types";
+import type { Coordinates, Place, RadioStation, Section } from "./types";
 
 export default function App() {
   const section = useAppStore((s) => s.section);
@@ -27,6 +28,7 @@ export default function App() {
   const savedIds = useAppStore((s) => s.savedIds);
   const toggleSaved = useAppStore((s) => s.toggleSaved);
   const [locating, setLocating] = useState(false);
+  const [currentRadio, setCurrentRadio] = useState<RadioStation | null>(null);
 
   const viewportQuery = useQuery({
     queryKey: ["viewport", location?.lat.toFixed(3), location?.lng.toFixed(3)],
@@ -83,7 +85,7 @@ export default function App() {
   const errorPlaces = category === "duty" ? dutyQuery.isError : viewportQuery.isError;
 
   return (
-    <div className="app-frame">
+    <div className={currentRadio ? "app-frame has-radio-player" : "app-frame"}>
       <header className="app-header">
         <button type="button" className="brand" onClick={() => setSection("nearby")} aria-label="Yakınım ana ekran">
           <span className="brand-mark">y.</span><span><strong>Yakınım</strong><small>{locationLabel}</small></span>
@@ -108,8 +110,9 @@ export default function App() {
 
       {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} /></main>}
       {section === "news" && <NewsView />}
-      {section === "radio" && <RadioView />}
+      {section === "radio" && <RadioView current={currentRadio} onSelect={setCurrentRadio} />}
 
+      <RadioPlayer station={currentRadio} onClose={() => setCurrentRadio(null)} />
       <BottomNav section={section} onChange={setSection} />
     </div>
   );
