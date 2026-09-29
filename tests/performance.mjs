@@ -25,10 +25,13 @@ assert.match(app, /bundleFromSpatialPool/);
 assert.match(app, /if \(restored \|\| permissionState === "granted"\)/);
 assert.doesNotMatch(app, /if \(permissionState === "denied"\)/);
 assert.doesNotMatch(app, /radiusSelect/);
-assert.match(lib, /PROVIDER_TIMEOUT_MS = 2600/);
+assert.match(lib, /PROVIDER_TIMEOUT_MS = 5000/);
+assert.match(lib, /PROVIDER_HEDGE_MS = 350/);
+assert.match(lib, /Promise\.any\(attempts\)/);
+assert.match(lib, /maps\.mail\.ru/);
 assert.match(lib, /\[timeout:5\]/);
-assert.match(lib, /Yakinim\/3\.0\.0/);
-assert.match(api, /s-maxage=180/);
-assert.match(api, /stale-while-revalidate=900/);
+assert.match(lib, /Yakinim\/3\.13\.0/);
+assert.match(api, /s-maxage=900/);
+assert.match(api, /stale-while-revalidate=86400/);
 
-console.log("Performance tests PASS: persistent spatial pool, neighbor prefetch, cancellation and bounded provider latency.");
+console.log("Performance tests PASS: persistent spatial pool, hedged providers, cancellation and longer shared cache.");
