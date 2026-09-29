@@ -98,7 +98,9 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
-  await expect(page.locator(".place-marker.is-cluster").first()).toBeVisible();
+  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.locator(".place-marker")).toHaveCount(0);
   await assertNoHorizontalOverflow(page);
 
   await nav.getByRole("button", { name: "Yakınım", exact: true }).click();
