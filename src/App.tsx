@@ -11,6 +11,8 @@ import { fetchDuty, fetchViewport } from "./services/api";
 import { useAppStore } from "./store";
 import type { Coordinates, Place, RadioStation, Section } from "./types";
 
+type SortMode = "distance" | "name";
+
 export default function App() {
   const section = useAppStore((s) => s.section);
   const setSection = useAppStore((s) => s.setSection);
@@ -29,6 +31,7 @@ export default function App() {
   const toggleSaved = useAppStore((s) => s.toggleSaved);
   const [locating, setLocating] = useState(false);
   const [currentRadio, setCurrentRadio] = useState<RadioStation | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("distance");
 
   const viewportQuery = useQuery({
     queryKey: ["viewport", location?.lat.toFixed(3), location?.lng.toFixed(3)],
@@ -48,8 +51,12 @@ export default function App() {
   const places = useMemo(() => {
     const source = category === "duty" ? (dutyQuery.data || []) : (viewportQuery.data || []);
     const term = search.trim().toLocaleLowerCase("tr");
-    return source.filter((place) => (category === "all" || place.category === category) && (!term || `${place.name} ${place.address}`.toLocaleLowerCase("tr").includes(term)));
-  }, [category, search, viewportQuery.data, dutyQuery.data]);
+    const filtered = source.filter((place) => (category === "all" || place.category === category) && (!term || `${place.name} ${place.address}`.toLocaleLowerCase("tr").includes(term)));
+    return [...filtered].sort((a, b) => {
+      if (sortMode === "name") return a.name.localeCompare(b.name, "tr", { sensitivity: "base" });
+      return (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity);
+    });
+  }, [category, search, sortMode, viewportQuery.data, dutyQuery.data]);
 
   function requestLocation() {
     if (!navigator.geolocation) {
@@ -101,6 +108,7 @@ export default function App() {
         {!location && <section className="location-gate"><div className="gate-icon"><MapPin size={24} /></div><div><strong>Çevreni aç</strong><p>Yakındaki yerleri görmek için konumunu kullan veya haritadan bir nokta seç.</p></div><div className="gate-actions"><button type="button" className="primary-button" onClick={requestLocation} disabled={locating}>{locating ? "Konum bulunuyor…" : "Konumumu kullan"}</button><button type="button" className="secondary-button" onClick={startManualPick}>Haritadan seç</button></div>{locationError && <p className="inline-error">{locationError}</p>}</section>}
 
         {location && <section className="results-section"><div className="results-heading"><div><p>YAKININDA</p><h2>{resultTitle(category)}</h2></div><button type="button" className="map-shortcut" onClick={() => setSection("map")}><MapIcon size={17} /> Harita</button></div>
+          {!loadingPlaces && !errorPlaces && <div className="results-meta"><span>{places.length} sonuç</span><div className="sort-toggle" role="group" aria-label="Sonuç sıralaması"><button type="button" aria-pressed={sortMode === "distance"} onClick={() => setSortMode("distance")}>Yakın</button><button type="button" aria-pressed={sortMode === "name"} onClick={() => setSortMode("name")}>A-Z</button></div></div>}
           {loadingPlaces && <SkeletonResults />}
           {errorPlaces && <div className="state-card"><strong>Yakındaki yerler alınamadı</strong><p>Bağlantıyı kontrol edip tekrar dene veya haritada başka bir alan seç.</p></div>}
           {!loadingPlaces && !errorPlaces && places.length === 0 && <div className="state-card"><strong>Bu alanda sonuç yok</strong><p>Başka bir kategori seç veya haritada biraz uzaklaş.</p></div>}
@@ -108,7 +116,7 @@ export default function App() {
         </section>}
       </main>}
 
-      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} /></main>}
+      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{places.length} yer</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} /></main>}
       {section === "news" && <NewsView />}
       {section === "radio" && <RadioView current={currentRadio} onSelect={setCurrentRadio} />}
 

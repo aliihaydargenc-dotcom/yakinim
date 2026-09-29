@@ -14,22 +14,6 @@ type DutyResponse = { pharmacies?: Array<Record<string, unknown>> };
 type NewsResponse = { items?: NewsItem[] };
 type RadioResponse = { stations?: RadioStation[] };
 
-const CATEGORY_LABEL: Record<Exclude<CategoryId, "all">, string> = {
-  duty: "Nöbetçi Eczane",
-  market: "Market",
-  food: "Yemek",
-  cafe: "Kafe",
-  atm: "ATM",
-  pharmacy: "Eczane",
-  hospital: "Sağlık",
-  fuel: "Akaryakıt",
-  parking: "Otopark",
-  park: "Park",
-  bakery: "Fırın",
-  greengrocer: "Manav",
-  shopping: "Alışveriş",
-};
-
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
   const amenity = tags.amenity || "";
   const shop = tags.shop || "";
@@ -46,6 +30,20 @@ function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId
   if (["mall", "department_store", "clothes"].includes(shop)) return "shopping";
   if (tags.leisure === "park") return "park";
   return null;
+}
+
+function cleanText(value?: string) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function displayNameFromTags(tags: Record<string, string> = {}) {
+  return cleanText(
+    tags["name:tr"]
+    || tags.name
+    || tags.brand
+    || tags.operator
+    || tags.network,
+  );
 }
 
 function addressFromTags(tags: Record<string, string> = {}) {
@@ -65,6 +63,28 @@ function distanceMeters(a: Coordinates, b: Coordinates) {
   return 2 * r * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+function dedupePlaces(places: Place[]) {
+  const bestByKey = new Map<string, Place>();
+  for (const place of places) {
+    const key = [
+      place.category,
+      place.name.toLocaleLowerCase("tr"),
+      place.lat.toFixed(4),
+      place.lng.toFixed(4),
+    ].join("|");
+    const current = bestByKey.get(key);
+    if (!current || placeQuality(place) > placeQuality(current)) bestByKey.set(key, place);
+  }
+  return [...bestByKey.values()];
+}
+
+function placeQuality(place: Place) {
+  let score = 0;
+  if (place.address && place.address !== "Adres bilgisi yok") score += 2;
+  if (place.phone) score += 1;
+  return score;
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -81,15 +101,16 @@ export async function fetchViewport(location: Coordinates): Promise<Place[]> {
     east: String(location.lng + lngSpan),
   });
   const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`);
-  return (payload.elements || []).flatMap((element) => {
+  const places = (payload.elements || []).flatMap((element) => {
     const lat = Number(element.lat ?? element.center?.lat);
     const lng = Number(element.lon ?? element.center?.lon);
     const category = categoryFromTags(element.tags);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !category) return [];
     const tags = element.tags || {};
+    const name = displayNameFromTags(tags);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !category || !name) return [];
     return [{
       id: `osm:${element.type}:${element.id}`,
-      name: tags.name || CATEGORY_LABEL[category],
+      name,
       category,
       lat,
       lng,
@@ -97,7 +118,8 @@ export async function fetchViewport(location: Coordinates): Promise<Place[]> {
       phone: tags.phone || tags["contact:phone"] || undefined,
       distanceM: Math.round(distanceMeters(location, { lat, lng })),
     } satisfies Place];
-  }).sort((a, b) => (a.distanceM || Infinity) - (b.distanceM || Infinity));
+  });
+  return dedupePlaces(places).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
 }
 
 export async function fetchDuty(location: Coordinates): Promise<Place[]> {

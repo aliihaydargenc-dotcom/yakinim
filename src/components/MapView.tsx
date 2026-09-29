@@ -3,10 +3,16 @@ import { Navigation, Phone, X } from "lucide-react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { Coordinates, Place } from "../types";
 
+type MarkerEntry = {
+  marker: Marker;
+  element: HTMLButtonElement;
+  place: Place;
+};
+
 export function MapView({ location, places, picking, onPick }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markersRef = useRef<Marker[]>([]);
+  const markersRef = useRef<MarkerEntry[]>([]);
   const locationMarkerRef = useRef<Marker | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
@@ -54,7 +60,7 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current.forEach(({ marker }) => marker.remove());
     markersRef.current = places.slice(0, 120).map((place) => {
       const el = document.createElement("button");
       el.type = "button";
@@ -67,10 +73,47 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
         setSelectedPlace(place);
         map.easeTo({ center: [place.lng, place.lat], duration: 300 });
       });
-      return new maplibregl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map);
+      const marker = new maplibregl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map);
+      return { marker, element: el, place };
     });
-    if (selectedPlace && !places.some((place) => place.id === selectedPlace.id)) setSelectedPlace(null);
-  }, [places, picking, selectedPlace?.id]);
+    setSelectedPlace((current) => current && !places.some((place) => place.id === current.id) ? null : current);
+  }, [places, picking]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateVisibility = () => {
+      const zoom = map.getZoom();
+      const cellSize = zoom >= 17 ? 28 : zoom >= 15 ? 38 : zoom >= 13 ? 50 : 64;
+      const occupied = new Set<string>();
+      const ordered = [...markersRef.current].sort((a, b) => {
+        if (a.place.id === selectedPlace?.id) return -1;
+        if (b.place.id === selectedPlace?.id) return 1;
+        return (a.place.distanceM ?? Infinity) - (b.place.distanceM ?? Infinity);
+      });
+
+      for (const entry of ordered) {
+        const point = map.project([entry.place.lng, entry.place.lat]);
+        const key = `${Math.round(point.x / cellSize)}:${Math.round(point.y / cellSize)}`;
+        const selected = entry.place.id === selectedPlace?.id;
+        const visible = selected || !occupied.has(key);
+        entry.element.style.display = visible ? "" : "none";
+        entry.element.setAttribute("aria-hidden", visible ? "false" : "true");
+        if (visible) occupied.add(key);
+      }
+    };
+
+    updateVisibility();
+    map.on("moveend", updateVisibility);
+    map.on("zoomend", updateVisibility);
+    map.on("resize", updateVisibility);
+    return () => {
+      map.off("moveend", updateVisibility);
+      map.off("zoomend", updateVisibility);
+      map.off("resize", updateVisibility);
+    };
+  }, [places, selectedPlace?.id]);
 
   return <div className="map-stage">
     <div ref={containerRef} className="map-canvas" />

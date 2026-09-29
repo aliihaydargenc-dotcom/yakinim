@@ -5,6 +5,9 @@ const viewportPayload = {
     { type: "node", id: 1, lat: 36.885, lon: 30.705, tags: { shop: "supermarket", name: "Yakın Market", "addr:street": "Atatürk Caddesi" } },
     { type: "node", id: 2, lat: 36.886, lon: 30.706, tags: { amenity: "cafe", name: "Yakın Kafe", "addr:street": "Cumhuriyet Sokak" } },
     { type: "node", id: 3, lat: 36.887, lon: 30.707, tags: { amenity: "atm", name: "Yakın ATM", "addr:street": "Merkez" } },
+    { type: "node", id: 4, lat: 36.8872, lon: 30.7072, tags: { shop: "supermarket", "addr:street": "İsimsiz Sokak" } },
+    { type: "node", id: 5, lat: 36.888, lon: 30.708, tags: { shop: "supermarket", brand: "Migros", "addr:street": "Serik Caddesi" } },
+    { type: "way", id: 6, center: { lat: 36.88801, lon: 30.70801 }, tags: { shop: "supermarket", brand: "Migros", "addr:street": "Serik Caddesi" } },
   ],
 };
 
@@ -61,6 +64,16 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
 
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
   await expect(page.getByText("Yakın Market")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Market", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Migros", exact: true })).toHaveCount(1);
+
+  const sortGroup = page.getByRole("group", { name: "Sonuç sıralaması" });
+  await sortGroup.getByRole("button", { name: "A-Z" }).click();
+  await expect(sortGroup.getByRole("button", { name: "A-Z" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".place-card h3").first()).toHaveText("Migros");
+  await sortGroup.getByRole("button", { name: "Yakın" }).click();
+  await expect(sortGroup.getByRole("button", { name: "Yakın" })).toHaveAttribute("aria-pressed", "true");
+
   await assertNoHorizontalOverflow(page);
 
   await page.getByRole("button", { name: "Nöbetçi", exact: true }).click();
