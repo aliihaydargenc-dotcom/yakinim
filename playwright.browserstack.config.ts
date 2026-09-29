@@ -14,6 +14,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: "http://bs-local.com:4173",
+    serviceWorkers: "block",
     screenshot: "only-on-failure",
     trace: "off",
     video: "off",

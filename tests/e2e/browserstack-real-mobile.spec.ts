@@ -8,6 +8,13 @@ const viewportPayload = {
   ],
 };
 
+const overturePayload = {
+  places: [
+    { id: "overture-real-device-1", name: "Overture Test Kafe", category: "cafe", lat: 36.8853, lng: 30.7058, address: "Kadriye", distanceM: 180 },
+    { id: "overture-real-device-2", name: "Yakın Market", category: "market", lat: 36.88501, lng: 30.70501, address: "Atatürk Caddesi", distanceM: 120 },
+  ],
+};
+
 const dutyPayload = {
   pharmacies: [
     { id: "duty-1", name: "Merkez Nöbetçi Eczane", address: "Kadriye Mahallesi", phone: "02420000000", latitude: 36.8855, longitude: 30.7065, distance_m: 420 },
@@ -27,7 +34,7 @@ const radioPayload = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.addInitScript((fixtures) => {
     const position = {
       coords: {
         latitude: 36.884,
@@ -40,6 +47,7 @@ test.beforeEach(async ({ page }) => {
       },
       timestamp: Date.now(),
     };
+
     Object.defineProperty(navigator, "geolocation", {
       configurable: true,
       value: {
@@ -51,12 +59,29 @@ test.beforeEach(async ({ page }) => {
         clearWatch: () => undefined,
       },
     });
-  });
 
-  await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
-  await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
-  await page.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
-  await page.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const json = (payload: unknown) => new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (url.includes("/api/viewport?")) return json(fixtures.viewport);
+      if (url.includes("/api/overture?")) return json(fixtures.overture);
+      if (url.includes("/api/duty?")) return json(fixtures.duty);
+      if (url.includes("/api/news?")) return json(fixtures.news);
+      if (url.includes("/api/radio?")) return json(fixtures.radio);
+      return originalFetch(input, init);
+    };
+  }, {
+    viewport: viewportPayload,
+    overture: overturePayload,
+    duty: dutyPayload,
+    news: newsPayload,
+    radio: radioPayload,
+  });
 });
 
 test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
@@ -80,20 +105,24 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await assertNoHorizontalOverflow(page);
 
   await activateMobile(page.locator(".primary-button"));
-  await expect(page.getByText("Yakın Market")).toBeVisible();
+  await expect(page.locator(".results-section")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Yakın Market")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Overture Test Kafe")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".results-meta")).toContainText("sonuç", { timeout: 30_000 });
 
   await activateMobile(page.locator(".category-pill").filter({ hasText: "Nöbetçi" }));
-  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
+  await expect(page.locator(".results-heading h2")).toHaveText("Nöbetçi eczaneler");
+  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible({ timeout: 30_000 });
 
   const nav = page.locator(".bottom-nav");
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
 
   await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
-  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible();
+  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible({ timeout: 30_000 });
 
   await activateMobile(nav.locator("button").filter({ hasText: "Radyo" }));
-  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
+  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible({ timeout: 30_000 });
   await activateMobile(page.locator(".station-card").filter({ hasText: "Gerçek Cihaz Test Radyosu" }));
   await expect(page.locator(".global-radio-player")).toBeVisible();
 
