@@ -63,10 +63,13 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await assertCategoryRailIsMobileScrollable(page);
   await page.screenshot({ path: testInfo.outputPath("mobile-home.png"), fullPage: false });
 
-  const viewportRequestPromise = page.waitForRequest("**/api/viewport?*");
+  const viewportRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/viewport?")) viewportRequests.push(request.url());
+  });
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
-  const viewportRequest = await viewportRequestPromise;
-  assertNearbyCoverage(viewportRequest.url());
+  await expect.poll(() => viewportRequests.length).toBe(9);
+  assertSegmentedNearbyCoverage(viewportRequests);
 
   await expect(page.getByText("Yakın Market")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Market", exact: true })).toHaveCount(0);
@@ -82,10 +85,16 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
 
   await assertNoHorizontalOverflow(page);
 
+  const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
+  await nav.getByRole("button", { name: "Harita", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
+  await expect(page.locator(".place-marker.is-cluster").first()).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+
+  await nav.getByRole("button", { name: "Yakınım", exact: true }).click();
   await page.getByRole("button", { name: "Nöbetçi", exact: true }).click();
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
-  const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
   await assertNoHorizontalOverflow(page);
@@ -113,14 +122,24 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await page.screenshot({ path: testInfo.outputPath("mobile-final.png"), fullPage: false });
 });
 
-function assertNearbyCoverage(requestUrl: string) {
-  const url = new URL(requestUrl);
-  const south = Number(url.searchParams.get("south"));
-  const west = Number(url.searchParams.get("west"));
-  const north = Number(url.searchParams.get("north"));
-  const east = Number(url.searchParams.get("east"));
-  expect(north - south).toBeGreaterThanOrEqual(0.089);
-  expect(east - west).toBeGreaterThanOrEqual(0.109);
+function assertSegmentedNearbyCoverage(requestUrls: string[]) {
+  expect(requestUrls).toHaveLength(9);
+  const boxes = requestUrls.map((requestUrl) => {
+    const url = new URL(requestUrl);
+    return {
+      south: Number(url.searchParams.get("south")),
+      west: Number(url.searchParams.get("west")),
+      north: Number(url.searchParams.get("north")),
+      east: Number(url.searchParams.get("east")),
+    };
+  });
+
+  expect(Math.max(...boxes.map((box) => box.north)) - Math.min(...boxes.map((box) => box.south))).toBeGreaterThanOrEqual(0.089);
+  expect(Math.max(...boxes.map((box) => box.east)) - Math.min(...boxes.map((box) => box.west))).toBeGreaterThanOrEqual(0.109);
+  boxes.forEach((box) => {
+    expect(box.north - box.south).toBeLessThanOrEqual(0.031);
+    expect(box.east - box.west).toBeLessThanOrEqual(0.038);
+  });
 }
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
