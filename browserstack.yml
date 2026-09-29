@@ -1,0 +1,26 @@
+userName: YOUR_USERNAME
+accessKey: YOUR_ACCESS_KEY
+
+projectName: Yakinim v2
+buildName: Yakinim v2 real mobile
+buildIdentifier: '#${BUILD_NUMBER}'
+
+platforms:
+  - browserName: safari
+    osVersion: 17
+    deviceName: iPhone 15 Pro Max
+  - browserName: chrome
+    osVersion: 16.0
+    deviceName: Google Pixel 9
+
+parallelsPerPlatform: 1
+browserstackLocal: true
+browserStackLocalOptions:
+  forceLocal: true
+
+framework: playwright
+source: yakinim-v2-real-mobile
+
+debug: false
+networkLogs: true
+testObservability: true

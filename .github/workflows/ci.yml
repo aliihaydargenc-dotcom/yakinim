@@ -12,7 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,10 +22,30 @@ jobs:
         with:
           node-version: 22
 
-      - name: JavaScript syntax
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Legacy syntax guard
         run: |
           node --check app.js
           node --check sw.js
 
-      - name: Smoke tests
+      - name: API + React build verification
         run: npm test
+
+      - name: Install mobile browser engines
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Mobile device emulation tests
+        run: npm run test:mobile
+
+      - name: Upload mobile test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

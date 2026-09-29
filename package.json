@@ -1,9 +1,29 @@
 {
   "name": "yakinim",
-  "version": "3.13.0",
+  "version": "4.0.0-beta.2",
   "private": true,
-  "description": "Mobil öncelikli günlük ihtiyaç haritası",
+  "description": "Yakınım v2 — mobil öncelikli yakın çevre keşif uygulaması",
   "scripts": {
-    "test": "node --check api/duty.js && node tests/duty.mjs && node --check app.js && node --check sprint1.js && node --check sprint2.js && node tests/sprint2.mjs && node --check sprint3.js && node tests/production-hardening.mjs && node tests/sprint1.mjs && node tests/smoke.mjs && node tests/discovery.mjs && node tests/network.mjs && node tests/viewport.mjs && node tests/spatial.mjs && node tests/location.mjs && node tests/product-standard.mjs && node tests/interactions.mjs && node tests/mobile-discovery.mjs && node tests/performance.mjs && node tests/media.mjs"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --check api/duty.js && node tests/duty.mjs && node tests/viewport.mjs && npm run build",
+    "test:mobile": "playwright test",
+    "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.66.0",
+    "lucide-react": "^0.468.0",
+    "maplibre-gl": "^5.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
   }
 }

@@ -1,0 +1,69 @@
+name: BrowserStack Real Mobile
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/e2e/**"
+      - "playwright.browserstack.config.ts"
+      - "browserstack.yml"
+      - "package.json"
+      - ".github/workflows/browserstack-mobile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browserstack-real-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-mobile:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify BrowserStack credentials are available
+        run: |
+          if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
+            echo "::error::BrowserStack Actions secrets are missing."
+            exit 1
+          fi
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install BrowserStack Node SDK
+        run: npm install --no-save --no-audit --no-fund browserstack-node-sdk@latest
+
+      - name: Verify Playwright compatibility
+        run: npx playwright --version | grep "Version 1.59.0"
+
+      - name: Run on real iOS Safari and Android Chrome
+        run: npx browserstack-node-sdk playwright test --config=./playwright.browserstack.config.ts
+
+      - name: Upload BrowserStack test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browserstack-real-mobile-report
+          path: |
+            playwright-report-browserstack/
+            test-results/
+            browserstack-artifacts/
+            log/
+          if-no-files-found: ignore
+          retention-days: 7

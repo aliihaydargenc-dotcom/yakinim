@@ -1,8 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "git": {
     "deploymentEnabled": {
-      "*": false,
+      "*": true,
       "main": true
     }
   },
@@ -10,37 +13,18 @@
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "geolocation=(self)"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        }
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(self)" },
+        { "key": "X-Frame-Options", "value": "DENY" }
       ]
     }
   ],
   "functions": {
-    "api/nearby.js": {
-      "maxDuration": 60
-    },
-    "api/viewport.js": {
-      "maxDuration": 30
-    },
-    "api/news.js": {
-      "maxDuration": 15
-    },
-    "api/radio.js": {
-      "maxDuration": 30
-    }
+    "api/nearby.js": { "maxDuration": 60 },
+    "api/viewport.js": { "maxDuration": 30 },
+    "api/duty.js": { "maxDuration": 30 },
+    "api/news.js": { "maxDuration": 15 },
+    "api/radio.js": { "maxDuration": 30 }
   }
 }
