@@ -20,7 +20,6 @@ const NEARBY_LAT_SPAN = 0.045;
 const NEARBY_LNG_SPAN = 0.055;
 const VIEWPORT_GRID_SIZE = 3;
 const VIEWPORT_CONCURRENCY = 3;
-const OVERTURE_ENRICHMENT_THRESHOLD = 80;
 const OVERTURE_RADIUS_M = 4500;
 
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
@@ -99,19 +98,28 @@ function buildViewportGrid(location: Coordinates): ViewportBounds[] {
   const centerIndex = Math.floor(cells.length / 2);
   return [cells[centerIndex], ...cells.slice(0, centerIndex), ...cells.slice(centerIndex + 1)];
 }
-async function fetchViewportElements(location: Coordinates): Promise<OsmElement[]> {
-  const cells = buildViewportGrid(location); const elements: OsmElement[] = []; let successCount = 0; let cursor = 0;
+async function fetchViewportCell(cell: ViewportBounds): Promise<OsmElement[]> {
+  const params = new URLSearchParams({ south: String(cell.south), west: String(cell.west), north: String(cell.north), east: String(cell.east) });
+  const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`);
+  return payload.elements || [];
+}
+async function fetchViewportCells(cells: ViewportBounds[]): Promise<{ elements: OsmElement[]; successCount: number }> {
+  const elements: OsmElement[] = [];
+  let successCount = 0;
+  let cursor = 0;
   async function worker() {
     while (cursor < cells.length) {
       const cell = cells[cursor++];
-      const params = new URLSearchParams({ south: String(cell.south), west: String(cell.west), north: String(cell.north), east: String(cell.east) });
-      try { const payload = await getJson<ViewportResponse>(`/api/viewport?${params}`); successCount += 1; elements.push(...(payload.elements || [])); } catch {}
+      try {
+        elements.push(...await fetchViewportCell(cell));
+        successCount += 1;
+      } catch {}
     }
   }
-  await Promise.all(Array.from({ length: VIEWPORT_CONCURRENCY }, () => worker()));
-  if (!successCount) throw new Error("viewport_unavailable");
-  const unique = new Map<string, OsmElement>(); for (const element of elements) unique.set(`${element.type}:${element.id}`, element);
-  return [...unique.values()];
+  await Promise.all(Array.from({ length: Math.min(VIEWPORT_CONCURRENCY, Math.max(1, cells.length)) }, () => worker()));
+  const unique = new Map<string, OsmElement>();
+  for (const element of elements) unique.set(`${element.type}:${element.id}`, element);
+  return { elements: [...unique.values()], successCount };
 }
 function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): Place[] {
   return elements.flatMap((element) => {
@@ -127,17 +135,35 @@ async function fetchOvertureSupplement(location: Coordinates): Promise<Place[]> 
   const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`);
   return payload.places || [];
 }
+function mergePlaces(places: Place[]) {
+  return dedupePlaces(places).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
+}
+
+export async function fetchViewportQuick(location: Coordinates): Promise<Place[]> {
+  const centerCell = buildViewportGrid(location)[0];
+  const [centerResult, supplementResult] = await Promise.allSettled([
+    fetchViewportCell(centerCell),
+    fetchOvertureSupplement(location),
+  ]);
+  const centerPlaces = centerResult.status === "fulfilled" ? osmPlacesFromElements(centerResult.value, location) : [];
+  const supplemental = supplementResult.status === "fulfilled" ? supplementResult.value : [];
+  const merged = mergePlaces([...centerPlaces, ...supplemental]);
+  if (!merged.length && centerResult.status === "rejected" && supplementResult.status === "rejected") throw new Error("nearby_quick_unavailable");
+  return merged;
+}
+
+export async function fetchViewportExpanded(location: Coordinates, seed: Place[] = []): Promise<Place[]> {
+  const outerCells = buildViewportGrid(location).slice(1);
+  const { elements, successCount } = await fetchViewportCells(outerCells);
+  const merged = mergePlaces([...seed, ...osmPlacesFromElements(elements, location)]);
+  if (!merged.length && !successCount && !seed.length) throw new Error("nearby_unavailable");
+  return merged;
+}
 
 export async function fetchViewport(location: Coordinates): Promise<Place[]> {
-  let osmPlaces: Place[] = []; let osmFailed = false;
-  try { osmPlaces = osmPlacesFromElements(await fetchViewportElements(location), location); } catch { osmFailed = true; }
-  let supplemental: Place[] = [];
-  if (osmPlaces.length < OVERTURE_ENRICHMENT_THRESHOLD) {
-    try { supplemental = await fetchOvertureSupplement(location); } catch {}
-  }
-  const merged = dedupePlaces([...osmPlaces, ...supplemental]).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
-  if (!merged.length && osmFailed) throw new Error("nearby_unavailable");
-  return merged;
+  let quick: Place[] = [];
+  try { quick = await fetchViewportQuick(location); } catch {}
+  return fetchViewportExpanded(location, quick);
 }
 
 export async function fetchDuty(location: Coordinates): Promise<Place[]> {

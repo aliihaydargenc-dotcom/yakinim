@@ -97,11 +97,18 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
 
   const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
+  await expect(page.locator(".map-category-dock")).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.locator(".user-marker")).toBeVisible();
   await expect(page.locator(".place-marker")).toHaveCount(0);
+  await assertMapChromeDoesNotOverlap(page);
   await assertNoHorizontalOverflow(page);
+
+  const mapMarketButton = page.locator(".map-category-dock").getByRole("button", { name: "Market", exact: true });
+  await mapMarketButton.click();
+  await expect(mapMarketButton).toHaveAttribute("aria-pressed", "true");
 
   const requestCountBeforePan = viewportRequests.length;
   await panMap(page);
@@ -112,7 +119,8 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
+  await assertMapChromeDoesNotOverlap(page);
   await assertNoHorizontalOverflow(page);
 
   await nav.getByRole("button", { name: "Haber", exact: true }).click();
@@ -181,7 +189,19 @@ async function assertBottomNavInsideViewport(page: import("@playwright/test").Pa
 }
 
 async function assertCategoryRailIsMobileScrollable(page: import("@playwright/test").Page) {
-  const rail = page.locator(".category-rail");
+  const rail = page.locator(".category-rail").first();
   const metrics = await rail.evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
   expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+}
+
+async function assertMapChromeDoesNotOverlap(page: import("@playwright/test").Page) {
+  const header = await page.locator(".app-header").boundingBox();
+  const dock = await page.locator(".map-category-dock").boundingBox();
+  const toolbar = await page.locator(".map-toolbar").boundingBox();
+  const canvas = await page.locator(".maplibregl-canvas").boundingBox();
+  expect(header && dock && toolbar && canvas).toBeTruthy();
+  if (!header || !dock || !toolbar || !canvas) return;
+  expect(dock.y).toBeGreaterThanOrEqual(header.y + header.height - 2);
+  expect(toolbar.y).toBeGreaterThanOrEqual(dock.y + dock.height - 2);
+  expect(canvas.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height - 2);
 }

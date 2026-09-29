@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Compass, LocateFixed, Map as MapIcon, MapPin, Newspaper, Radio, Search } from "lucide-react";
 import { CategoryRail } from "./components/CategoryRail";
@@ -7,7 +7,7 @@ import { NewsView } from "./components/NewsView";
 import { PlaceCard } from "./components/PlaceCard";
 import { RadioPlayer } from "./components/RadioPlayer";
 import { RadioView } from "./components/RadioView";
-import { fetchDuty, fetchViewport } from "./services/api";
+import { fetchDuty, fetchViewportExpanded, fetchViewportQuick } from "./services/api";
 import { useAppStore } from "./store";
 import type { Coordinates, Place, RadioStation, Section } from "./types";
 
@@ -33,24 +33,34 @@ export default function App() {
   const [locating, setLocating] = useState(false);
   const [currentRadio, setCurrentRadio] = useState<RadioStation | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("distance");
-  const [mapCenter, setMapCenter] = useState<Coordinates | null>(null);
+  const [mapCenter, setMapCenter] = useState<Coordinates | null>(location);
+  const lastAppliedLocationRef = useRef<Coordinates | null>(location);
+  const bestAccuracyRef = useRef(Number.POSITIVE_INFINITY);
 
   useEffect(() => {
     if (!location) {
       setMapCenter(null);
+      lastAppliedLocationRef.current = null;
       return;
     }
+    lastAppliedLocationRef.current = location;
     setMapCenter(location);
   }, [location?.lat, location?.lng]);
 
   const queryCenter = section === "map" ? (mapCenter || location) : location;
-  const viewportQuery = useQuery({
-    queryKey: ["viewport", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
-    queryFn: () => fetchViewport(queryCenter as Coordinates),
+  const viewportQuickQuery = useQuery({
+    queryKey: ["viewport-quick", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
+    queryFn: () => fetchViewportQuick(queryCenter as Coordinates),
     enabled: Boolean(queryCenter),
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+  const viewportExpandedQuery = useQuery({
+    queryKey: ["viewport-expanded", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
+    queryFn: () => fetchViewportExpanded(queryCenter as Coordinates, viewportQuickQuery.data || []),
+    enabled: Boolean(queryCenter && viewportQuickQuery.isFetched),
     staleTime: 15 * 60 * 1000,
     retry: 1,
-    placeholderData: (previousData) => previousData,
   });
   const dutyQuery = useQuery({
     queryKey: ["duty", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
@@ -58,11 +68,11 @@ export default function App() {
     enabled: Boolean(queryCenter && category === "duty"),
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    placeholderData: (previousData) => previousData,
   });
 
+  const viewportData = (viewportExpandedQuery.data?.length ? viewportExpandedQuery.data : viewportQuickQuery.data) || [];
   const places = useMemo(() => {
-    const source = category === "duty" ? (dutyQuery.data || []) : (viewportQuery.data || []);
+    const source = category === "duty" ? (dutyQuery.data || []) : viewportData;
     const withUserDistance = location
       ? source.map((place) => ({ ...place, distanceM: Math.round(distanceMeters(location, place)) }))
       : source;
@@ -72,7 +82,7 @@ export default function App() {
       if (sortMode === "name") return a.name.localeCompare(b.name, "tr", { sensitivity: "base" });
       return (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity);
     });
-  }, [category, search, sortMode, viewportQuery.data, dutyQuery.data, location?.lat, location?.lng]);
+  }, [category, search, sortMode, viewportData, dutyQuery.data, location?.lat, location?.lng]);
 
   function requestLocation() {
     if (!navigator.geolocation) {
@@ -81,18 +91,43 @@ export default function App() {
     }
     setLocating(true);
     setLocationError("");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-        setLocation(coords);
+    let settled = false;
+    let failures = 0;
+
+    const applyPosition = (position: GeolocationPosition, precise: boolean) => {
+      const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+      const accuracy = Number(position.coords.accuracy) || Number.POSITIVE_INFINITY;
+      const previous = lastAppliedLocationRef.current;
+      const movedM = previous ? distanceMeters(previous, coords) : Number.POSITIVE_INFINITY;
+      const meaningfullyBetter = accuracy + 5 < bestAccuracyRef.current;
+      if (!previous || meaningfullyBetter || movedM > 60) {
+        bestAccuracyRef.current = Math.min(bestAccuracyRef.current, accuracy);
+        lastAppliedLocationRef.current = coords;
+        setLocation(coords, precise ? "Konum hazır" : "Konum bulundu");
         setMapCenter(coords);
+      }
+      if (!settled) {
+        settled = true;
         setLocating(false);
-      },
-      () => {
-        setLocationError("Konum alınamadı. Haritadan bir nokta seçebilirsin.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      }
+    };
+
+    const handleFailure = () => {
+      failures += 1;
+      if (failures < 2 || settled) return;
+      setLocationError("Konum alınamadı. Haritadan bir nokta seçebilirsin.");
+      setLocating(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => applyPosition(position, false),
+      handleFailure,
+      { enableHighAccuracy: false, timeout: 2500, maximumAge: 5 * 60 * 1000 },
+    );
+    navigator.geolocation.getCurrentPosition(
+      (position) => applyPosition(position, true),
+      handleFailure,
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     );
   }
 
@@ -102,6 +137,8 @@ export default function App() {
   }
 
   function pickLocation(coords: Coordinates) {
+    lastAppliedLocationRef.current = coords;
+    bestAccuracyRef.current = Number.POSITIVE_INFINITY;
     setLocation(coords, "Haritadan seçilen konum");
     setMapCenter(coords);
     setPickingLocation(false);
@@ -115,9 +152,12 @@ export default function App() {
     });
   }
 
-  const loadingPlaces = category === "duty" ? dutyQuery.isPending : viewportQuery.isPending;
-  const errorPlaces = category === "duty" ? dutyQuery.isError : viewportQuery.isError;
-  const refreshingMap = section === "map" && (category === "duty" ? dutyQuery.isFetching : viewportQuery.isFetching) && !loadingPlaces;
+  const viewportLoading = viewportQuickQuery.isPending && !viewportQuickQuery.data;
+  const viewportError = viewportQuickQuery.isError && viewportExpandedQuery.isError;
+  const viewportRefreshing = (viewportQuickQuery.isFetching || viewportExpandedQuery.isFetching) && !viewportLoading;
+  const loadingPlaces = category === "duty" ? dutyQuery.isPending : viewportLoading;
+  const errorPlaces = category === "duty" ? dutyQuery.isError : viewportError;
+  const refreshingMap = section === "map" && (category === "duty" ? dutyQuery.isFetching && !dutyQuery.isPending : viewportRefreshing);
 
   return (
     <div className={currentRadio ? "app-frame has-radio-player" : "app-frame"}>
@@ -125,7 +165,7 @@ export default function App() {
         <button type="button" className="brand" onClick={() => setSection("nearby")} aria-label="Yakınım ana ekran">
           <span className="brand-mark">y.</span><span><strong>Yakınım</strong><small>{locationLabel}</small></span>
         </button>
-        <button type="button" className="location-control" onClick={requestLocation} disabled={locating}><LocateFixed size={19} /><span>{locating ? "Bulunuyor" : "Konumum"}</span></button>
+        <button type="button" className={locating ? "location-control is-locating" : "location-control"} onClick={requestLocation} disabled={locating}><LocateFixed size={19} /><span>{locating ? "Bulunuyor" : "Konumum"}</span></button>
       </header>
 
       {section === "nearby" && <main className="nearby-screen">
@@ -136,7 +176,7 @@ export default function App() {
         {!location && <section className="location-gate"><div className="gate-icon"><MapPin size={24} /></div><div><strong>Çevreni aç</strong><p>Yakındaki yerleri görmek için konumunu kullan veya haritadan bir nokta seç.</p></div><div className="gate-actions"><button type="button" className="primary-button" onClick={requestLocation} disabled={locating}>{locating ? "Konum bulunuyor…" : "Konumumu kullan"}</button><button type="button" className="secondary-button" onClick={startManualPick}>Haritadan seç</button></div>{locationError && <p className="inline-error">{locationError}</p>}</section>}
 
         {location && <section className="results-section"><div className="results-heading"><div><p>YAKININDA</p><h2>{resultTitle(category)}</h2></div><button type="button" className="map-shortcut" onClick={() => setSection("map")}><MapIcon size={17} /> Harita</button></div>
-          {!loadingPlaces && !errorPlaces && <div className="results-meta"><span>{places.length} sonuç</span><div className="sort-toggle" role="group" aria-label="Sonuç sıralaması"><button type="button" aria-pressed={sortMode === "distance"} onClick={() => setSortMode("distance")}>Yakın</button><button type="button" aria-pressed={sortMode === "name"} onClick={() => setSortMode("name")}>A-Z</button></div></div>}
+          {!loadingPlaces && !errorPlaces && <div className="results-meta"><span>{places.length} sonuç{viewportRefreshing && category !== "duty" ? " · çevre genişletiliyor" : ""}</span><div className="sort-toggle" role="group" aria-label="Sonuç sıralaması"><button type="button" aria-pressed={sortMode === "distance"} onClick={() => setSortMode("distance")}>Yakın</button><button type="button" aria-pressed={sortMode === "name"} onClick={() => setSortMode("name")}>A-Z</button></div></div>}
           {loadingPlaces && <SkeletonResults />}
           {errorPlaces && <div className="state-card"><strong>Yakındaki yerler alınamadı</strong><p>Bağlantıyı kontrol edip tekrar dene veya haritada başka bir alan seç.</p></div>}
           {!loadingPlaces && !errorPlaces && places.length === 0 && <div className="state-card"><strong>Bu alanda sonuç yok</strong><p>Başka bir kategori seç veya haritada biraz uzaklaş.</p></div>}
@@ -144,7 +184,11 @@ export default function App() {
         </section>}
       </main>}
 
-      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{refreshingMap ? "Yenileniyor…" : `${places.length} yer`}</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} onViewportChange={handleMapViewportChange} /></main>}
+      {section === "map" && <main className="map-screen">
+        <div className="map-category-dock"><CategoryRail value={category} onChange={setCategory} variant="map" /></div>
+        <div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Liste</button><div className="map-toolbar-actions">{location && <span className={refreshingMap ? "map-result-count is-loading" : "map-result-count"}>{refreshingMap ? <><span className="mini-spinner" /> Yenileniyor</> : `${places.length} yer`}</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Nokta seç"}</button></div></div>
+        <div className="map-surface"><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} onViewportChange={handleMapViewportChange} loading={loadingPlaces || refreshingMap} loadingText={loadingPlaces ? "Çevre taranıyor" : "Yeni alan yükleniyor"} /></div>
+      </main>}
       {section === "news" && <NewsView />}
       {section === "radio" && <RadioView current={currentRadio} onSelect={setCurrentRadio} />}
 

@@ -12,7 +12,7 @@ const INITIAL_LAYER = "nearby-place-initials";
 const LABEL_LAYER = "nearby-place-labels";
 const SELECTED_LABEL_LAYER = "nearby-place-selected-label";
 
-export function MapView({ location, places, picking, onPick, onViewportChange }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates) => void }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor" }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates) => void; loading?: boolean; loadingText?: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
@@ -33,8 +33,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange }:
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: "https://tiles.openfreemap.org/styles/positron",
-      center: [35, 39],
-      zoom: 5.2,
+      center: location ? [location.lng, location.lat] : [35, 39],
+      zoom: location ? 14.6 : 5.2,
       attributionControl: false,
     });
 
@@ -68,7 +68,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange }:
         const coordinates = feature.geometry.coordinates as [number, number];
         const zoom = await source.getClusterExpansionZoom(clusterId);
         setSelectedPlace(null);
-        map.easeTo({ center: coordinates, zoom: Math.min(18, zoom), duration: 320 });
+        map.easeTo({ center: coordinates, zoom: Math.min(18, zoom), duration: 280 });
         return;
       }
 
@@ -76,7 +76,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange }:
       const place = placesRef.current.find((candidate) => candidate.id === placeId);
       if (!place) return;
       setSelectedPlace(place);
-      map.easeTo({ center: [place.lng, place.lat], duration: 220 });
+      map.easeTo({ center: [place.lng, place.lat], duration: 180 });
     };
 
     const handlePointer = (event: maplibregl.MapMouseEvent) => {
@@ -119,12 +119,17 @@ export function MapView({ location, places, picking, onPick, onViewportChange }:
     if (!locationMarkerRef.current) {
       const el = document.createElement("div");
       el.className = "user-marker";
+      el.setAttribute("aria-label", "Konumun");
       locationMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(map);
     } else {
       locationMarkerRef.current.setLngLat([location.lng, location.lat]);
     }
 
-    map.easeTo({ center: [location.lng, location.lat], zoom: Math.max(map.getZoom(), 14), duration: 550 });
+    const center = map.getCenter();
+    const alreadyCentered = Math.abs(center.lat - location.lat) < 0.0008 && Math.abs(center.lng - location.lng) < 0.0008;
+    if (!alreadyCentered || map.getZoom() < 13.8) {
+      map.easeTo({ center: [location.lng, location.lat], zoom: Math.max(map.getZoom(), 14.6), duration: 280 });
+    }
   }, [location?.lat, location?.lng]);
 
   useEffect(() => {
@@ -160,6 +165,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange }:
 
   return <div className="map-stage" data-map-renderer="maplibre-layers" data-place-count={places.length}>
     <div ref={containerRef} className="map-canvas" />
+    {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
     {selectedPlace && <MapPlaceSheet place={selectedPlace} onClose={() => setSelectedPlace(null)} />}
   </div>;
