@@ -12,18 +12,20 @@ const INITIAL_LAYER = "nearby-place-initials";
 const LABEL_LAYER = "nearby-place-labels";
 const SELECTED_LABEL_LAYER = "nearby-place-selected-label";
 
-export function MapView({ location, places, picking, onPick }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void }) {
+export function MapView({ location, places, picking, onPick, onViewportChange }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
   const placesRef = useRef<Place[]>(places);
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
+  const onViewportChangeRef = useRef(onViewportChange);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   placesRef.current = places;
   pickingRef.current = picking;
   onPickRef.current = onPick;
+  onViewportChangeRef.current = onViewportChange;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -88,14 +90,22 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       map.getCanvas().style.cursor = overFeature ? "pointer" : "grab";
     };
 
+    const handleMoveEnd = () => {
+      if (pickingRef.current) return;
+      const center = map.getCenter();
+      onViewportChangeRef.current({ lat: center.lat, lng: center.lng });
+    };
+
     map.on("load", setup);
     map.on("click", handleClick);
     map.on("mousemove", handlePointer);
+    map.on("moveend", handleMoveEnd);
 
     return () => {
       map.off("load", setup);
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);
+      map.off("moveend", handleMoveEnd);
       map.remove();
       mapRef.current = null;
       locationMarkerRef.current = null;

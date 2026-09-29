@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Compass, LocateFixed, Map as MapIcon, MapPin, Newspaper, Radio, Search } from "lucide-react";
 import { CategoryRail } from "./components/CategoryRail";
@@ -33,31 +33,46 @@ export default function App() {
   const [locating, setLocating] = useState(false);
   const [currentRadio, setCurrentRadio] = useState<RadioStation | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("distance");
+  const [mapCenter, setMapCenter] = useState<Coordinates | null>(null);
 
+  useEffect(() => {
+    if (!location) {
+      setMapCenter(null);
+      return;
+    }
+    setMapCenter(location);
+  }, [location?.lat, location?.lng]);
+
+  const queryCenter = section === "map" ? (mapCenter || location) : location;
   const viewportQuery = useQuery({
-    queryKey: ["viewport", location?.lat.toFixed(3), location?.lng.toFixed(3)],
-    queryFn: () => fetchViewport(location as Coordinates),
-    enabled: Boolean(location),
+    queryKey: ["viewport", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
+    queryFn: () => fetchViewport(queryCenter as Coordinates),
+    enabled: Boolean(queryCenter),
     staleTime: 15 * 60 * 1000,
     retry: 1,
+    placeholderData: (previousData) => previousData,
   });
   const dutyQuery = useQuery({
-    queryKey: ["duty", location?.lat.toFixed(3), location?.lng.toFixed(3)],
-    queryFn: () => fetchDuty(location as Coordinates),
-    enabled: Boolean(location && category === "duty"),
+    queryKey: ["duty", queryCenter?.lat.toFixed(3), queryCenter?.lng.toFixed(3)],
+    queryFn: () => fetchDuty(queryCenter as Coordinates),
+    enabled: Boolean(queryCenter && category === "duty"),
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   const places = useMemo(() => {
     const source = category === "duty" ? (dutyQuery.data || []) : (viewportQuery.data || []);
+    const withUserDistance = location
+      ? source.map((place) => ({ ...place, distanceM: Math.round(distanceMeters(location, place)) }))
+      : source;
     const term = search.trim().toLocaleLowerCase("tr");
-    const filtered = source.filter((place) => (category === "all" || place.category === category) && (!term || `${place.name} ${place.address}`.toLocaleLowerCase("tr").includes(term)));
+    const filtered = withUserDistance.filter((place) => (category === "all" || place.category === category) && (!term || `${place.name} ${place.address}`.toLocaleLowerCase("tr").includes(term)));
     return [...filtered].sort((a, b) => {
       if (sortMode === "name") return a.name.localeCompare(b.name, "tr", { sensitivity: "base" });
       return (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity);
     });
-  }, [category, search, sortMode, viewportQuery.data, dutyQuery.data]);
+  }, [category, search, sortMode, viewportQuery.data, dutyQuery.data, location?.lat, location?.lng]);
 
   function requestLocation() {
     if (!navigator.geolocation) {
@@ -68,7 +83,9 @@ export default function App() {
     setLocationError("");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setLocation(coords);
+        setMapCenter(coords);
         setLocating(false);
       },
       () => {
@@ -86,11 +103,21 @@ export default function App() {
 
   function pickLocation(coords: Coordinates) {
     setLocation(coords, "Haritadan seçilen konum");
+    setMapCenter(coords);
     setPickingLocation(false);
+  }
+
+  function handleMapViewportChange(coords: Coordinates) {
+    if (!location || pickingLocation) return;
+    setMapCenter((current) => {
+      if (current && current.lat.toFixed(3) === coords.lat.toFixed(3) && current.lng.toFixed(3) === coords.lng.toFixed(3)) return current;
+      return coords;
+    });
   }
 
   const loadingPlaces = category === "duty" ? dutyQuery.isPending : viewportQuery.isPending;
   const errorPlaces = category === "duty" ? dutyQuery.isError : viewportQuery.isError;
+  const refreshingMap = section === "map" && (category === "duty" ? dutyQuery.isFetching : viewportQuery.isFetching) && !loadingPlaces;
 
   return (
     <div className={currentRadio ? "app-frame has-radio-player" : "app-frame"}>
@@ -117,7 +144,7 @@ export default function App() {
         </section>}
       </main>}
 
-      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{places.length} yer</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} /></main>}
+      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{refreshingMap ? "Yenileniyor…" : `${places.length} yer`}</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} onViewportChange={handleMapViewportChange} /></main>}
       {section === "news" && <NewsView />}
       {section === "radio" && <RadioView current={currentRadio} onSelect={setCurrentRadio} />}
 
@@ -129,6 +156,16 @@ export default function App() {
 
 function resultTitle(category: string) {
   return ({ all: "Tüm yerler", duty: "Nöbetçi eczaneler", market: "Marketler", food: "Yemek", cafe: "Kafeler", atm: "ATM'ler", pharmacy: "Eczaneler", hospital: "Sağlık", fuel: "Akaryakıt", parking: "Otopark", park: "Parklar", bakery: "Fırınlar", greengrocer: "Manavlar", shopping: "Alışveriş" } as Record<string, string>)[category] || "Yakındaki yerler";
+}
+
+function distanceMeters(a: Coordinates, b: Coordinates) {
+  const r = 6371000;
+  const p1 = a.lat * Math.PI / 180;
+  const p2 = b.lat * Math.PI / 180;
+  const dp = (b.lat - a.lat) * Math.PI / 180;
+  const dl = (b.lng - a.lng) * Math.PI / 180;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * r * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
 function BottomNav({ section, onChange }: { section: Section; onChange: (section: Section) => void }) {
