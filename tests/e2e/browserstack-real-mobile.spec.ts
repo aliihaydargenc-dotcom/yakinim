@@ -117,8 +117,9 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   const nav = page.locator(".bottom-nav");
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
-  await expect(page.locator(".place-marker-label").first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".place-marker-label").first()).toContainText("Merkez Nöbetçi Eczane");
+  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".place-marker")).toHaveCount(0);
 
   await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
   await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible({ timeout: 30_000 });
