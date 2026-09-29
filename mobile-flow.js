@@ -6,8 +6,13 @@
   const ROUTE_PICK_KEY = "yakinimda:route-pick-mode:v1";
   const SURFACE_CLASS = "ykn-mobile-surface-in";
   const MAP_CLASS = "ykn-mobile-map-in";
+  const CATEGORY_PRIORITY = [
+    "all", "duty", "market", "food", "cafe", "atm", "pharmacy", "hospital",
+    "fuel", "parking", "shopping", "park", "bakery", "greengrocer", "favorites",
+  ];
   let previousSurface = "";
   let transitionTimer = 0;
+  let categoryObserver = null;
 
   const $ = (selector, root = document) => root.querySelector(selector);
 
@@ -35,8 +40,7 @@
 
   function visibleSurface() {
     const key = currentSurfaceKey();
-    if (key === "map") return $(".sheet");
-    if (key === "nearby") return $(".sheet");
+    if (key === "map" || key === "nearby") return $(".sheet");
     if (key === "news") return $("#newsSection");
     if (key === "radio") return $("#radioSection");
     if (key === "route") return $("#routeTray");
@@ -49,7 +53,6 @@
     if (!force && key === previousSurface) return;
     const oldKey = previousSurface;
     previousSurface = key;
-
     const surface = visibleSurface();
     if (!surface || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -68,14 +71,13 @@
     transitionTimer = window.setTimeout(() => {
       surface.classList.remove(SURFACE_CLASS);
       map?.classList.remove(MAP_CLASS);
-    }, 260);
+    }, 220);
   }
 
   function normalizeMapEntry(previousView) {
     if (!isMobile()) return;
     if (document.body.dataset.section !== "nearby" || document.body.dataset.view !== "map") return;
     if (previousView === "map") return;
-
     window.requestAnimationFrame(() => {
       const sheet = $(".sheet");
       if (!sheet) return;
@@ -92,13 +94,31 @@
     });
   }
 
+  function prioritizeMobileCategories() {
+    const strip = $("#categoryStrip");
+    if (!strip || !isMobile()) return;
+    const buttons = Array.from(strip.querySelectorAll(".category-button"));
+    if (!buttons.length) return;
+    const rank = new Map(CATEGORY_PRIORITY.map((id, index) => [id, index]));
+    const sorted = [...buttons].sort((a, b) => (rank.get(a.dataset.category) ?? 999) - (rank.get(b.dataset.category) ?? 999));
+    if (sorted.some((button, index) => button !== buttons[index])) sorted.forEach(button => strip.appendChild(button));
+  }
+
+  function watchCategoryStrip() {
+    const strip = $("#categoryStrip");
+    if (!strip) return;
+    prioritizeMobileCategories();
+    categoryObserver?.disconnect();
+    categoryObserver = new MutationObserver(() => prioritizeMobileCategories());
+    categoryObserver.observe(strip, { childList: true });
+  }
+
   function ensureRoutePickBanner() {
     const sheet = $(".sheet");
     const categoryStrip = $("#categoryStrip");
     if (!sheet || !categoryStrip) return null;
     let banner = $("#routePickBanner");
     if (banner) return banner;
-
     banner = document.createElement("section");
     banner.id = "routePickBanner";
     banner.className = "ykn-route-pick-banner";
@@ -120,14 +140,13 @@
     const banner = ensureRoutePickBanner();
     if (!banner) return;
     const active = document.body.classList.contains("route-pick-mode");
-    if (banner.hidden === active) banner.hidden = !active;
+    banner.hidden = !active;
     const meta = $("#routePickMeta", banner);
     if (!meta) return;
     const count = routeCount();
-    const nextCopy = count
-      ? `${count} durak eklendi · başka bir yer daha seçebilir veya rotaya dönebilirsin.`
-      : "Bir yer kartındaki + Rotaya ekle düğmesini kullan.";
-    if (meta.textContent !== nextCopy) meta.textContent = nextCopy;
+    meta.textContent = count
+      ? `${count} durak eklendi · başka bir yer seçebilir veya rotaya dönebilirsin.`
+      : "Bir yer kartındaki Rotaya ekle düğmesini kullan.";
   }
 
   function enterRoutePickMode() {
@@ -155,10 +174,9 @@
     const count = routeCount();
     const empty = $(".ykn-route-empty", tray);
     if (empty) {
-      const shouldHide = count > 0;
-      if (empty.hidden !== shouldHide) empty.hidden = shouldHide;
-      const emptyCopy = "Henüz durağın yok. Yakındaki yerlerden birini seçerek rotanı oluşturmaya başla.";
-      if (empty.textContent !== emptyCopy) empty.textContent = emptyCopy;
+      empty.hidden = count > 0;
+      const copy = "Henüz durağın yok. Yakındaki yerlerden birini seçerek rotanı oluşturmaya başla.";
+      if (empty.textContent !== copy) empty.textContent = copy;
     }
 
     let discover = $(".ykn-route-discover", tray);
@@ -171,8 +189,7 @@
       const emptyTarget = empty || $("#routeStops", tray);
       emptyTarget?.insertAdjacentElement("afterend", discover);
     }
-    const shouldHideDiscover = count > 0;
-    if (discover.hidden !== shouldHideDiscover) discover.hidden = shouldHideDiscover;
+    discover.hidden = count > 0;
 
     const openRoute = $("#openRoute", tray);
     if (openRoute) openRoute.toggleAttribute("aria-disabled", count < 1);
@@ -197,39 +214,22 @@
     document.addEventListener("click", event => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
-
       const routeNav = target.closest("[data-mobile-destination='route']");
       if (routeNav) {
         exitRoutePickMode();
         window.setTimeout(syncRouteExperience, 0);
         return;
       }
-
       const routeAction = target.closest(".route-button,#detailRoute");
-      if (routeAction) {
-        window.setTimeout(() => {
-          syncRouteExperience();
-          syncRoutePickBanner();
-        }, 50);
-      }
+      if (routeAction) window.setTimeout(syncRouteExperience, 50);
     });
 
     const tray = $("#routeTray");
     if (tray) {
       const stops = $("#routeStops", tray);
-      if (stops) {
-        new MutationObserver(syncRouteExperience).observe(stops, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-        });
-      }
-      new MutationObserver(syncRouteExperience).observe(tray, {
-        attributes: true,
-        attributeFilter: ["hidden", "data-mobile-open"],
-      });
+      if (stops) new MutationObserver(syncRouteExperience).observe(stops, { childList: true, subtree: true, characterData: true });
+      new MutationObserver(syncRouteExperience).observe(tray, { attributes: true, attributeFilter: ["hidden", "data-mobile-open"] });
     }
-
     window.addEventListener("storage", event => {
       if (event.key === ROUTE_STORAGE_KEY) syncRouteExperience();
     });
@@ -238,17 +238,8 @@
   function bindUnifiedMobileNavigation() {
     let previousView = document.body.dataset.view || "list";
     previousSurface = currentSurfaceKey();
-
     const bodyObserver = new MutationObserver(mutations => {
-      let stateChanged = false;
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && ["data-section", "data-view"].includes(mutation.attributeName)) {
-          stateChanged = true;
-          break;
-        }
-      }
-      if (!stateChanged) return;
-
+      if (!mutations.some(m => m.type === "attributes" && ["data-section", "data-view"].includes(m.attributeName))) return;
       const nextView = document.body.dataset.view || "list";
       normalizeMapEntry(previousView);
       previousView = nextView;
@@ -257,26 +248,31 @@
     bodyObserver.observe(document.body, { attributes: true, attributeFilter: ["data-section", "data-view"] });
 
     const tray = $("#routeTray");
-    if (tray) {
-      new MutationObserver(() => animateMobileSurface()).observe(tray, {
-        attributes: true,
-        attributeFilter: ["data-mobile-open", "hidden"],
-      });
-    }
-
+    if (tray) new MutationObserver(() => animateMobileSurface()).observe(tray, { attributes: true, attributeFilter: ["data-mobile-open", "hidden"] });
     window.addEventListener("resize", () => {
       if (!isMobile()) exitRoutePickMode();
     }, { passive: true });
   }
 
-  function applyMediterraneanBrowserChrome() {
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f7fbfa");
+  function ensurePolishStyles() {
+    if (document.getElementById("yknMobilePolishStylesheet")) return;
+    const link = document.createElement("link");
+    link.id = "yknMobilePolishStylesheet";
+    link.rel = "stylesheet";
+    link.href = "./mobile-polish.css?v=1.0.0";
+    document.head.appendChild(link);
+  }
+
+  function applyMobileBrowserChrome() {
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f6f8fb");
   }
 
   function boot() {
     if (!isMobile()) return;
     document.documentElement.classList.add("ykn-mobile-flow");
-    applyMediterraneanBrowserChrome();
+    ensurePolishStyles();
+    applyMobileBrowserChrome();
+    watchCategoryStrip();
     bindUnifiedMobileNavigation();
     bindRouteFlow();
     animateMobileSurface(true);
