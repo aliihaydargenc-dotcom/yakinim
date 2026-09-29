@@ -78,9 +78,19 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await nav.getByRole("button", { name: "Radyo", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Radyo" })).toBeVisible();
   await expect(page.getByText("Test Radyo")).toBeVisible();
+  await page.locator(".station-card").filter({ hasText: "Test Radyo" }).click();
+  await expect(page.getByRole("complementary", { name: "Radyo oynatıcı" })).toBeVisible();
+  await expect(page.locator(".global-radio-player").getByText("Test Radyo")).toBeVisible();
+
+  await nav.getByRole("button", { name: "Yakınım", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Şu anda sana ne lazım?" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Radyo oynatıcı" })).toBeVisible();
+
   await assertNoHorizontalOverflow(page);
   await assertBottomNavInsideViewport(page);
 
+  await page.getByRole("button", { name: "Radyo oynatıcıyı kapat" }).click();
+  await expect(page.getByRole("complementary", { name: "Radyo oynatıcı" })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("mobile-final.png"), fullPage: false });
 });
 
