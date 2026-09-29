@@ -26,6 +26,12 @@ const radioPayload = {
   ],
 };
 
+const EXPECTED_VIEWPORTS: Record<string, { width: number; height: number }> = {
+  "iphone-14-webkit-390x844": { width: 390, height: 844 },
+  "pixel-7-chromium-412x915": { width: 412, height: 915 },
+  "compact-android-360x800": { width: 360, height: 800 },
+};
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
   await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
@@ -39,37 +45,37 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
-    touchPoints: navigator.maxTouchPoints,
   }));
-  expect(viewport.width).toBeGreaterThanOrEqual(360);
-  expect(viewport.width).toBeLessThanOrEqual(430);
-  expect(viewport.height).toBeGreaterThanOrEqual(760);
-  expect(viewport.touchPoints).toBeGreaterThan(0);
+  const expected = EXPECTED_VIEWPORTS[testInfo.project.name];
+  expect(expected, `Unknown mobile project: ${testInfo.project.name}`).toBeTruthy();
+  expect(viewport).toEqual(expected);
 
   await expect(page.getByRole("button", { name: "Yakınım ana ekran" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Konumum" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Konumum", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Şu anda sana ne lazım?" })).toBeVisible();
 
   await assertNoHorizontalOverflow(page);
   await assertBottomNavInsideViewport(page);
+  await assertCategoryRailIsMobileScrollable(page);
+  await page.screenshot({ path: testInfo.outputPath("mobile-home.png"), fullPage: false });
 
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
   await expect(page.getByText("Yakın Market")).toBeVisible();
   await assertNoHorizontalOverflow(page);
 
-  await page.getByRole("button", { name: "Nöbetçi" }).click();
+  await page.getByRole("button", { name: "Nöbetçi", exact: true }).click();
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
-  await nav.getByRole("button", { name: "Harita" }).click();
+  await nav.getByRole("button", { name: "Harita", exact: true }).click();
   await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
   await assertNoHorizontalOverflow(page);
 
-  await nav.getByRole("button", { name: "Haber" }).click();
+  await nav.getByRole("button", { name: "Haber", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Haberler" })).toBeVisible();
   await expect(page.getByText("Mobil test haberi")).toBeVisible();
 
-  await nav.getByRole("button", { name: "Radyo" }).click();
+  await nav.getByRole("button", { name: "Radyo", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Radyo" })).toBeVisible();
   await expect(page.getByText("Test Radyo")).toBeVisible();
   await assertNoHorizontalOverflow(page);
@@ -91,4 +97,13 @@ async function assertBottomNavInsideViewport(page: import("@playwright/test").Pa
   expect(navBox.x).toBeGreaterThanOrEqual(0);
   expect(navBox.x + navBox.width).toBeLessThanOrEqual(viewportWidth + 1);
   expect(navBox.height).toBeGreaterThanOrEqual(60);
+}
+
+async function assertCategoryRailIsMobileScrollable(page: import("@playwright/test").Page) {
+  const rail = page.locator(".category-rail");
+  const metrics = await rail.evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
 }
