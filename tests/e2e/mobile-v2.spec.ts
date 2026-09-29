@@ -12,10 +12,10 @@ const viewportPayload = {
   ],
 };
 
-const fsqPayload = {
+const overturePayload = {
   places: [
-    { id: "fsq:1", name: "FSQ Ek Kafe", category: "cafe", lat: 36.8854, lng: 30.7061, address: "Kadriye", distanceM: 180 },
-    { id: "fsq:2", name: "Migros", category: "market", lat: 36.88802, lng: 30.70802, address: "Serik Caddesi", distanceM: 520 },
+    { id: "overture:1", name: "Overture Ek Kafe", category: "cafe", lat: 36.8854, lng: 30.7061, address: "Kadriye", distanceM: 180 },
+    { id: "overture:2", name: "Migros", category: "market", lat: 36.88802, lng: 30.70802, address: "Serik Caddesi", distanceM: 520 },
   ],
 };
 
@@ -45,7 +45,7 @@ const EXPECTED_VIEWPORTS: Record<string, { width: number; height: number }> = {
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
-  await page.route("**/api/fsq?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fsqPayload) }));
+  await page.route("**/api/overture?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(overturePayload) }));
   await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
   await page.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
   await page.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
@@ -69,19 +69,19 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await page.screenshot({ path: testInfo.outputPath("mobile-home.png"), fullPage: false });
 
   const viewportRequests: string[] = [];
-  const fsqRequests: string[] = [];
+  const overtureRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/viewport?")) viewportRequests.push(request.url());
-    if (request.url().includes("/api/fsq?")) fsqRequests.push(request.url());
+    if (request.url().includes("/api/overture?")) overtureRequests.push(request.url());
   });
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
   await expect.poll(() => viewportRequests.length).toBe(9);
-  await expect.poll(() => fsqRequests.length).toBe(1);
+  await expect.poll(() => overtureRequests.length).toBe(1);
   assertSegmentedNearbyCoverage(viewportRequests);
-  expect(new URL(fsqRequests[0]).searchParams.get("radius")).toBe("4500");
+  expect(new URL(overtureRequests[0]).searchParams.get("radius")).toBe("4500");
 
   await expect(page.getByText("Yakın Market")).toBeVisible();
-  await expect(page.getByText("FSQ Ek Kafe")).toBeVisible();
+  await expect(page.getByText("Overture Ek Kafe")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Market", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Migros", exact: true })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Otopark", exact: true })).toHaveCount(1);
@@ -89,7 +89,7 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   const sortGroup = page.getByRole("group", { name: "Sonuç sıralaması" });
   await sortGroup.getByRole("button", { name: "A-Z" }).click();
   await expect(sortGroup.getByRole("button", { name: "A-Z" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".place-card h3").first()).toHaveText("FSQ Ek Kafe");
+  await expect(page.locator(".place-card h3").first()).toHaveText("Migros");
   await sortGroup.getByRole("button", { name: "Yakın" }).click();
   await expect(sortGroup.getByRole("button", { name: "Yakın" })).toHaveAttribute("aria-pressed", "true");
 
