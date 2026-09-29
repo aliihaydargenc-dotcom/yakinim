@@ -181,6 +181,7 @@ function renderPlaceMarker(element: HTMLButtonElement, place: Place, selected = 
   element.replaceChildren(document.createTextNode(place.name.slice(0, 1).toLocaleUpperCase("tr")));
 
   const label = document.createElement("span");
+  label.className = "place-marker-label";
   label.textContent = place.name;
   label.setAttribute("aria-hidden", "true");
   label.style.position = "absolute";
