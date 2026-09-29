@@ -6,14 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --check api/duty.js && node tests/duty.mjs && node tests/viewport.mjs && npm run build",
+    "test": "node --check api/duty.js && node --check api/fsq.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/fsq.mjs && npm run build",
     "test:mobile": "playwright test",
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js"
   },
   "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
     "@tanstack/react-query": "^5.66.0",
     "lucide-react": "^0.468.0",
     "maplibre-gl": "^5.0.1",
+    "pbf": "^5.1.2",
+    "pmtiles": "^4.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.3"
