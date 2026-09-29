@@ -20,8 +20,8 @@ const NEARBY_LAT_SPAN = 0.045;
 const NEARBY_LNG_SPAN = 0.055;
 const VIEWPORT_GRID_SIZE = 3;
 const VIEWPORT_CONCURRENCY = 3;
-const FSQ_ENRICHMENT_THRESHOLD = 80;
-const FSQ_RADIUS_M = 4500;
+const OVERTURE_ENRICHMENT_THRESHOLD = 80;
+const OVERTURE_RADIUS_M = 4500;
 
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
   const amenity = tags.amenity || "";
@@ -122,9 +122,9 @@ function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): P
     return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
   });
 }
-async function fetchFsqSupplement(location: Coordinates): Promise<Place[]> {
-  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(FSQ_RADIUS_M) });
-  const payload = await getJson<SupplementalResponse>(`/api/fsq?${params}`);
+async function fetchOvertureSupplement(location: Coordinates): Promise<Place[]> {
+  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M) });
+  const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`);
   return payload.places || [];
 }
 
@@ -132,8 +132,8 @@ export async function fetchViewport(location: Coordinates): Promise<Place[]> {
   let osmPlaces: Place[] = []; let osmFailed = false;
   try { osmPlaces = osmPlacesFromElements(await fetchViewportElements(location), location); } catch { osmFailed = true; }
   let supplemental: Place[] = [];
-  if (osmPlaces.length < FSQ_ENRICHMENT_THRESHOLD) {
-    try { supplemental = await fetchFsqSupplement(location); } catch {}
+  if (osmPlaces.length < OVERTURE_ENRICHMENT_THRESHOLD) {
+    try { supplemental = await fetchOvertureSupplement(location); } catch {}
   }
   const merged = dedupePlaces([...osmPlaces, ...supplemental]).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
   if (!merged.length && osmFailed) throw new Error("nearby_unavailable");
