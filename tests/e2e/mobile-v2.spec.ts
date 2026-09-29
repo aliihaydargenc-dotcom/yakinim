@@ -8,6 +8,7 @@ const viewportPayload = {
     { type: "node", id: 4, lat: 36.8872, lon: 30.7072, tags: { shop: "supermarket", "addr:street": "İsimsiz Sokak" } },
     { type: "node", id: 5, lat: 36.888, lon: 30.708, tags: { shop: "supermarket", brand: "Migros", "addr:street": "Serik Caddesi" } },
     { type: "way", id: 6, center: { lat: 36.88801, lon: 30.70801 }, tags: { shop: "supermarket", brand: "Migros", "addr:street": "Serik Caddesi" } },
+    { type: "way", id: 7, center: { lat: 36.889, lon: 30.709 }, tags: { amenity: "parking" } },
   ],
 };
 
@@ -62,10 +63,15 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await assertCategoryRailIsMobileScrollable(page);
   await page.screenshot({ path: testInfo.outputPath("mobile-home.png"), fullPage: false });
 
+  const viewportRequestPromise = page.waitForRequest("**/api/viewport?*");
   await page.getByRole("button", { name: "Konumumu kullan" }).click();
+  const viewportRequest = await viewportRequestPromise;
+  assertNearbyCoverage(viewportRequest.url());
+
   await expect(page.getByText("Yakın Market")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Market", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Migros", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Otopark", exact: true })).toHaveCount(1);
 
   const sortGroup = page.getByRole("group", { name: "Sonuç sıralaması" });
   await sortGroup.getByRole("button", { name: "A-Z" }).click();
@@ -106,6 +112,16 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await expect(page.getByRole("complementary", { name: "Radyo oynatıcı" })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("mobile-final.png"), fullPage: false });
 });
+
+function assertNearbyCoverage(requestUrl: string) {
+  const url = new URL(requestUrl);
+  const south = Number(url.searchParams.get("south"));
+  const west = Number(url.searchParams.get("west"));
+  const north = Number(url.searchParams.get("north"));
+  const east = Number(url.searchParams.get("east"));
+  expect(north - south).toBeGreaterThanOrEqual(0.089);
+  expect(east - west).toBeGreaterThanOrEqual(0.109);
+}
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
