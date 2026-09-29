@@ -61,7 +61,7 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
     const map = mapRef.current;
     if (!map) return;
     markersRef.current.forEach(({ marker }) => marker.remove());
-    markersRef.current = places.slice(0, 120).map((place) => {
+    markersRef.current = places.slice(0, 160).map((place) => {
       const el = document.createElement("button");
       el.type = "button";
       el.className = `place-marker marker-${place.category}`;
@@ -70,6 +70,20 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       el.addEventListener("click", (event) => {
         event.stopPropagation();
         if (picking) return;
+
+        const clusterCount = Number(el.dataset.clusterCount || "1");
+        const clusterLat = Number(el.dataset.clusterLat);
+        const clusterLng = Number(el.dataset.clusterLng);
+        if (clusterCount > 1 && Number.isFinite(clusterLat) && Number.isFinite(clusterLng)) {
+          setSelectedPlace(null);
+          map.easeTo({
+            center: [clusterLng, clusterLat],
+            zoom: Math.min(18, map.getZoom() + 2),
+            duration: 380,
+          });
+          return;
+        }
+
         setSelectedPlace(place);
         map.easeTo({ center: [place.lng, place.lat], duration: 300 });
       });
@@ -83,10 +97,21 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
     const map = mapRef.current;
     if (!map) return;
 
+    const showNormalMarker = (entry: MarkerEntry) => {
+      entry.element.style.display = "";
+      entry.element.setAttribute("aria-hidden", "false");
+      entry.element.classList.remove("is-cluster");
+      entry.element.textContent = entry.place.name.slice(0, 1).toLocaleUpperCase("tr");
+      entry.element.setAttribute("aria-label", `${entry.place.name} harita işareti`);
+      delete entry.element.dataset.clusterCount;
+      delete entry.element.dataset.clusterLat;
+      delete entry.element.dataset.clusterLng;
+    };
+
     const updateVisibility = () => {
       const zoom = map.getZoom();
-      const cellSize = zoom >= 17 ? 28 : zoom >= 15 ? 38 : zoom >= 13 ? 50 : 64;
-      const occupied = new Set<string>();
+      const cellSize = zoom >= 17 ? 28 : zoom >= 15 ? 38 : zoom >= 13 ? 48 : 58;
+      const groups = new Map<string, MarkerEntry[]>();
       const ordered = [...markersRef.current].sort((a, b) => {
         if (a.place.id === selectedPlace?.id) return -1;
         if (b.place.id === selectedPlace?.id) return 1;
@@ -94,13 +119,43 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       });
 
       for (const entry of ordered) {
+        entry.element.style.display = "none";
+        entry.element.setAttribute("aria-hidden", "true");
+        entry.element.classList.remove("is-cluster");
+        delete entry.element.dataset.clusterCount;
+        delete entry.element.dataset.clusterLat;
+        delete entry.element.dataset.clusterLng;
+
         const point = map.project([entry.place.lng, entry.place.lat]);
-        const key = `${Math.round(point.x / cellSize)}:${Math.round(point.y / cellSize)}`;
-        const selected = entry.place.id === selectedPlace?.id;
-        const visible = selected || !occupied.has(key);
-        entry.element.style.display = visible ? "" : "none";
-        entry.element.setAttribute("aria-hidden", visible ? "false" : "true");
-        if (visible) occupied.add(key);
+        const key = `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`;
+        const group = groups.get(key) || [];
+        group.push(entry);
+        groups.set(key, group);
+      }
+
+      for (const group of groups.values()) {
+        const selected = group.find((entry) => entry.place.id === selectedPlace?.id);
+        if (selected) {
+          showNormalMarker(selected);
+          continue;
+        }
+
+        if (group.length === 1) {
+          showNormalMarker(group[0]);
+          continue;
+        }
+
+        const representative = group[0];
+        const clusterLat = group.reduce((sum, entry) => sum + entry.place.lat, 0) / group.length;
+        const clusterLng = group.reduce((sum, entry) => sum + entry.place.lng, 0) / group.length;
+        representative.element.style.display = "";
+        representative.element.setAttribute("aria-hidden", "false");
+        representative.element.classList.add("is-cluster");
+        representative.element.textContent = group.length > 99 ? "99+" : String(group.length);
+        representative.element.dataset.clusterCount = String(group.length);
+        representative.element.dataset.clusterLat = String(clusterLat);
+        representative.element.dataset.clusterLng = String(clusterLng);
+        representative.element.setAttribute("aria-label", `${group.length} yakın yer. Yakınlaştırmak için dokun.`);
       }
     };
 
