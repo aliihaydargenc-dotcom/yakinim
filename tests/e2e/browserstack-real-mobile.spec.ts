@@ -116,10 +116,13 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
 
   const nav = page.locator(".bottom-nav");
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
-  await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
+  await expect(page.locator(".map-category-dock")).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".user-marker")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".place-marker")).toHaveCount(0);
+  await assertMapChromeDoesNotOverlap(page);
 
   await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
   await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible({ timeout: 30_000 });
@@ -158,4 +161,16 @@ async function assertBottomNavInsideViewport(page: import("@playwright/test").Pa
   expect(navBox.x).toBeGreaterThanOrEqual(0);
   expect(navBox.x + navBox.width).toBeLessThanOrEqual(viewportWidth + 1);
   expect(navBox.height).toBeGreaterThanOrEqual(60);
+}
+
+async function assertMapChromeDoesNotOverlap(page: import("@playwright/test").Page) {
+  const header = await page.locator(".app-header").boundingBox();
+  const dock = await page.locator(".map-category-dock").boundingBox();
+  const toolbar = await page.locator(".map-toolbar").boundingBox();
+  const canvas = await page.locator(".maplibregl-canvas").boundingBox();
+  expect(header && dock && toolbar && canvas).toBeTruthy();
+  if (!header || !dock || !toolbar || !canvas) return;
+  expect(dock.y).toBeGreaterThanOrEqual(header.y + header.height - 2);
+  expect(toolbar.y).toBeGreaterThanOrEqual(dock.y + dock.height - 2);
+  expect(canvas.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height - 2);
 }
