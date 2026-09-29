@@ -1,0 +1,116 @@
+import { expect, test } from "@playwright/test";
+
+const viewportPayload = {
+  elements: [
+    { type: "node", id: 1, lat: 36.885, lon: 30.705, tags: { shop: "supermarket", name: "Yakın Market", "addr:street": "Atatürk Caddesi" } },
+    { type: "node", id: 2, lat: 36.886, lon: 30.706, tags: { amenity: "cafe", name: "Yakın Kafe", "addr:street": "Cumhuriyet Sokak" } },
+    { type: "node", id: 3, lat: 36.887, lon: 30.707, tags: { amenity: "atm", name: "Yakın ATM", "addr:street": "Merkez" } },
+  ],
+};
+
+const dutyPayload = {
+  pharmacies: [
+    { id: "duty-1", name: "Merkez Nöbetçi Eczane", address: "Kadriye Mahallesi", phone: "02420000000", latitude: 36.8855, longitude: 30.7065, distance_m: 420 },
+  ],
+};
+
+const newsPayload = {
+  items: [
+    { id: "n1", title: "Gerçek cihaz test haberi", url: "https://example.com/news", publishedAt: "2026-09-29T09:00:00.000Z", source: "Test Haber" },
+  ],
+};
+
+const radioPayload = {
+  stations: [
+    { id: "r1", name: "Gerçek Cihaz Test Radyosu", streamUrl: "https://example.com/test.mp3", codec: "MP3", bitrate: 128, liveVerified: true, measuredRank: 1 },
+  ],
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const position = {
+      coords: {
+        latitude: 36.884,
+        longitude: 30.704,
+        accuracy: 10,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      },
+      timestamp: Date.now(),
+    };
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) => success(position as GeolocationPosition),
+        watchPosition: (success: PositionCallback) => {
+          success(position as GeolocationPosition);
+          return 1;
+        },
+        clearWatch: () => undefined,
+      },
+    });
+  });
+
+  await page.route("**/api/viewport?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(viewportPayload) }));
+  await page.route("**/api/duty?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(dutyPayload) }));
+  await page.route("**/api/news?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(newsPayload) }));
+  await page.route("**/api/radio?*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(radioPayload) }));
+});
+
+test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const device = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    userAgent: navigator.userAgent,
+    touchPoints: navigator.maxTouchPoints,
+  }));
+
+  expect(device.width).toBeGreaterThanOrEqual(320);
+  expect(device.width).toBeLessThanOrEqual(500);
+  expect(device.height).toBeGreaterThanOrEqual(600);
+  expect(device.userAgent).toMatch(/Android|iPhone|iPad|Mobile/i);
+
+  await expect(page.getByRole("button", { name: "Yakınım ana ekran" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Konumum", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Şu anda sana ne lazım?" })).toBeVisible();
+  await assertNoHorizontalOverflow(page);
+
+  await page.getByRole("button", { name: "Konumumu kullan" }).click();
+  await expect(page.getByText("Yakın Market")).toBeVisible();
+
+  await page.getByRole("button", { name: "Nöbetçi" }).click();
+  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
+
+  const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
+  await nav.getByRole("button", { name: "Harita" }).click();
+  await expect(page.getByRole("button", { name: "Listeye dön" })).toBeVisible();
+
+  await nav.getByRole("button", { name: "Haber" }).click();
+  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible();
+
+  await nav.getByRole("button", { name: "Radyo" }).click();
+  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible();
+
+  await assertNoHorizontalOverflow(page);
+  await assertBottomNavInsideViewport(page);
+  await page.screenshot({ path: testInfo.outputPath("browserstack-real-mobile.png"), fullPage: false });
+});
+
+async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+}
+
+async function assertBottomNavInsideViewport(page: import("@playwright/test").Page) {
+  const navBox = await page.getByRole("navigation", { name: "Ana navigasyon" }).boundingBox();
+  expect(navBox).not.toBeNull();
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  if (!navBox) return;
+  expect(navBox.x).toBeGreaterThanOrEqual(0);
+  expect(navBox.x + navBox.width).toBeLessThanOrEqual(viewportWidth + 1);
+  expect(navBox.height).toBeGreaterThanOrEqual(60);
+}
