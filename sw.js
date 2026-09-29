@@ -1,7 +1,9 @@
-const CACHE_NAME = "yakinimda-shell-v58";
+const CACHE_NAME = "yakinimda-shell-v59";
 const RUNTIME_CACHE = "yakinimda-runtime-v1";
 const APP_SHELL = ["./", "./index.html", "./styles.css?v=3.9.0", "./sprint1.js?v=1.0.0", "./app.js?v=3.12.0", "./sprint2.js?v=1.0.0", "./sprint3.js?v=1.0.0", "./manifest.webmanifest", "./icon.svg", "./robots.txt", "./sitemap.xml"];
 const LEAFLET_ORIGIN = "https://unpkg.com";
+const LEGACY_DUTY_ORIGIN = "https://eczaneadresi.com";
+const LEGACY_DUTY_PATH = "/api/public/v1/nearest-pharmacies";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -27,6 +29,14 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+
+  if (url.origin === LEGACY_DUTY_ORIGIN && url.pathname === LEGACY_DUTY_PATH) {
+    const proxy = new URL("/api/duty", self.location.origin);
+    url.searchParams.forEach((value, key) => proxy.searchParams.append(key, value));
+    event.respondWith(fetch(proxy.toString(), { headers: { Accept: "application/json" } }));
+    return;
+  }
+
   if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
 
   if (url.origin === self.location.origin) {
@@ -70,4 +80,3 @@ async function cacheFirst(request, cacheName) {
   }
   return response;
 }
-
