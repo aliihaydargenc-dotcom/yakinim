@@ -1,6 +1,6 @@
 {
   "name": "yakinim",
-  "version": "4.0.0-beta.2",
+  "version": "4.0.0-beta.3",
   "private": true,
   "description": "Yakınım v2 — mobil öncelikli yakın çevre keşif uygulaması",
   "scripts": {
