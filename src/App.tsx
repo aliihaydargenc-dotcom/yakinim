@@ -144,7 +144,7 @@ export default function App() {
         </section>}
       </main>}
 
-      {section === "map" && <main className="map-screen"><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{refreshingMap ? "Yenileniyor…" : `${places.length} yer`}</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} onViewportChange={handleMapViewportChange} /></main>}
+      {section === "map" && <main className="map-screen"><div className="map-category-overlay"><CategoryRail value={category} onChange={setCategory} variant="map" /></div><div className="map-toolbar"><button type="button" onClick={() => setSection("nearby")}>Listeye dön</button><div className="map-toolbar-actions">{location && <span className="map-result-count">{refreshingMap ? "Yenileniyor…" : `${places.length} yer`}</span>}<button type="button" className={pickingLocation ? "is-active" : ""} onClick={() => setPickingLocation(!pickingLocation)}>{pickingLocation ? "Seçimi kapat" : "Haritadan seç"}</button></div></div><MapView location={location} places={places} picking={pickingLocation} onPick={pickLocation} onViewportChange={handleMapViewportChange} /></main>}
       {section === "news" && <NewsView />}
       {section === "radio" && <RadioView current={currentRadio} onSelect={setCurrentRadio} />}
 
