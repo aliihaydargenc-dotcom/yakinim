@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --check api/duty.js && node --check api/fsq.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/fsq.mjs && npm run build",
+    "test": "node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && npm run build",
     "test:mobile": "playwright test",
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js"
   },
