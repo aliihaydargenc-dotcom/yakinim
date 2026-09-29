@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Navigation, Phone, X } from "lucide-react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { Coordinates, Place } from "../types";
 
@@ -7,6 +8,7 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const locationMarkerRef = useRef<Marker | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -26,7 +28,10 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
     const map = mapRef.current;
     if (!map) return;
     const handler = (event: maplibregl.MapMouseEvent) => {
-      if (picking) onPick({ lat: event.lngLat.lat, lng: event.lngLat.lng });
+      if (picking) {
+        setSelectedPlace(null);
+        onPick({ lat: event.lngLat.lat, lng: event.lngLat.lng });
+      }
     };
     map.on("click", handler);
     map.getCanvas().style.cursor = picking ? "crosshair" : "grab";
@@ -55,15 +60,44 @@ export function MapView({ location, places, picking, onPick }: { location: Coord
       el.type = "button";
       el.className = `place-marker marker-${place.category}`;
       el.textContent = place.name.slice(0, 1).toLocaleUpperCase("tr");
-      el.setAttribute("aria-label", place.name);
-      const popup = new maplibregl.Popup({ offset: 18, closeButton: false }).setHTML(`<strong>${escapeHtml(place.name)}</strong><span>${escapeHtml(place.address)}</span>`);
-      return new maplibregl.Marker({ element: el }).setLngLat([place.lng, place.lat]).setPopup(popup).addTo(map);
+      el.setAttribute("aria-label", `${place.name} harita işareti`);
+      el.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (picking) return;
+        setSelectedPlace(place);
+        map.easeTo({ center: [place.lng, place.lat], duration: 300 });
+      });
+      return new maplibregl.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map);
     });
-  }, [places]);
+    if (selectedPlace && !places.some((place) => place.id === selectedPlace.id)) setSelectedPlace(null);
+  }, [places, picking, selectedPlace?.id]);
 
-  return <div className="map-stage"><div ref={containerRef} className="map-canvas" />{picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}</div>;
+  return <div className="map-stage">
+    <div ref={containerRef} className="map-canvas" />
+    {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
+    {selectedPlace && <MapPlaceSheet place={selectedPlace} onClose={() => setSelectedPlace(null)} />}
+  </div>;
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char] || char));
+function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }) {
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
+  return <aside className="map-place-sheet" aria-label={`${place.name} detayları`}>
+    <div className="map-place-heading">
+      <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
+      <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
+    </div>
+    <p className="map-place-address">{place.address}</p>
+    <div className="map-place-actions">
+      {place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
+      <a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>
+    </div>
+  </aside>;
+}
+
+function categoryLabel(category: Place["category"]) {
+  return ({ duty: "Nöbetçi Eczane", market: "Market", food: "Yemek", cafe: "Kafe", atm: "ATM", pharmacy: "Eczane", hospital: "Sağlık", fuel: "Akaryakıt", parking: "Otopark", park: "Park", bakery: "Fırın", greengrocer: "Manav", shopping: "Alışveriş" } as Record<Place["category"], string>)[category];
+}
+
+function distanceLabel(value: number) {
+  return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1).replace(".", ",")} km`;
 }
