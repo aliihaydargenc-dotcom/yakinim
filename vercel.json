@@ -47,6 +47,12 @@
     },
     "api/radio.js": {
       "maxDuration": 30
+    },
+    "api/transit.js": {
+      "maxDuration": 60
+    },
+    "api/events.js": {
+      "maxDuration": 15
     }
   }
 }

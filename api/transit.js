@@ -1,0 +1,3 @@
+'use strict';
+const {query}=require('../lib/transit.cjs');
+module.exports=async(req,res)=>{if(req.method!=='GET'){res.setHeader('Allow','GET');return res.status(405).json({error:'method_not_allowed'});}const params=new URL(req.url,'https://yakinim.local').searchParams;try{const data=await query(params.get('action')||'stops',params);res.setHeader('Cache-Control','no-store');return res.status(200).json({...data,fetchedAt:new Date().toISOString()});}catch(e){res.setHeader('Cache-Control','no-store');return res.status(e.message.startsWith('invalid_')?400:503).json({error:e.message.startsWith('invalid_')?e.message:'transit_unavailable'});}};

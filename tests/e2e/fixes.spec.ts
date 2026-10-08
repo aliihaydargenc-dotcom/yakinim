@@ -319,3 +319,26 @@ test('unavailable high accuracy GPS falls back to a fresh normal accuracy reques
  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
  expect(await page.evaluate(()=>(window as any).gpsOptions.map((o:PositionOptions)=>[o.enableHighAccuracy,o.maximumAge]))).toEqual([[true,0],[false,0]]);
 });
+
+test('Antalya transit pilot retains source direction and opens route stops',async({page})=>{
+ const stop={id:'10027',name:'Gazi Lisesi',lat:36.8888,lng:30.6841,routes:['AC03','KL08'],distanceM:620};
+ const requests:string[]=[];
+ await page.route('**/api/transit?**',async r=>{const u=new URL(r.request().url());requests.push(u.search);if(u.searchParams.get('action')==='arrivals')return r.fulfill({json:{fresh:true,sourceAt:new Date().toISOString(),buses:[{id:'75805',code:'AC03',name:'MINICITY - AKSU',direction:1,minutes:4,stops:3}]}});if(u.searchParams.get('action')==='route')return r.fulfill({json:{name:'MINICITY - AKSU',stops:[stop,{...stop,id:'10028',name:'Sonraki Durak'}]}});return r.fulfill({json:{stops:[stop],coverage:['AC03','KL08'],partial:false}});});
+ await page.goto('/?preview');await page.getByRole('button',{name:'Ulaşım',exact:true}).click();await page.getByRole('button',{name:/Gazi Lisesi/}).click();await expect(page.locator('.bus-row')).toContainText('4 dk');await expect(page.locator('.bus-row')).toContainText('Tahmini');await page.locator('.bus-row').click();await expect(page.locator('.route-stops li')).toHaveCount(2);expect(requests.some(q=>q.includes('direction=1'))).toBe(true);
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);expect(overflow).toBe(false);
+ await page.getByRole('button',{name:'Durağa dön'}).click();await expect(page.getByRole('link',{name:'Durağa yol tarifi'})).toHaveAttribute('href',/destination=36.8888,30.6841/);
+});
+test('stale transit data never advertises an arrival countdown',async({page})=>{
+ await page.route('**/api/transit?**',r=>{const a=new URL(r.request().url()).searchParams.get('action');return r.fulfill({json:a==='arrivals'?{fresh:false,sourceAt:'2026-01-01T00:00:00Z',buses:[{id:'1',code:'KL08',direction:0,minutes:2,stops:2}]}:{stops:[{id:'10027',name:'Gazi Lisesi',lat:36.88,lng:30.68,routes:['KL08'],distanceM:120}],coverage:['KL08']}});});
+ await page.goto('/?preview');await page.getByRole('button',{name:'Ulaşım',exact:true}).click();await page.getByRole('button',{name:/Gazi Lisesi/}).click();await expect(page.getByRole('alert')).toContainText('Kaynak güncel değil');await expect(page.locator('.bus-row')).toHaveCount(0);
+});
+test('events show verified dates and hide expired records without requiring GPS',async({page})=>{
+ await page.addInitScript(()=>Object.defineProperty(navigator,'permissions',{value:{query:async()=>({state:'prompt'})},configurable:true}));
+ const now=new Date(),date=new Date(now.getTime()+86400000).toISOString(),end=new Date(now.getTime()+3*86400000).toISOString();
+ await page.route('**/api/events',r=>r.fulfill({json:{items:[{id:'current',title:'Pilot Etkinliği',startsAt:date,endsAt:end,venue:'Cam Piramit',hours:'10:00–20:00',url:'https://kitapfuari.antalya.bel.tr/',directionsUrl:'https://www.google.com/maps/dir/?api=1&destination=Cam+Piramit',source:'Antalya Büyükşehir Belediyesi',price:null},{id:'expired',title:'Geçmiş Etkinlik',startsAt:'2025-01-01T00:00:00+03:00',endsAt:'2025-01-02T00:00:00+03:00',url:'https://kitapfuari.antalya.bel.tr/'}],coverage:'Kitap Fuarı'}}));
+ await page.goto('/');await page.getByRole('button',{name:'Etkinlik',exact:true}).click();await expect(page.getByRole('heading',{name:'Pilot Etkinliği'})).toBeVisible();await expect(page.getByText('Geçmiş Etkinlik')).toHaveCount(0);await expect(page.getByRole('link',{name:'Resmi program'})).toHaveAttribute('href','https://kitapfuari.antalya.bel.tr/');await page.getByRole('button',{name:'Bugün',exact:true}).click();await expect(page.locator('.event-card')).toHaveCount(0);await page.getByRole('button',{name:'7 gün',exact:true}).click();await expect(page.locator('.event-card')).toHaveCount(1);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('market prices open the official source and make no unsupported price request',async({page})=>{
+ const priceRequests:string[]=[];page.on('request',r=>{if(/api\/.*price/.test(r.url()))priceRequests.push(r.url());});
+ await page.goto('/?preview');await page.getByRole('button',{name:'Ürün fiyatları',exact:true}).click();await expect(page.getByRole('link',{name:'Market Fiyatı’nda ara'})).toHaveAttribute('href','https://marketfiyati.org.tr/');await expect(page.getByText('Yakınım henüz fiyat verisini içeri aktarmıyor.',{exact:false})).toBeVisible();expect(priceRequests).toEqual([]);await page.getByRole('button',{name:'Marketler',exact:true}).click();await expect(page.locator('.place-row')).toHaveCount(1);
+});

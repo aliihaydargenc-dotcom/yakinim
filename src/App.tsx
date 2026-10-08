@@ -7,6 +7,7 @@ import { combinePlaceSources, fetchArea, fetchDuty, fetchOvertureSupplement, fet
 import { useAppStore } from "./store";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
+const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
 const MapView = lazy(() => import("./components/MapView").then(m => ({ default: m.MapView })));
 const NewsView = lazy(() => import("./components/NewsView").then(m => ({ default: m.NewsView })));
 const RadioView = lazy(() => import("./components/RadioView").then(m => ({ default: m.RadioView })));
@@ -22,7 +23,7 @@ const DEMO_PLACES: Place[] = [
   { id: "demo5", name: "Örnek Yemek Yeri", category: "food", lat: 36.8587, lng: 30.6415, address: "Örnek adres · Konyaaltı, Antalya" },
   { id: "demo6", name: "Örnek ATM", category: "atm", lat: 36.8606, lng: 30.6347, address: "Örnek adres · Konyaaltı, Antalya" },
 ];
-const LABELS: Record<string,string> = { all:"Tüm yerler", market:"Marketler", food:"Yemek", cafe:"Kafeler", duty:"Nöbetçi eczaneler", pharmacy:"Eczaneler", bakery:"Fırınlar", atm:"ATM", park:"Parklar", hospital:"Sağlık", fuel:"Akaryakıt", parking:"Otopark", greengrocer:"Manavlar", shopping:"Alışveriş" };
+const LABELS: Record<string,string> = { transit:"Ulaşım",events:"Etkinlik",all:"Tüm yerler", market:"Marketler", food:"Yemek", cafe:"Kafeler", duty:"Nöbetçi eczaneler", pharmacy:"Eczaneler", bakery:"Fırınlar", atm:"ATM", park:"Parklar", hospital:"Sağlık", fuel:"Akaryakıt", parking:"Otopark", greengrocer:"Manavlar", shopping:"Alışveriş" };
 function boundsAround(c: Coordinates): ViewportBounds { return { south:c.lat-.012, north:c.lat+.012, west:c.lng-.018, east:c.lng+.018 }; }
 function distance(a: Coordinates,b: Coordinates) { const r=Math.PI/180; const h=Math.sin((b.lat-a.lat)*r/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin((b.lng-a.lng)*r/2)**2; return Math.round(12742000*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))); }
 function distanceLabel(m?: number) { return m === undefined || !Number.isFinite(m) ? "" : m<1000 ? `${m} m` : `${(m/1000).toFixed(1).replace('.',',')} km`; }
@@ -32,6 +33,8 @@ export default function App() {
   const [previewState,setPreviewState] = useState("ready");
   const location = DEMO ? (previewState === "location" ? null : DEMO_ORIGIN) : storedLocation;
   const [area,setArea] = useState<{center:Coordinates;bounds:ViewportBounds}|null>(()=>location ? {center:location,bounds:boundsAround(location)} : null);
+  const [productMode,setProductMode] = useState(false);
+  const pilot = category === "transit" || category === "events" || category === "market" && productMode;
   const [mapOpen,setMapOpen] = useState(false);
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
@@ -67,8 +70,8 @@ export default function App() {
   useEffect(()=>{ if(location) setArea({center:location,bounds:boundsAround(location)}); },[location?.lat,location?.lng]);
   const active = section === "nearby" || section === "map";
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
-  const areaQuery = useQuery({queryKey:["area-v6",...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:600000,retry:0});
-  const supplementQuery = useQuery({queryKey:["supplement-v6",area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:1800000,retry:0});
+  const areaQuery = useQuery({queryKey:["area-v6",...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !pilot && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:600000,retry:0});
+  const supplementQuery = useQuery({queryKey:["supplement-v6",area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !pilot && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:1800000,retry:0});
   const dutyDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Istanbul"}).format(new Date());
   const dutyQuery = useQuery({queryKey:["duty-v5",dutyDate,area?.center.lat.toFixed(3),area?.center.lng.toFixed(3)],queryFn:()=>fetchDuty(area!.center),enabled:!DEMO && active && !!location && !!area && category==="duty",staleTime:300000,refetchInterval:300000,retry:0});
   const areaData = useRetainedPlaces(areaQuery.data, "area");
@@ -117,11 +120,12 @@ export default function App() {
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
       <main className={mapOpen?'map-workspace':'list-workspace'}>
-        {!mapOpen && <label className="search-box"><Search size={19}/><input aria-label="Yer ara" placeholder="Ara" value={search} onChange={e=>setSearch(e.target.value)}/>{search && <button onClick={()=>setSearch('')} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
-        <CategoryRail value={category} onChange={c=>{setCategory(c);setSelected(null);}}/>
+        {!mapOpen && !pilot && <label className="search-box"><Search size={19}/><input aria-label="Yer ara" placeholder="Ara" value={search} onChange={e=>setSearch(e.target.value)}/>{search && <button onClick={()=>setSearch('')} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
+        <CategoryRail value={category} onChange={c=>{setCategory(c);setSelected(null);if(c==="transit"||c==="events")setMapOpen(false);setPicking(false);}}/>
+        {category==='market'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>setProductMode(false)}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
-        {(!location || picking || locationError) && <section className="state-card"><strong>{locationError?'Konum alınamadı':picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
+        {((!location&&!pilot) || picking || locationError) && <section className="state-card"><strong>{locationError?'Konum alınamadı':picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
+        {pilot?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>setMapOpen(true)}><MapPin size={18}/>Harita</button></div>
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}

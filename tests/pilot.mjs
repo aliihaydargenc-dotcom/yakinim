@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import transit from '../lib/transit.cjs';
+import events from '../lib/events.cjs';
+const now=Date.parse('2026-10-08T22:18:23+03:00');
+const data={result:{dateTime:'20261008221823'},busList:[{busId:'75805',displayRouteCode:'AC03',headSign:'MINICITY - AKSU',direction:'1',timeDiff:'6',stopDiff:'5',lat:'36.897068',lng:'30.669865'},{busId:'bad',timeDiff:'',lat:'36.9',lng:'30.7'}]};
+const normalized=transit.normalizeArrivals(data,now);assert.equal(normalized.fresh,true);assert.equal(normalized.buses.length,1);assert.equal(normalized.buses[0].direction,1);assert.equal(normalized.buses[0].minutes,6);assert.equal(transit.normalizeArrivals(data,now+181000).fresh,false);assert.equal(transit.normalizeArrivals({...data,result:{}},now).fresh,false);
+const route=transit.normalizePath({pathList:[{headSign:'SARISU - GÜZELOBA',busStopList:[{stopId:'13001',stopName:'SARISU',lat:'36.83',lng:'30.59',routes:'KL08,VS18'},{stopId:'13002',stopName:'Invalid',lat:'',lng:'30.6'}]}]},'KL08',0);assert.equal(route.stops.length,1);assert.deepEqual(route.stops[0].routes,['KL08','VS18']);
+const html='<title>16. Antalya Kitap Fuarı 2026</title><p>2–11 Ekim 2026, Cam Piramit Fuar ve Kongre Merkezi, 10:00–20:00</p><img src="/logo.png" alt="Antalya Kitap Fuarı"><img src="/poster.jpg" alt="16. Antalya Kitap Fuarı"><a href="https://www.google.com/maps/dir/?api=1&amp;destination=Cam+Piramit">Yol</a>';
+const [event]=events.parseBookFair(html,now);assert.equal(event.startsAt,'2026-10-02T10:00:00+03:00');assert.equal(event.endsAt,'2026-10-11T20:00:00+03:00');assert.equal(event.imageUrl,'https://kitapfuari.antalya.bel.tr/poster.jpg');assert.equal(event.price,null);assert.equal(new URL(event.directionsUrl).searchParams.get('destination'),'Cam Piramit');assert.equal(events.parseBookFair(html,Date.parse('2026-10-12')).length,0);assert.throws(()=>events.parseBookFair('<title>Kitap Fuarı</title><p>2026</p>',now));assert.throws(()=>events.parseBookFair(html.replace('11 Ekim','32 Ekim'),now));
+assert.equal((await import('../api/transit.js')).default instanceof Function,true);assert.equal((await import('../api/events.js')).default instanceof Function,true);
+console.log('Antalya pilot PASS: fresh/stale arrivals, directions, valid stops, verified dates, expired events and source links.');
