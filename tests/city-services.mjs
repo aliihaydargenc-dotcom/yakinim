@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import outages from '../lib/outages.cjs';
+import events from '../lib/events.cjs';
+const water='<p><strong>KEPEZ BELEDIYESI</strong></p><p>8.10.2026 tarihinde 10:25 civarı saatlerinde su kesintisi olacaktır. Kesintinin Yeri : HUSNU KARAKAS MAH.</p>';
+const [record]=outages.parseWater(water);assert.equal(record.startsAt,'2026-10-08T10:25:00+03:00');assert.equal(record.endsAt,null);assert.equal(record.status,'reported');assert.equal(outages.parseWater(water+water).length,1);assert.equal(outages.parseWater(water.replace('8.10','32.10')).length,0);assert.throws(()=>outages.parseWater('<h1>Unavailable</h1>'));
+const row={OUTAGE_NO:'42',CBS_TM_NO:'7',RPTD_DATE:'2026-10-09T00:28:06+03:00',EST_REPAIR_TIME:'2026-10-09T02:28:06+03:00',MESSAGE:'Çalışma'};
+const points=[[36.9,30.7],[36.91,30.71],[36.92,30.7]].map(([LAT,LON],i)=>({OUTAGE_NO:'42',TM_NO:'7',PARTNO:'1',POLIGON_TIPI:'DIS POLIGON',KOORD_SIRA:String(i),LAT:String(LAT),LON:String(LON)}));
+const normalized=outages.normalizeElectric({Outage:[row,row]},{OutageTransformersList:{OutageTransformers:points.reverse()}});assert.equal(normalized.length,1);assert.equal(normalized[0].geometry.coordinates.length,1);assert.deepEqual(normalized[0].geometry.coordinates[0][0],[[30.7,36.9],[30.71,36.91],[30.7,36.92],[30.7,36.9]]);assert.equal(normalized[0].status,'reported');assert.throws(()=>outages.normalizeElectric({},{}));assert.deepEqual(outages.normalizeElectric({Outage:[]},{OutageTransformersList:{OutageTransformers:[]}}),[]);
+const calendar=rows=>'<script>window.calendarEvents='+JSON.stringify(rows)+';</script>';
+const exhibition=day=>({title:'Resim Sergisi',start:day,extendedProps:{yer:'Galeri',saat:''}});
+const items=events.parseMuratpasa(calendar([exhibition('2026-10-09'),exhibition('2026-10-10'),exhibition('2026-10-12'),{title:'Çocuk Tiyatrosu (ücretsiz)',start:'2026-10-10',extendedProps:{yer:'Türkan Şoray Kültür Merkezi',saat:'19.00'}}]),undefined,Date.parse('2026-10-09T00:00:00+03:00'));
+assert.equal(items.length,3);assert.equal(items[0].endsAt,'2026-10-10T23:59:59+03:00');assert.equal(items[1].startsAt,'2026-10-10T19:00:00+03:00');assert.equal(items[1].priceLabel,'Ücretsiz');assert.ok(events.locateEvents(items)[1].directionsUrl);assert.equal(items[2].startsAt.slice(0,10),'2026-10-12');assert.throws(()=>events.parseMuratpasa('<script>window.calendarEvents=alert(1)</script>'));
+console.log('City services PASS: reported water, invalid dates, outage deduplication, ordered closed polygons, empty upstream, consecutive exhibition days, official venue and price labels.');

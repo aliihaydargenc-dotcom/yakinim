@@ -3,6 +3,7 @@ export type Section = "nearby" | "map" | "news" | "radio" | "games";
 export type CategoryId =
   | "transit"
   | "events"
+  | "outages"
   | "all"
   | "duty"
   | "market"
