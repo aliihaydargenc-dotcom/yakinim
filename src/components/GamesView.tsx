@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Blocks, Grid2X2, Brain, ChevronRight } from 'lucide-react';
-const games=[{id:'blocks',title:'Düşen Bloklar',subtitle:'Bulmaca',Icon:Blocks},{id:'2048',title:'2048',subtitle:'Sayı oyunu',Icon:Grid2X2},{id:'memory',title:'Hafıza',subtitle:'Desen eşleştirme',Icon:Brain}];
+import { ArrowLeft, Blocks, Grid2X2, Brain, ChevronRight, Worm, Bomb } from 'lucide-react';
+const games=[{id:'blocks',title:'Düşen Bloklar',subtitle:'Bulmaca',Icon:Blocks},{id:'2048',title:'2048',subtitle:'Sayı oyunu',Icon:Grid2X2},{id:'memory',title:'Hafıza',subtitle:'Desen eşleştirme',Icon:Brain},{id:'snake',title:'Yılan',subtitle:'Kaydırarak oyna',Icon:Worm},{id:'mines',title:'Mayın Tarlası',subtitle:'Mantık oyunu',Icon:Bomb}];
 export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>void}){
  const [selected,setSelected]=useState<string|null>(null);
  const game=games.find(g=>g.id===selected);

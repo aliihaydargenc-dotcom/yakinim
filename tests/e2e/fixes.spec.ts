@@ -173,3 +173,43 @@ test('reported absent Akbank ATM is excluded even from a cached provider respons
  await page.addInitScript(value=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...value,savedAt:Date.now()})),origin);
  await page.goto('/');await page.getByRole('button',{name:'ATM',exact:true}).click();await expect(page.locator('.place-row')).toHaveCount(1);await expect(page.locator('.place-row')).toContainText('Başka adres');
 });
+
+test('games fit the mobile width, blocks start full height and new games respond',async({page})=>{
+ await page.goto('/?preview');await page.getByRole('button',{name:'Oyun',exact:true}).click();
+ await page.getByRole('button',{name:'Düşen Bloklar Bulmaca'}).click();
+ const blocks=page.frameLocator('iframe');
+ await expect.poll(async()=> (await blocks.locator('.board-frame').boundingBox())?.height||0).toBeGreaterThan(300);
+ await expect(blocks.getByRole('button',{name:'Başla',exact:true})).toBeVisible();
+ await page.goBack();
+ for(const [name,selector] of [['2048 Sayı oyunu','.game-container'],['Hafıza Desen eşleştirme','#game-container']] as const){
+  await page.getByRole('button',{name}).click();const frame=page.frameLocator('iframe');
+  if(name.startsWith('Hafıza'))await frame.getByRole('button',{name:'Orta',exact:true}).click();
+  const box=await frame.locator(selector).boundingBox();expect(box?.width).toBeGreaterThan(page.viewportSize()!.width-40);expect(box!.y+box!.height).toBeLessThan(page.viewportSize()!.height);
+  if(name.startsWith('2048')){await frame.locator('.game-container').click();await page.keyboard.press('ArrowLeft');await expect(frame.locator('.tile').first()).toBeVisible();}
+  await page.goBack();
+ }
+ await page.getByRole('button',{name:'Yılan Kaydırarak oyna'}).click();const snake=page.frameLocator('iframe');
+ await snake.getByRole('button',{name:'Başla',exact:true}).click();await expect(snake.locator('#status')).toContainText('Kaydır');await snake.getByRole('button',{name:'Yukarı',exact:true}).click();
+ await page.goBack();await page.getByRole('button',{name:'Mayın Tarlası Mantık oyunu'}).click();const mines=page.frameLocator('iframe');
+ await expect(mines.locator('.cell')).toHaveCount(64);await mines.locator('.cell').first().click();await expect(mines.locator('.cell.bomb')).toHaveCount(0);await expect(mines.locator('.cell.open').first()).toBeVisible();
+ await mines.getByRole('button',{name:'Bayrak koy'}).click();await mines.locator('.cell:not(.open)').first().click();await expect(mines.locator('#score')).toHaveText('9 mayın');
+});
+
+test('radio media actions publish metadata, disconnect on pause and stop without closing app',async({page})=>{
+ await page.addInitScript(()=>{
+  const actions:Record<string,MediaSessionActionHandler|null>={};
+  navigator.mediaSession.setActionHandler=(action,handler)=>{actions[action]=handler;};
+  (window as any).mediaActions=actions;
+  HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};
+  HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};
+  HTMLMediaElement.prototype.load=function(){};
+ });
+ await page.route('**/api/radio?**',r=>r.fulfill({json:{stations:[{id:'test',name:'Test FM',streamUrl:'https://radio.example/live',codec:'MP3'}]}}));
+ await page.goto('/?preview');await page.getByRole('button',{name:'Radyo',exact:true}).click();await page.locator('.station-card').first().click();
+ await expect.poll(()=>page.evaluate(()=>navigator.mediaSession.metadata?.title)).toBe('Test FM');
+ await page.evaluate(()=>(window as any).mediaActions.pause());await expect(page.locator('audio')).not.toHaveAttribute('src');
+ await expect(page.locator('.player-copy')).toContainText('Duraklatıldı');
+ await page.evaluate(()=>(window as any).mediaActions.play());await expect(page.locator('audio')).toHaveAttribute('src','https://radio.example/live');
+ await page.evaluate(()=>(window as any).mediaActions.stop());await expect(page.locator('.global-radio-player')).toHaveCount(0);await expect(page.locator('.model-nav')).toBeVisible();
+ expect(await page.evaluate(()=>navigator.mediaSession.metadata)).toBeNull();
+});

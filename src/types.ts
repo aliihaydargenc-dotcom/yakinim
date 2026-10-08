@@ -55,4 +55,5 @@ export type RadioStation = {
   tags?: string[];
   liveVerified?: boolean;
   measuredRank?: number | null;
+  hls?: boolean;
 };

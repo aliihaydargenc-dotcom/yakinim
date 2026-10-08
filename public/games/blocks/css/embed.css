@@ -17,3 +17,4 @@ body:has(.overlay:not([hidden])) .vpad,body.dialog-open .vpad{visibility:hidden;
 .overlay{position:absolute!important;inset:0!important;border-radius:8px!important}.overlay-card{padding:16px!important;gap:12px!important}.overlay-card h1{font-family:system-ui!important;font-size:20px!important}.overlay-card .cta{background:#79576d!important;color:white!important}
 #settings-dialog input[name=server],#gameover-form label,#gameover-form button[value=submit],#gameover-form button[value=sign]{display:none!important}button{font-family:system-ui!important}
 .stage{grid-template-columns:minmax(0,1fr)!important;justify-content:stretch!important}.game-wrap{min-width:0!important;justify-content:stretch!important}.board-frame{box-shadow:none!important}
+.stage{grid-row:2!important}.mobile-bar{grid-row:1!important}.board-frame{grid-row:1!important;grid-column:1!important}

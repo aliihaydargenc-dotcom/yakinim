@@ -109,3 +109,11 @@ assert.equal(radio.rankingSource, "RİAK");
 assert.equal(radio.rankingPeriod, "Mayıs 2026");
 
 console.log("Media tests PASS: multi-source news, RİAK-prioritized radio and live-stream validation.");
+
+const sessionRows = groupStationRows([
+ {stationuuid:'tracked',name:'Kral FM',url_resolved:'https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8?listenerid=fixed',lastcheckok:1,votes:9999,hls:1},
+ {stationuuid:'fresh',name:'Kral FM',url_resolved:'https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8',lastcheckok:1,hls:1},
+ {stationuuid:'wrong',name:'Kral Pop',url_resolved:'https://dygedge2.radyotvonline.net/kralfm/playlist.m3u8',lastcheckok:1,hls:1},
+]);
+assert.equal(sessionRows.length,1);
+assert.equal(sessionRows[0].id,'fresh');

@@ -192,7 +192,7 @@ export async function fetchDuty(location: Coordinates): Promise<Place[]> {
   }).sort((a, b) => (a.distanceM || Infinity) - (b.distanceM || Infinity));
 }
 export async function fetchNews(category: string): Promise<NewsItem[]> { const payload = await getJson<NewsResponse>(`/api/news?category=${encodeURIComponent(category)}`); return payload.items || []; }
-export async function fetchRadio(): Promise<RadioStation[]> { const payload = await getJson<RadioResponse>("/api/radio?scope=turkiye"); return payload.stations || []; }
+export async function fetchRadio(): Promise<RadioStation[]> { const payload = await getJson<RadioResponse>("/api/radio?scope=turkiye&quality=4"); return payload.stations || []; }
 
 export async function fetchArea(bounds: ViewportBounds, origin: Coordinates, signal?: AbortSignal): Promise<Place[]> {
   const params = new URLSearchParams(Object.entries(bounds).map(([key,value])=>[key,String(value)]));
