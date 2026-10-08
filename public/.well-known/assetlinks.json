@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.alihaydargenc.yakinim",
+      "sha256_cert_fingerprints": [
+        "64:75:B9:70:91:A1:26:F7:7B:6E:D1:2C:35:3B:42:C5:1E:9B:7D:32:BF:D4:0F:42:C2:5D:5F:48:EA:69:FD:3C"
+      ]
+    }
+  }
+]

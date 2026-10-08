@@ -4,3 +4,11 @@ dist/
 node_modules/
 test-results/
 playwright-report/
+android/node_modules/
+android/twa/
+android/local.properties
+*.p12
+*.jks
+*.keystore
+*.apk
+*.aab

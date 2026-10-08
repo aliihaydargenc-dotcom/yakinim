@@ -1,0 +1,43 @@
+{
+  "packageId": "com.alihaydargenc.yakinim",
+  "host": "yakinim.vercel.app",
+  "name": "Yakınım",
+  "launcherName": "Yakınım",
+  "display": "standalone",
+  "themeColor": "#f7f5f1",
+  "themeColorDark": "#f7f5f1",
+  "navigationColor": "#f7f5f1",
+  "navigationColorDark": "#f7f5f1",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#f7f5f1",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://yakinim.vercel.app/icons/icon-512.png",
+  "splashScreenFadeOutDuration": 200,
+  "signingKey": {
+    "path": "yakinim-release.p12",
+    "alias": "yakinim"
+  },
+  "appVersion": "1.0.0",
+  "appVersionCode": 100,
+  "minSdkVersion": 23,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://yakinim.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": true,
+  "orientation": "portrait",
+  "fingerprints": [
+    {
+      "name": "Yakınım release",
+      "value": "64:75:B9:70:91:A1:26:F7:7B:6E:D1:2C:35:3B:42:C5:1E:9B:7D:32:BF:D4:0F:42:C2:5D:5F:48:EA:69:FD:3C"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "features": {}
+}
