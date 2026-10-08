@@ -96,19 +96,10 @@ function availableBoardHeight() {
 
   const isMobile = matchMedia('(max-width: 760px)').matches;
 
-  // ---- MOBILE: board = full viewport minus floating mobile-bar minus safe-area-bottom.
+  // The board and controls are separate grid rows. Measure only the play row.
   if (isMobile) {
-    const mb = document.getElementById('mobile-bar');
-    // Mobile-bar is fixed:top — its .bottom is the px below the viewport top
-    // where the bar ends. Add a small breathing gap so the playfield doesn't
-    // butt against the bar's blurred edge.
-    const mbBottom = mb ? mb.getBoundingClientRect().bottom : 56;
-    // Read safe-area-inset-bottom from a probe element — CSS env() isn't
-    // accessible from JS directly, so we read the computed style of body's
-    // padding-bottom (which is set to env(safe-area-inset-bottom) by base.css
-    // on supporting browsers). Fallback to 0.
-    const safeBottom = 12; // small breathing pad; vpad floats on top anyway
-    return Math.max(BOARD_MIN_H, window.innerHeight - mbBottom - safeBottom - 118);
+    const frame = wrap.querySelector('.board-frame');
+    return Math.max(20, (frame?.getBoundingClientRect().height || wrap.getBoundingClientRect().height) - 4);
   }
 
   // ---- DESKTOP: pre-v1.5.0 logic, untouched.
@@ -162,7 +153,7 @@ function availableBoardWidth() {
   if (isMobile) {
     // v1.5.0: board frame is edge-to-edge (no padding/border), so the budget
     // is the FULL viewport width. The canvas is centered inside via flex.
-    return Math.max(BOARD_MIN_H / BOARD_ASPECT, window.innerWidth);
+    return Math.max(10, wrap.querySelector('.board-frame').getBoundingClientRect().width - 4);
   }
   const cs = getComputedStyle(wrap);
   const hudW = parseFloat(cs.getPropertyValue('--hud-w')) || 130;
@@ -194,7 +185,7 @@ function applyBoardSize() {
   const ceilingCell = Math.min(cellFit, CELL_MAX);
   const zoomedCell = Math.floor(cellFit * z);
   let cell = Math.min(zoomedCell, ceilingCell);
-  cell = Math.max(CELL_MIN, cell);
+  cell = Math.max(1, Math.min(cellFit, Math.max(CELL_MIN, cell)));
 
   // 3) Derive --board-h and --board-w from the SAME integer cell. The grid
   //    column and canvas are now guaranteed to agree, so renderer.resize()
@@ -248,6 +239,7 @@ function scheduleApplyBoardSize() {
   _resizeRaf = requestAnimationFrame(() => { _resizeRaf = 0; applyBoardSize(); });
 }
 window.addEventListener('resize', scheduleApplyBoardSize);
+new ResizeObserver(scheduleApplyBoardSize).observe(document.querySelector('.board-frame'));
 window.addEventListener('orientationchange', scheduleApplyBoardSize);
 
 // ---------------------------------------------------------------------------
@@ -488,6 +480,7 @@ $('#btn-mode').addEventListener('click', () => {
 // light/dark + settings buttons so users don't have to fish for the desktop
 // topbar (which is display:none on phones). They forward to the canonical
 // handlers above so behavior stays in one place.
+$('#btn-pause-mobile')?.addEventListener('click', () => action('pause'));
 $('#btn-mode-mobile')?.addEventListener('click', () => $('#btn-mode').click());
 $('#btn-settings-mobile')?.addEventListener('click', () => $('#btn-settings').click());
 // Manual zoom buttons: adjust the multiplier on top of the fitted base.

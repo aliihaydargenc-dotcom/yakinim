@@ -21,3 +21,8 @@ assert.match(overture.PMTILES_URL, /\/2026-09-23\.1\/places\.pmtiles$/);
 assert.equal(overture.MIN_CONFIDENCE, 0.55);
 
 console.log("Overture tests PASS: real schema parsing, category mapping and bounded tile coverage.");
+assert.equal(overture.categoryFromOvertureProperties({name:'Medstar Muratpaşa Antalya',basic_category:'food_and_beverage_store',taxonomy:'{"primary":"grocery_store","hierarchy":["shopping","grocery_store"]}'}),null,'Conflicting health/grocery record must not become a market');
+assert.equal(overture.categoryFromOvertureProperties({taxonomy:'{"primary":"medical_center"}'}),'hospital');
+assert.equal(overture.categoryFromOvertureProperties({taxonomy:'{"primary":"convenience_store"}'}),'market');
+assert.equal(overture.categoryFromOvertureProperties({name:'Şok',taxonomy:'{"primary":"grocery_store"}'}),'market');
+assert.equal(overture.addressFromProperties({addresses:JSON.stringify([{freeform:'Yıldız, Muratpaşa, Antalya',locality:'Muratpaşa',region:'Antalya'}])}),'Yıldız, Muratpaşa, Antalya');

@@ -1,0 +1,8 @@
+[
+  "\\bmedstar\\b",
+  "\\bhastane(?:si|ler(?:i)?)?\\b",
+  "\\bhospital\\b",
+  "\\bmedical (?:center|clinic)\\b",
+  "\\beczane(?:si)?\\b",
+  "\\bpharmacy\\b"
+]

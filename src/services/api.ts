@@ -1,4 +1,11 @@
 import type { CategoryId, Coordinates, NewsItem, Place, RadioStation } from "../types";
+import marketExclusions from "../../lib/market-name-exclusions.json";
+const marketNameExclusions = marketExclusions.map(pattern=>new RegExp(pattern,'iu'));
+
+function cleanAddress(value:string) {
+  const parts=value.replace(/[“”"]/g,'').replace(/\s+/g,' ').trim().split(/\s*,\s*/).filter(Boolean);
+  return [...new Map(parts.map(part=>[part.toLocaleLowerCase('tr'),part])).values()].join(', ');
+}
 
 type OsmElement = {
   id: number;
@@ -70,7 +77,7 @@ function placeQuality(place: Place) {
   return score;
 }
 function dedupePlaces(places: Place[]) {
-  const ordered = [...places].sort((a, b) => placeQuality(b) - placeQuality(a));
+  const ordered = places.filter(p=>p.category!=="market" || !marketNameExclusions.some(pattern=>pattern.test(p.name.toLocaleLowerCase('tr')))).map(p=>({...p,address:cleanAddress(p.address)})).sort((a, b) => placeQuality(b) - placeQuality(a));
   const result: Place[] = [];
   for (const place of ordered) {
     const name = canonicalName(place.name);
@@ -138,7 +145,7 @@ function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): P
   });
 }
 export async function fetchOvertureSupplement(location: Coordinates, signal?: AbortSignal): Promise<Place[]> {
-  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M) });
+  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M), quality:"2" });
   const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`, signal);
   return payload.places || [];
 }

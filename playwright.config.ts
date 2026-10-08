@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: "redesign.spec.ts",
+  testMatch: ["redesign.spec.ts", "fixes.spec.ts"],
   timeout: 45_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:4173",
-    launchOptions: {executablePath:process.env.CHROMIUM_EXECUTABLE},
+    launchOptions: {executablePath:process.env.CHROMIUM_EXECUTABLE,args:["--no-sandbox","--disable-dev-shm-usage","--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"]},
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "off",

@@ -9,7 +9,6 @@ const CLUSTER_LAYER = "nearby-place-clusters";
 const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const SELECTED_HALO_LAYER = "nearby-place-selected-halo";
 const POINT_LAYER = "nearby-place-points";
-const INITIAL_LAYER = "nearby-place-initials";
 const LABEL_LAYER = "nearby-place-labels";
 const SELECTED_LABEL_LAYER = "nearby-place-selected-label";
 
@@ -54,7 +53,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         return;
       }
 
-      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, INITIAL_LAYER, POINT_LAYER]
+      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, POINT_LAYER]
         .filter((layerId) => Boolean(map.getLayer(layerId)));
       if (interactiveLayers.length === 0) return;
 
@@ -85,7 +84,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         map.getCanvas().style.cursor = "crosshair";
         return;
       }
-      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, INITIAL_LAYER, POINT_LAYER]
+      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, POINT_LAYER]
         .filter((layerId) => Boolean(map.getLayer(layerId)));
       const overFeature = interactiveLayers.length > 0 && map.queryRenderedFeatures(event.point, { layers: interactiveLayers }).length > 0;
       map.getCanvas().style.cursor = overFeature ? "pointer" : "grab";
@@ -191,9 +190,9 @@ function ensurePlaceLayers(map: MapLibreMap) {
     filter: ["has", "point_count"],
     paint: {
       "circle-color": "#79576d",
-      "circle-radius": ["step", ["get", "point_count"], 20, 10, 23, 30, 27],
+      "circle-radius": ["step", ["get", "point_count"], 14, 10, 16, 30, 19],
       "circle-stroke-color": "rgba(255,255,255,.95)",
-      "circle-stroke-width": 3,
+      "circle-stroke-width": 2,
       "circle-opacity": 0.96,
     },
   } as any);
@@ -218,7 +217,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     source: PLACES_SOURCE,
     filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], "__none__"]],
     paint: {
-      "circle-radius": 23,
+      "circle-radius": 11,
       "circle-color": "rgba(121,87,109,.14)",
       "circle-stroke-color": "rgba(121,87,109,.34)",
       "circle-stroke-width": 2,
@@ -231,26 +230,12 @@ function ensurePlaceLayers(map: MapLibreMap) {
     source: PLACES_SOURCE,
     filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 14, 16, 17, 18, 19],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 16, 5, 18, 6],
       "circle-color": ["match", ["get", "category"], "duty", "#79576d", "pharmacy", "#79576d", "#79576d"],
       "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 3,
+      "circle-stroke-width": 1.5,
       "circle-opacity": 0.97,
     },
-  } as any);
-
-  map.addLayer({
-    id: INITIAL_LAYER,
-    type: "symbol",
-    source: PLACES_SOURCE,
-    filter: ["!", ["has", "point_count"]],
-    layout: {
-      "text-field": ["get", "initial"],
-      "text-size": 12,
-      "text-allow-overlap": true,
-      "text-ignore-placement": true,
-    },
-    paint: { "text-color": "#ffffff" },
   } as any);
 
   map.addLayer({
@@ -263,17 +248,17 @@ function ensurePlaceLayers(map: MapLibreMap) {
       "text-field": ["get", "name"],
       "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 16, 12, 18, 13],
       "text-variable-anchor": ["top", "bottom", "left", "right"],
-      "text-radial-offset": 1.75,
+      "text-radial-offset": 0.85,
       "text-justify": "auto",
-      "text-max-width": 14,
-      "text-padding": 7,
+      "text-max-width": 11,
+      "text-padding": 5,
       "text-allow-overlap": false,
       "text-ignore-placement": false,
       "text-optional": true,
       "symbol-sort-key": ["get", "distanceM"],
     },
     paint: {
-      "text-color": "#79576d",
+      "text-color": "#51404d",
       "text-halo-color": "rgba(255,255,255,.98)",
       "text-halo-width": 2.2,
       "text-halo-blur": 0.4,
@@ -289,7 +274,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
       "text-field": ["get", "name"],
       "text-size": 13,
       "text-variable-anchor": ["top", "bottom", "left", "right"],
-      "text-radial-offset": 1.9,
+      "text-radial-offset": 1.1,
       "text-justify": "auto",
       "text-max-width": 15,
       "text-allow-overlap": true,
@@ -316,7 +301,6 @@ function updatePlaceSource(map: MapLibreMap, places: Place[]) {
         id: place.id,
         name: place.name,
         category: place.category,
-        initial: place.name.slice(0, 1).toLocaleUpperCase("tr"),
         distanceM: place.distanceM ?? 999999,
       },
     })),

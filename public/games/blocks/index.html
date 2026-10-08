@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/themes.css" />
   <link rel="stylesheet" href="css/game.css" />
-<style>body{font-family:system-ui,sans-serif!important;background:#f7f5f1!important}#bg-canvas,.topbar,.hint,.hud-left,.hud-right{display:none!important}.stage{padding:8px!important}.mobile-bar{background:#f7f5f1!important}#settings-dialog input[name=server],#gameover-form label{display:none!important}#gameover-form button[value=submit],#gameover-form button[value=sign]{display:none!important}button{font-family:system-ui!important}</style><style>html{--color-text:#29262b!important;--color-text-muted:#827d80!important;--color-accent:#79576d!important;--font-game:system-ui!important}.vpad{top:auto!important;bottom:8px!important;transform:translateX(-50%)!important;opacity:1!important;pointer-events:auto!important}.vbtn{background:#eeeae6!important;color:#29262b!important;border:1px solid #cfc5cd!important;min-height:44px}.mobile-bar,.mobile-bar *{color:#29262b!important}.mb-mini-label,.mb-stat-l{font-size:11px!important}.overlay-card h1{font-family:system-ui!important;font-size:20px!important}.overlay-card .cta{background:#79576d!important;color:white!important}</style></head>
+<link rel="stylesheet" href="css/embed.css" />
+</head>
 <body>
   <!-- Animated tetromino background -->
   <canvas id="bg-canvas" aria-hidden="true"></canvas>
@@ -56,6 +57,7 @@
       <canvas id="next-canvas-mobile" width="96" height="120" aria-label="next pieces"></canvas>
     </div>
     <div class="mb-actions">
+      <button class="iconbtn" id="btn-pause-mobile" title="Duraklat" aria-label="Duraklat">Ⅱ</button>
       <button class="iconbtn" id="btn-mode-mobile" title="Light / dark" aria-label="Toggle light / dark">☼</button>
       <button class="iconbtn" id="btn-settings-mobile" title="Settings" aria-label="Settings">⚙</button>
     </div>
@@ -120,12 +122,12 @@
 
     <!-- Virtual pad -->
     <div class="vpad" id="vpad" aria-label="virtual controls">
-      <button class="vbtn" data-action="left" aria-label="move left">◀</button>
-      <button class="vbtn" data-action="rotate" aria-label="rotate">↻</button>
-      <button class="vbtn" data-action="right" aria-label="move right">▶</button>
-      <button class="vbtn" data-action="hold" aria-label="hold">H</button>
-      <button class="vbtn vbtn-down" data-action="soft" aria-label="soft drop">▼</button>
-      <button class="vbtn vbtn-drop" data-action="drop" aria-label="hard drop">⤓</button>
+      <button class="vbtn" data-action="left" aria-label="Sola">◀</button>
+      <button class="vbtn" data-action="rotate" aria-label="Döndür">↻</button>
+      <button class="vbtn" data-action="right" aria-label="Sağa">▶</button>
+      <button class="vbtn" data-action="hold" aria-label="Sakla">Sakla</button>
+      <button class="vbtn vbtn-down" data-action="soft" aria-label="Yavaş indir">▼</button>
+      <button class="vbtn vbtn-drop" data-action="drop" aria-label="Hızlı indir">⤓</button>
     </div>
   </main>
 

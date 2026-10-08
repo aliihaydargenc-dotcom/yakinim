@@ -24,7 +24,7 @@ const assert=require('node:assert/strict');
    await page.getByRole('button',{name:new RegExp(title)}).click();const frame=page.frameLocator('iframe');await frame.locator('body').waitFor();await page.waitForTimeout(300);
    if(title==='2048'){await frame.locator('.tile').first().waitFor();assert.ok(await frame.locator('.tile').count()>=2);await frame.locator('body').click({position:{x:10,y:10}});await page.keyboard.press('ArrowRight');}
    if(title==='Hafıza'){await frame.getByRole('button',{name:'Kolay',exact:true}).click();await frame.locator('#game-container').waitFor();}
-   if(title==='Düşen Bloklar'){await frame.locator('#game-canvas').waitFor();await frame.getByRole('button',{name:'Başla',exact:true}).click();await frame.locator('.vpad').waitFor({state:'visible'});const rect=await frame.locator('.vpad').boundingBox();assert.ok(rect.height>0);}
+   if(title==='Düşen Bloklar'){await frame.locator('#game-canvas').waitFor();await frame.getByRole('button',{name:'Başla',exact:true}).click();await frame.locator('.vpad').waitFor({state:'visible'});const rect=await frame.locator('.vpad').boundingBox();assert.ok(rect.height>0);const board=await frame.locator('#game-canvas').boundingBox();assert.ok(board.height>300&&board.width>140,'Board uses the available screen');assert.ok(board.y+board.height<=rect.y,'Touch pad must be below the entire board');assert.ok(rect.y+rect.height<=844,'Pad fits viewport');assert.equal(await page.locator('.model-nav').count(),0,'Navigation hidden during game');}
    await page.screenshot({path:`test-results/model1-${width}-${title==='2048'?'2048':title==='Hafıza'?'memory':'blocks'}.png`});
    await page.getByRole('button',{name:'Oyunlara dön'}).click();
   }

@@ -22,3 +22,11 @@ try{
  assert.equal(status,200);assert.equal(payload.source,'legacy-fallback');assert.equal(payload.pharmacies.length,1);assert.ok(calls.some(u=>u.includes('eczaneadresi')));assert.ok(calls.some(u=>u.includes('?nobetci=Eczaneler')));assert.equal(payload.queryDate,today);
 }finally{globalThis.fetch=originalFetch;}
 console.log('Model 1 data PASS: source balance, future dates, empty official duty fallback.');
+const {parseRss,imageFromRss}=require('../lib/news.cjs');
+const feed={id:'fixture',source:'Kaynak',url:'https://publisher.example/feed'};
+const fixture=body=>`<rss><item><title>Görselli haber</title><link>https://publisher.example/story</link>${body}</item></rss>`;
+for(const body of ['<media:thumbnail url="https://cdn.example/a.jpg"/>','<media:content url="https://cdn.example/a.jpg" type="image/jpeg"/>','<image>https://cdn.example/a.jpg</image>','<description><![CDATA[<img src="https://cdn.example/a.jpg"/>]]></description>'])assert.equal(parseRss(fixture(body),'gundem',feed)[0].imageUrl,'https://cdn.example/a.jpg');
+assert.equal(imageFromRss('<enclosure type="audio/mp3" url="https://cdn.example/a.mp3"/>',feed.url),undefined);
+assert.equal(imageFromRss('<media:content url="javascript:alert(1)"/>',feed.url),undefined);
+assert.equal(imageFromRss('<media:content url="https://cdn.example/a.jpg?x=1&amp;y=2"/>',feed.url),'https://cdn.example/a.jpg?x=1&y=2');
+console.log('RSS images PASS: media, image, CDATA and unsafe URL rejection');

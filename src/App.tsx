@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Compass, LocateFixed, MapPin, Newspaper, Radio, Search, ChevronRight, Gamepad2, Cross, X, Navigation, Phone, Heart, List, Layers, ArrowLeft } from "lucide-react";
 import { CategoryRail } from "./components/CategoryRail";
 import { RadioPlayer } from "./components/RadioPlayer";
@@ -36,21 +36,30 @@ export default function App() {
   const [picking,setPicking] = useState(false);
   const [locating,setLocating] = useState(false);
   const [currentRadio,setCurrentRadio] = useState<RadioStation|null>(null);
+  const [gameActive,setGameActive] = useState(false);
+  const playingGame = section === "games" && gameActive;
   const moveTimer = useRef<ReturnType<typeof setTimeout>>();
   const mounted = useRef(true);
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);};},[]);
   useEffect(()=>{ if(location) setArea({center:location,bounds:boundsAround(location)}); },[location?.lat,location?.lng]);
   const active = section === "nearby" || section === "map";
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
-  const areaQuery = useQuery({queryKey:["area-v5",...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",staleTime:600000,retry:0});
-  const supplementQuery = useQuery({queryKey:["supplement-v5",area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",staleTime:1800000,retry:0});
+  const areaQuery = useQuery({queryKey:["area-v6",...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:600000,retry:0});
+  const supplementQuery = useQuery({queryKey:["supplement-v6",area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:1800000,retry:0});
   const dutyDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Istanbul"}).format(new Date());
   const dutyQuery = useQuery({queryKey:["duty-v5",dutyDate,area?.center.lat.toFixed(3),area?.center.lng.toFixed(3)],queryFn:()=>fetchDuty(area!.center),enabled:!DEMO && active && !!location && !!area && category==="duty",staleTime:300000,refetchInterval:300000,retry:0});
-  const places = useMemo(()=>{
-    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyQuery.data || [] : combinePlaceSources([...(areaQuery.data||[]),...(supplementQuery.data||[])]);
+  const previousArea = useRef<Place[]>([]);
+  const previousSupplement = useRef<Place[]>([]);
+  useEffect(()=>{if(areaQuery.data&&!areaQuery.isPlaceholderData)previousArea.current=areaQuery.data;},[areaQuery.data,areaQuery.isPlaceholderData]);
+  useEffect(()=>{if(supplementQuery.data&&!supplementQuery.isPlaceholderData)previousSupplement.current=supplementQuery.data;},[supplementQuery.data,supplementQuery.isPlaceholderData]);
+  const areaData = areaQuery.data ?? previousArea.current;
+  const supplementData = supplementQuery.data ?? previousSupplement.current;
+  const matchingPlaces = useMemo(()=>{
+    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyQuery.data || [] : combinePlaceSources([...areaData,...supplementData]);
     const term=search.trim().toLocaleLowerCase("tr");
-    return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term)) && (category==="duty" || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
-  },[category,search,areaQuery.data,supplementQuery.data,dutyQuery.data,area,location?.lat,location?.lng]);
+    return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
+  },[category,search,areaData,supplementData,dutyQuery.data,location?.lat,location?.lng]);
+  const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area]);
   const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyQuery.data : !areaQuery.data && !supplementQuery.data && (areaQuery.isFetching||supplementQuery.isFetching);
   const failed = DEMO ? previewState==="error" : category==="duty" ? dutyQuery.isError : areaQuery.isError && supplementQuery.isError;
   const updating = !DEMO && (areaQuery.isFetching || supplementQuery.isFetching);
@@ -67,7 +76,7 @@ export default function App() {
   }
   function pick(c:Coordinates) {setLocation(c,"Haritadan seçilen konum");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();}}
-  return <div className={`model-app ${currentRadio?'with-player':''}`}>
+  return <div className={`model-app ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
@@ -76,7 +85,7 @@ export default function App() {
         <CategoryRail value={category} onChange={c=>{setCategory(c);setSelected(null);}}/>
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
         {(!location || picking) && <section className="state-card"><strong>{picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={()=>{setMapOpen(true);setPicking(!picking);}}>Haritadan seç</button></section>}
-        {mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={visible} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
+        {mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>setMapOpen(true)}><MapPin size={18}/>Harita</button></div>
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}
@@ -87,8 +96,8 @@ export default function App() {
         </> : null}
       </main>
       {selected && <div className="detail-backdrop" onClick={()=>setSelected(null)}><section className="place-detail" role="dialog" aria-modal="true" aria-label={selected.name} onKeyDown={e=>{if(e.key==="Escape")setSelected(null);if(e.key==="Tab"){const nodes=e.currentTarget.querySelectorAll<HTMLElement>('button,a[href]');const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}} onClick={e=>e.stopPropagation()}><div className="detail-top"><h2>{selected.name}</h2><button autoFocus onClick={()=>setSelected(null)} aria-label="Kapat"><X size={22}/></button></div><p>{selected.address}</p><small>{distanceLabel(selected.distanceM)}{selected.distanceM!==undefined?" · kuş uçuşu":""}</small>{selected.source&&<small className="data-note">{selected.source==="legacy-fallback"?"Alternatif kaynak":selected.source} · {selected.queryDate}</small>}<div className="detail-buttons">{selected.phone&&!DEMO&&<a className="outline-button" href={`tel:${selected.phone}`}><Phone size={18}/>Ara</a>}{!DEMO&&Number.isFinite(selected.lat)&&Number.isFinite(selected.lng)&&<a className="solid-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={18}/>Yol tarifi</a>}<button aria-label="Yeri kaydet" aria-pressed={savedIds.includes(selected.id)} onClick={()=>toggleSaved(selected.id)}><Heart size={20} fill={savedIds.includes(selected.id)?'currentColor':'none'}/></button></div></section></div>}
-    </> : <main className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
+    </> : <main className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView onActiveChange={setGameActive}/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
     <RadioPlayer station={currentRadio} onClose={()=>setCurrentRadio(null)}/>
-    <nav className="model-nav" aria-label="Ana menü">{[{id:'nearby' as const,label:'Keşfet',Icon:Compass},{id:'news' as const,label:'Haber',Icon:Newspaper},{id:'radio' as const,label:'Radyo',Icon:Radio},{id:'games' as const,label:'Oyun',Icon:Gamepad2}].map(({id,label,Icon})=><button key={id} onClick={()=>setSection(id)} aria-current={section===id?'page':undefined}><Icon size={22}/><span>{label}</span></button>)}</nav>
+    {!playingGame && <nav className="model-nav" aria-label="Ana menü">{[{id:'nearby' as const,label:'Keşfet',Icon:Compass},{id:'news' as const,label:'Haber',Icon:Newspaper},{id:'radio' as const,label:'Radyo',Icon:Radio},{id:'games' as const,label:'Oyun',Icon:Gamepad2}].map(({id,label,Icon})=><button key={id} onClick={()=>setSection(id)} aria-current={section===id?'page':undefined}><Icon size={22}/><span>{label}</span></button>)}</nav>}
   </div>;
 }

@@ -1,0 +1,19 @@
+/* Yakınım embedding: HUD, playfield and touch controls never overlap. */
+html{--color-text:#29262b!important;--color-text-muted:#827d80!important;--color-accent:#79576d!important;--font-game:system-ui!important;height:100%;background:#f7f5f1!important}
+body{font-family:system-ui,sans-serif!important;background:#f7f5f1!important;position:static!important;height:100dvh!important;width:100%!important;min-height:0!important;overflow:hidden!important;padding:6px!important;margin:0!important;display:grid!important;grid-template-rows:58px minmax(0,1fr);gap:8px!important}
+#bg-canvas,.topbar,.hint,.hud-left,.hud-right,#btn-mode-mobile{display:none!important}
+.mobile-bar{display:flex!important;position:static!important;inset:auto!important;z-index:auto!important;height:58px;min-height:0;gap:6px!important;padding:4px 6px!important;background:#eeeae6!important;border:0!important;border-radius:10px!important;color:#29262b!important;backdrop-filter:none!important}
+.mobile-bar *{color:#29262b!important}.mobile-bar canvas{background:transparent!important}
+.mobile-bar .mb-mini{gap:4px}.mb-mini-label,.mb-stat-l{font-size:9px!important;letter-spacing:0!important}.mobile-bar #hold-canvas-mobile,.mobile-bar #next-canvas-mobile{width:30px;height:34px}
+.mobile-bar .mb-stats{display:grid!important;grid-template-columns:auto auto!important;grid-template-rows:repeat(2,auto)!important;grid-auto-flow:row!important;gap:1px 5px!important;margin:0;overflow:visible}
+.mb-stats>:nth-child(n+5){display:none}.mobile-bar .mb-stat-v{font-size:12px;margin:0}.mb-actions .iconbtn{border-color:#cfc5cd!important;min-width:28px;height:32px!important}
+.stage{position:relative!important;height:auto!important;min-height:0!important;width:100%!important;padding:0!important;display:grid!important;grid-template-rows:minmax(0,1fr) auto;gap:8px!important;align-items:stretch!important;overflow:hidden}
+.game-wrap{height:100%!important;min-height:0!important;width:100%!important;display:grid!important;grid-template-columns:1fr!important;grid-template-rows:minmax(0,1fr)!important;gap:0!important;align-items:stretch!important}
+.board-frame{height:100%!important;min-height:0!important;width:100%!important;position:relative;display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;border:0!important;border-radius:8px!important;overflow:hidden!important;background:#fff!important}
+#game-canvas{display:block;width:var(--board-w)!important;height:var(--board-h)!important;flex-shrink:0}
+.vpad{display:grid!important;position:static!important;inset:auto!important;transform:none!important;width:100%!important;max-width:360px;justify-self:center;grid-template-columns:repeat(3,1fr)!important;gap:6px!important;opacity:1!important;pointer-events:auto!important;padding:0!important;z-index:auto!important}
+.vbtn{height:48px!important;min-height:44px!important;border-radius:10px;background:#eeeae6!important;color:#29262b!important;border:1px solid #cfc5cd!important;font-size:20px!important;font-family:system-ui!important}.vbtn[data-action=hold]{font-size:13px!important}
+body:has(.overlay:not([hidden])) .vpad,body.dialog-open .vpad{visibility:hidden;pointer-events:none!important}
+.overlay{position:absolute!important;inset:0!important;border-radius:8px!important}.overlay-card{padding:16px!important;gap:12px!important}.overlay-card h1{font-family:system-ui!important;font-size:20px!important}.overlay-card .cta{background:#79576d!important;color:white!important}
+#settings-dialog input[name=server],#gameover-form label,#gameover-form button[value=submit],#gameover-form button[value=sign]{display:none!important}button{font-family:system-ui!important}
+.stage{grid-template-columns:minmax(0,1fr)!important;justify-content:stretch!important}.game-wrap{min-width:0!important;justify-content:stretch!important}.board-frame{box-shadow:none!important}

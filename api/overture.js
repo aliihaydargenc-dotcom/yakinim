@@ -6,6 +6,7 @@ const MAX_TILES = 36;
 const TILE_CONCURRENCY = 6;
 const MAX_RESULTS = 300;
 const MIN_CONFIDENCE = 0.55;
+const MARKET_NAME_EXCLUSIONS = require('../lib/market-name-exclusions.json').map(pattern => new RegExp(pattern, 'iu'));
 
 let modulesPromise;
 let archivePromise;
@@ -35,7 +36,7 @@ function categoryText(properties = {}) {
     taxonomyText(properties),
     properties.category,
     properties.categories,
-  ].filter(Boolean).join(" ").toLocaleLowerCase("en-US");
+  ].filter(Boolean).join(" ").replaceAll('_', ' ').toLocaleLowerCase("en-US");
 }
 
 function categoryFromOvertureProperties(properties = {}) {
@@ -48,7 +49,11 @@ function categoryFromOvertureProperties(properties = {}) {
   if (/parking/.test(text)) return "parking";
   if (/bakery|pastry/.test(text)) return "bakery";
   if (/fruit.*vegetable|vegetable.*fruit|greengrocer|produce market|farmers market/.test(text)) return "greengrocer";
-  if (/supermarket|grocery|convenience store|food market/.test(text)) return "market";
+  if (/supermarket|grocery|convenience store|food market/.test(text)) {
+    // Contradictory grocery records are excluded without inventing a category.
+    const name = primaryName(properties).toLocaleLowerCase('tr');
+    return MARKET_NAME_EXCLUSIONS.some(pattern => pattern.test(name)) ? null : "market";
+  }
   if (/\bcafe\b|coffee shop|tea room|coffeehouse/.test(text)) return "cafe";
   if (/restaurant|fast food|burger|pizza|kebab|steakhouse|seafood|sushi|diner|food court|eatery/.test(text)) return "food";
   if (/shopping mall|department store|clothing store|apparel|shoe store/.test(text)) return "shopping";
@@ -68,7 +73,12 @@ function addressFromProperties(properties = {}) {
   const first = Array.isArray(addresses) ? addresses[0] : null;
   if (first && typeof first === "object") {
     const parts = [first.freeform, first.locality, first.region].map(cleanText).filter(Boolean);
-    if (parts.length) return [...new Set(parts)].join(", ");
+    const unique = [];
+    for (const part of parts) {
+      const normalized = part.toLocaleLowerCase('tr');
+      if (!unique.some(value => value.toLocaleLowerCase('tr').includes(normalized))) unique.push(part);
+    }
+    if (unique.length) return unique.join(", ");
   }
   return cleanText(properties.address) || "Adres bilgisi yok";
 }

@@ -42,6 +42,7 @@ export type NewsItem = {
   publishedAt: string | null;
   category: string;
   categoryLabel: string;
+  imageUrl?: string;
 };
 
 export type RadioStation = {
