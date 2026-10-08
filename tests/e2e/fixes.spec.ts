@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Route} from '@playwright/test';
 const origin={lat:36.884,lng:30.704};
 const elements=[1,2].map(id=>({type:'node',id,lat:origin.lat+.0002*id,lon:origin.lng,tags:{name:`Market ${id}`,shop:'supermarket'}}));
 for(const outcome of ['success','error'] as const){
@@ -60,4 +60,116 @@ test('short phone has a full board above controls and Android back exits the gam
  expect(board.y+board.height).toBeLessThanOrEqual(pad.y);expect(pad.y+pad.height).toBeLessThanOrEqual(640);expect(board.height/board.width).toBe(2);
  await frame.getByRole('button',{name:'Hızlı indir',exact:true}).click();await expect(frame.locator('#mb-score')).not.toHaveText('0');
  await page.goBack();await expect(page.locator('iframe')).toHaveCount(0);await expect(page.locator('.model-nav')).toBeVisible();
+});
+
+for (const kind of ['pharmacy','duty'] as const) {
+ test(`${kind} marker stays clickable through zoom, pan and partial or empty refresh`,async({page})=>{
+  let hold=false,requests=0,phase='partial',release:()=>void=()=>{};
+  const gate=new Promise<void>(resolve=>release=resolve);
+  const a={type:'node',id:101,lat:origin.lat+.0002,lon:origin.lng,tags:{name:'A Eczanesi',amenity:'pharmacy'}};
+  const b={...a,id:102,lat:origin.lat+.0008,lon:origin.lng+.001,tags:{name:'B Eczanesi',amenity:'pharmacy'}};
+  const respond=async(route:Route,isDuty:boolean)=>{
+   const delayed=hold;
+   if(delayed){requests++;await gate;}
+   const rows=!delayed?[a]:phase==='empty'?[]:phase==='tomorrow'?[{...b,id:103,tags:{name:'Yeni Gün Eczanesi',amenity:'pharmacy'}}]:[b];
+   await route.fulfill({json:isDuty?{queryDate:'08/10/2026',source:'Test',pharmacies:rows.map(row=>({id:String(row.id),name:row.tags.name,latitude:row.lat,longitude:row.lon,address:'Test adresi'}))}:{elements:rows}});
+  };
+  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+  await page.route('**/api/viewport?**',r=>respond(r,false));
+  await page.route('**/api/duty?**',r=>respond(r,true));
+  await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,glyphs:'https://fonts.example/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+  await page.route('https://fonts.example/**',r=>r.fulfill({body:Buffer.alloc(0)}));
+  await page.addInitScript(value=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...value,savedAt:Date.now()})),origin);
+  await page.goto('/');await page.getByRole('button',{name:'Eczane',exact:true}).click();
+  if(kind==='duty')await page.getByRole('button',{name:'Nöbetçi',exact:true}).click();
+  await expect(page.locator('.place-row')).toHaveCount(1);
+  await page.getByRole('button',{name:'Harita',exact:true}).click();
+  const marker=page.getByRole('button',{name:'A Eczanesi',exact:true});
+  await expect(marker).toBeVisible();
+  await expect(page.getByRole('img',{name:'Konumun'}).locator('img')).toHaveAttribute('src','/icons/icon.svg');
+  expect((await page.getByRole('img',{name:'Konumun'}).boundingBox())?.width).toBe(40);
+  await page.waitForTimeout(800);
+  await marker.evaluate(element=>{
+   element.setAttribute('data-proof','original');
+   (window as any).markerGaps=[];
+   const sample=()=>{
+    if(!element.isConnected||element.getBoundingClientRect().width===0)(window as any).markerGaps.push(performance.now());
+    (window as any).markerMonitor=requestAnimationFrame(sample);
+   };sample();
+  });
+  hold=true;
+  // A real zoom gesture plus a slight drag; inspect the actual touch target,
+  // not merely the number of records React passed to the map component.
+  await page.locator('.maplibregl-ctrl-zoom-in').click();
+  if(kind==='pharmacy')await expect.poll(()=>requests).toBeGreaterThan(0);
+  const box=await page.locator('.maplibregl-canvas').boundingBox();if(!box)throw Error('Map missing');
+  await page.mouse.move(box.x+box.width*.6,box.y+box.height*.4);await page.mouse.down();await page.mouse.move(box.x+box.width*.6+(kind==='duty'?60:12),box.y+box.height*.4+8,{steps:6});await page.mouse.up();
+  await expect.poll(()=>requests).toBeGreaterThan(0);
+  await expect(marker).toHaveAttribute('data-proof','original');
+  await marker.click();await expect(page.getByRole('complementary',{name:'A Eczanesi detayları'})).toBeVisible();
+  const destination=new URL(await page.getByRole('link',{name:'Yol tarifi',exact:true}).getAttribute('href')||'').searchParams.get('destination');
+  expect(destination).toBe(`${a.lat},${a.lon}`);
+  release();
+  await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count','2');
+  await expect(marker).toHaveAttribute('data-proof','original');
+  await expect(page.getByRole('complementary',{name:'A Eczanesi detayları'})).toBeVisible();
+  await page.getByRole('button',{name:'Yer kartını kapat'}).click();
+  phase='empty';const before=requests;
+  await page.locator('.maplibregl-ctrl-zoom-in').click();
+  if(kind==='duty'){await page.mouse.move(box.x+box.width*.6,box.y+box.height*.4);await page.mouse.down();await page.mouse.move(box.x+box.width*.6,box.y+box.height*.4+100,{steps:10});await page.mouse.up();}
+  await expect.poll(()=>requests).toBeGreaterThan(before);
+  await page.waitForTimeout(600);
+  await expect(marker).toHaveAttribute('data-proof','original');await marker.click();
+  await expect(page.getByRole('complementary',{name:'A Eczanesi detayları'})).toBeVisible();
+  expect(await page.evaluate(()=>{cancelAnimationFrame((window as any).markerMonitor);return (window as any).markerGaps;})).toEqual([]);
+  if(kind==='duty'){
+   phase='tomorrow';
+   await page.getByRole('button',{name:'Yer kartını kapat'}).click();
+   await page.clock.setFixedTime(new Date(Date.now()+86400000));
+   await page.locator('.maplibregl-ctrl-zoom-in').click();
+   await expect(page.getByRole('button',{name:'Yeni Gün Eczanesi',exact:true})).toBeVisible();
+   await expect(marker).toHaveCount(0);
+  }
+ });
+}
+
+test('ATM is not labeled as a branch and its route follows a corrected coordinate',async({page})=>{
+ let hold=false,release:()=>void=()=>{};const gate=new Promise<void>(resolve=>release=resolve);
+ const first={type:'node',id:201,lat:origin.lat+.0003,lon:origin.lng,tags:{amenity:'atm',name:'Ziraat Bankası'}};
+ const corrected={...first,lat:first.lat+.0001};let updates=0;
+ await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+ await page.route('**/api/viewport?**',async r=>{if(hold){updates++;await gate;}await r.fulfill({json:{elements:[hold?corrected:first]}});});
+ await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,glyphs:'https://fonts.example/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+ await page.route('https://fonts.example/**',r=>r.fulfill({body:Buffer.alloc(0)}));
+ await page.addInitScript(value=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...value,savedAt:Date.now()})),origin);
+ await page.goto('/');await page.getByRole('button',{name:'ATM',exact:true}).click();
+ await expect(page.locator('.place-row')).toContainText('Ziraat Bankası ATM');
+ await page.getByRole('button',{name:'Harita',exact:true}).click();const marker=page.getByRole('button',{name:'Ziraat Bankası ATM',exact:true});await expect(marker).toBeVisible();await page.waitForTimeout(800);
+ hold=true;await page.locator('.maplibregl-ctrl-zoom-in').click();await expect.poll(()=>updates).toBeGreaterThan(0);
+ await marker.click();await expect(page.getByRole('complementary',{name:'Ziraat Bankası ATM detayları'})).toContainText('OpenStreetMap');
+ const destination=async()=>new URL(await page.getByRole('link',{name:'Yol tarifi',exact:true}).getAttribute('href')||'').searchParams.get('destination');
+ expect(await destination()).toBe(`${first.lat},${first.lon}`);release();
+ await expect.poll(destination).toBe(`${corrected.lat},${corrected.lon}`);
+});
+
+for(const mode of ['device','manual'] as const){
+ test(`${mode} location handles saved coordinates correctly on reopening`,async({page})=>{
+  const saved={lat:origin.lat+.01,lng:origin.lng};
+  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+  await page.addInitScript(value=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...value,savedAt:Date.now()})),{...saved,mode});
+  await page.goto('/');await expect(page.locator('.place-row')).toHaveCount(2);
+  const latitude=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat);
+  if(mode==='device')await expect.poll(latitude).toBe(origin.lat);
+  else{await page.waitForTimeout(600);expect(await latitude()).toBe(saved.lat);}
+ });
+}
+
+test('reported absent Akbank ATM is excluded even from a cached provider response',async({page})=>{
+ await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements:[]}}));
+ await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[
+  {id:'overture:73208e05-796d-44c1-acce-814c39c0ba06',name:'Akbank ATM',category:'atm',lat:36.89544412961155,lng:30.685742497444153,address:'Yıldız Mahallesi Hamidiye Caddesi No:53, Antalya'},
+  {id:'another-akbank',name:'Akbank ATM',category:'atm',...origin,address:'Başka adres'}
+ ]}}));
+ await page.addInitScript(value=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...value,savedAt:Date.now()})),origin);
+ await page.goto('/');await page.getByRole('button',{name:'ATM',exact:true}).click();await expect(page.locator('.place-row')).toHaveCount(1);await expect(page.locator('.place-row')).toContainText('Başka adres');
 });

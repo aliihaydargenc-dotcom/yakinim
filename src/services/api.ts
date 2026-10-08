@@ -1,6 +1,8 @@
 import type { CategoryId, Coordinates, NewsItem, Place, RadioStation } from "../types";
 import marketExclusions from "../../lib/market-name-exclusions.json";
+import placeExclusions from "../../lib/place-exclusions.json";
 const marketNameExclusions = marketExclusions.map(pattern=>new RegExp(pattern,'iu'));
+const excludedPlaceIds = new Set(placeExclusions.map(place=>place.id));
 
 function cleanAddress(value:string) {
   const parts=value.replace(/[“”"]/g,'').replace(/\s+/g,' ').trim().split(/\s*,\s*/).filter(Boolean);
@@ -77,7 +79,7 @@ function placeQuality(place: Place) {
   return score;
 }
 function dedupePlaces(places: Place[]) {
-  const ordered = places.filter(p=>p.category!=="market" || !marketNameExclusions.some(pattern=>pattern.test(p.name.toLocaleLowerCase('tr')))).map(p=>({...p,address:cleanAddress(p.address)})).sort((a, b) => placeQuality(b) - placeQuality(a));
+  const ordered = places.filter(p=>!excludedPlaceIds.has(p.id) && (p.category!=="market" || !marketNameExclusions.some(pattern=>pattern.test(p.name.toLocaleLowerCase('tr'))))).map(p=>({...p,address:cleanAddress(p.address)})).sort((a, b) => placeQuality(b) - placeQuality(a));
   const result: Place[] = [];
   for (const place of ordered) {
     const name = canonicalName(place.name);
@@ -139,13 +141,14 @@ function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): P
   return elements.flatMap((element) => {
     const lat = Number(element.lat ?? element.center?.lat), lng = Number(element.lon ?? element.center?.lon);
     const category = categoryFromTags(element.tags), tags = element.tags || {};
-    const name = displayNameFromTags(tags) || fallbackInfrastructureName(category);
+    const rawName = displayNameFromTags(tags) || fallbackInfrastructureName(category);
+    const name = category === "atm" && !/\batm\b|bankamatik/i.test(rawName) ? `${rawName} ATM` : rawName;
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !category || !name) return [];
-    return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
+    return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, source: "OpenStreetMap", distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
   });
 }
 export async function fetchOvertureSupplement(location: Coordinates, signal?: AbortSignal): Promise<Place[]> {
-  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M), quality:"2" });
+  const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M), quality:"3" });
   const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`, signal);
   return payload.places || [];
 }

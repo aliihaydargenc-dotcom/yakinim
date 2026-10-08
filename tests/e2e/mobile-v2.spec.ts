@@ -99,7 +99,7 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
   await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
   await expect(page.locator(".map-category-dock")).toBeVisible();
-  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
+  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-stable-markers");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   await expect(page.locator(".user-marker")).toBeVisible();
   await expect(page.locator(".place-marker")).toHaveCount(0);

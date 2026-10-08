@@ -7,10 +7,8 @@ import type { Coordinates, Place } from "../types";
 const PLACES_SOURCE = "nearby-places";
 const CLUSTER_LAYER = "nearby-place-clusters";
 const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
-const SELECTED_HALO_LAYER = "nearby-place-selected-halo";
-const POINT_LAYER = "nearby-place-points";
-const LABEL_LAYER = "nearby-place-labels";
-const SELECTED_LABEL_LAYER = "nearby-place-selected-label";
+const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
+type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
 
 export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor" }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -21,6 +19,68 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const onPickRef = useRef(onPick);
   const onViewportChangeRef = useRef(onViewportChange);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const selectedRef = useRef<Place | null>(null);
+  const markersRef = useRef(new Map<string, PlaceMarker>());
+  const syncMarkersRef = useRef<() => void>(() => {});
+  const sourceSignatureRef = useRef("");
+  selectedRef.current = selectedPlace;
+
+  // Native markers retain their DOM identity through zooming and GeoJSON tile
+  // rebuilds. Updating one place never removes the other clickable markers.
+  syncMarkersRef.current = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const { clientWidth: width, clientHeight: height } = map.getContainer();
+    const candidates = placesRef.current.flatMap(place => {
+      if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return [];
+      const point = map.project([place.lng, place.lat]);
+      if (place.id !== selectedRef.current?.id && (point.x < -160 || point.x > width + 160 || point.y < -160 || point.y > height + 160)) return [];
+      return [{place, point}];
+    }).sort((a,b) => Number(b.place.id === selectedRef.current?.id) - Number(a.place.id === selectedRef.current?.id)
+      || Math.hypot(a.point.x-width/2,a.point.y-height/2)-Math.hypot(b.point.x-width/2,b.point.y-height/2)).slice(0,500);
+    const ids = new Set(candidates.map(({place}) => place.id));
+    for (const [id, entry] of markersRef.current) {
+      if (!ids.has(id)) { entry.marker.remove(); markersRef.current.delete(id); }
+    }
+    const occupied: Array<{left:number;top:number;right:number;bottom:number}> = [];
+    for (const {place,point} of candidates) {
+      let entry = markersRef.current.get(place.id);
+      if (!entry) {
+        const element = document.createElement("div");
+        element.className = "stable-place-marker";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.placeId = place.id;
+        const label = document.createElement("span");
+        label.className = "stable-place-name";
+        button.append(label); element.append(button);
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          const current = placesRef.current.find(candidate => candidate.id === place.id);
+          if (!current) return;
+          if (pickingRef.current) { onPickRef.current(current); return; }
+          setSelectedPlace(current);
+          map.easeTo({center:[current.lng,current.lat],duration:180});
+        });
+        const marker = new maplibregl.Marker({element,anchor:"center"}).setLngLat([place.lng,place.lat]).addTo(map);
+        entry = {marker,button,label};
+        markersRef.current.set(place.id,entry);
+      }
+      entry.marker.setLngLat([place.lng,place.lat]);
+      entry.button.setAttribute("aria-label",place.name);
+      entry.button.setAttribute("aria-pressed",String(place.id === selectedRef.current?.id));
+      if (entry.label.textContent !== place.name) entry.label.textContent = place.name;
+      entry.marker.getElement().hidden = map.getZoom() < 13;
+      // Reserve name space only after a gesture settles. Dots and their touch
+      // targets remain available even when two names cannot fit side by side.
+      const labelWidth = entry.label.offsetWidth || 100;
+      const labelHeight = entry.label.offsetHeight || 32;
+      const rect = {left:point.x-labelWidth/2-4,right:point.x+labelWidth/2+4,top:point.y+14,bottom:point.y+14+labelHeight+4};
+      const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
+      entry.label.style.visibility = overlap ? "hidden" : "visible";
+      if (!overlap) occupied.push(rect);
+    }
+  };
 
   placesRef.current = places;
   pickingRef.current = picking;
@@ -41,9 +101,17 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     mapRef.current = map;
 
+    const syncSource = () => {
+      const signature = JSON.stringify(placesRef.current.map(({id,lat,lng}) => [id,lat,lng]));
+      if (signature !== sourceSignatureRef.current && map.getSource(PLACES_SOURCE)) {
+        updatePlaceSource(map, placesRef.current);
+        sourceSignatureRef.current = signature;
+      }
+    };
     const setup = () => {
       ensurePlaceLayers(map);
-      updatePlaceSource(map, placesRef.current);
+      syncSource();
+      syncMarkersRef.current();
     };
 
     const handleClick = async (event: maplibregl.MapMouseEvent) => {
@@ -53,7 +121,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         return;
       }
 
-      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, POINT_LAYER]
+      const interactiveLayers = [CLUSTER_LAYER, OVERVIEW_POINT_LAYER]
         .filter((layerId) => Boolean(map.getLayer(layerId)));
       if (interactiveLayers.length === 0) return;
 
@@ -71,12 +139,11 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         map.easeTo({ center: coordinates, zoom: Math.min(18, zoom), duration: 280 });
         return;
       }
-
-      const placeId = String(properties.id || "");
-      const place = placesRef.current.find((candidate) => candidate.id === placeId);
-      if (!place) return;
-      setSelectedPlace(place);
-      map.easeTo({ center: [place.lng, place.lat], duration: 180 });
+      const place = placesRef.current.find(candidate => candidate.id === String(properties.id));
+      if (place) {
+        setSelectedPlace(place);
+        map.easeTo({center:[place.lng,place.lat],zoom:Math.max(13,map.getZoom()),duration:180});
+      }
     };
 
     const handlePointer = (event: maplibregl.MapMouseEvent) => {
@@ -84,13 +151,15 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         map.getCanvas().style.cursor = "crosshair";
         return;
       }
-      const interactiveLayers = [CLUSTER_LAYER, SELECTED_LABEL_LAYER, LABEL_LAYER, POINT_LAYER]
+      const interactiveLayers = [CLUSTER_LAYER, OVERVIEW_POINT_LAYER]
         .filter((layerId) => Boolean(map.getLayer(layerId)));
       const overFeature = interactiveLayers.length > 0 && map.queryRenderedFeatures(event.point, { layers: interactiveLayers }).length > 0;
       map.getCanvas().style.cursor = overFeature ? "pointer" : "grab";
     };
 
     const handleMoveEnd = () => {
+      syncSource();
+      syncMarkersRef.current();
       if (pickingRef.current) return;
       const center = map.getCenter();
       const bounds = map.getBounds();
@@ -101,12 +170,20 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     map.on("click", handleClick);
     map.on("mousemove", handlePointer);
     map.on("moveend", handleMoveEnd);
+    const handleZoom = () => {
+      for (const entry of markersRef.current.values()) entry.marker.getElement().hidden = map.getZoom() < 13;
+    };
+    map.on("zoom", handleZoom);
 
     return () => {
       map.off("load", setup);
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);
       map.off("moveend", handleMoveEnd);
+      map.off("zoom", handleZoom);
+      for (const entry of markersRef.current.values()) entry.marker.remove();
+      markersRef.current.clear();
+      sourceSignatureRef.current = "";
       map.remove();
       mapRef.current = null;
       locationMarkerRef.current = null;
@@ -120,7 +197,14 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     if (!locationMarkerRef.current) {
       const el = document.createElement("div");
       el.className = "user-marker";
+      el.setAttribute("role", "img");
       el.setAttribute("aria-label", "Konumun");
+      const logo = document.createElement("img");
+      logo.src = "/icons/icon.svg";
+      logo.alt = "";
+      logo.width = 32;
+      logo.height = 32;
+      el.append(logo);
       locationMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(map);
     } else {
       locationMarkerRef.current.setLngLat([location.lng, location.lat]);
@@ -139,13 +223,19 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
     const sync = () => {
       ensurePlaceLayers(map);
-      updatePlaceSource(map, places);
+      if (map.isMoving()) return;
+      const signature = JSON.stringify(places.map(({id,lat,lng}) => [id,lat,lng]));
+      if (signature !== sourceSignatureRef.current) {
+        updatePlaceSource(map,places);
+        sourceSignatureRef.current = signature;
+      }
+      syncMarkersRef.current();
     };
 
     if (map.isStyleLoaded()) sync();
     else map.once("load", sync);
 
-    setSelectedPlace((current) => current && !places.some((place) => place.id === current.id) ? null : current);
+    setSelectedPlace(current => current ? places.find(place => place.id === current.id) ?? null : null);
     return () => { map.off("load", sync); };
   }, [places]);
 
@@ -157,14 +247,11 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.getLayer(SELECTED_HALO_LAYER) || !map.getLayer(SELECTED_LABEL_LAYER)) return;
-    const selectedId = selectedPlace?.id || "__none__";
-    const filter = ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], selectedId]] as any;
-    map.setFilter(SELECTED_HALO_LAYER, filter);
-    map.setFilter(SELECTED_LABEL_LAYER, filter);
+    if (!map) return;
+    syncMarkersRef.current();
   }, [selectedPlace?.id]);
 
-  return <div className="map-stage" data-map-renderer="maplibre-layers" data-place-count={places.length}>
+  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
@@ -180,11 +267,12 @@ function ensurePlaceLayers(map: MapLibreMap) {
     data: emptyFeatureCollection(),
     cluster: true,
     clusterRadius: 52,
-    clusterMaxZoom: 13,
+    clusterMaxZoom: 12,
   });
 
   map.addLayer({
     id: CLUSTER_LAYER,
+    maxzoom: 13,
     type: "circle",
     source: PLACES_SOURCE,
     filter: ["has", "point_count"],
@@ -199,6 +287,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
 
   map.addLayer({
     id: CLUSTER_COUNT_LAYER,
+    maxzoom: 13,
     type: "symbol",
     source: PLACES_SOURCE,
     filter: ["has", "point_count"],
@@ -212,81 +301,14 @@ function ensurePlaceLayers(map: MapLibreMap) {
   } as any);
 
   map.addLayer({
-    id: SELECTED_HALO_LAYER,
-    type: "circle",
-    source: PLACES_SOURCE,
-    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], "__none__"]],
-    paint: {
-      "circle-radius": 11,
-      "circle-color": "rgba(121,87,109,.14)",
-      "circle-stroke-color": "rgba(121,87,109,.34)",
-      "circle-stroke-width": 2,
-    },
-  } as any);
-
-  map.addLayer({
-    id: POINT_LAYER,
+    id: OVERVIEW_POINT_LAYER,
+    maxzoom: 13,
     type: "circle",
     source: PLACES_SOURCE,
     filter: ["!", ["has", "point_count"]],
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 16, 5, 18, 6],
-      "circle-color": ["match", ["get", "category"], "duty", "#79576d", "pharmacy", "#79576d", "#79576d"],
-      "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 1.5,
-      "circle-opacity": 0.97,
-    },
+    paint: {"circle-radius":4,"circle-color":"#79576d","circle-stroke-color":"white","circle-stroke-width":1.5},
   } as any);
 
-  map.addLayer({
-    id: LABEL_LAYER,
-    type: "symbol",
-    source: PLACES_SOURCE,
-    minzoom: 0,
-    filter: ["!", ["has", "point_count"]],
-    layout: {
-      "text-field": ["get", "name"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 16, 12, 18, 13],
-      "text-variable-anchor": ["top", "bottom", "left", "right"],
-      "text-radial-offset": 0.85,
-      "text-justify": "auto",
-      "text-max-width": 11,
-      "text-padding": 5,
-      "text-allow-overlap": false,
-      "text-ignore-placement": false,
-      "text-optional": true,
-      "symbol-sort-key": ["get", "distanceM"],
-    },
-    paint: {
-      "text-color": "#51404d",
-      "text-halo-color": "rgba(255,255,255,.98)",
-      "text-halo-width": 2.2,
-      "text-halo-blur": 0.4,
-    },
-  } as any);
-
-  map.addLayer({
-    id: SELECTED_LABEL_LAYER,
-    type: "symbol",
-    source: PLACES_SOURCE,
-    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], "__none__"]],
-    layout: {
-      "text-field": ["get", "name"],
-      "text-size": 13,
-      "text-variable-anchor": ["top", "bottom", "left", "right"],
-      "text-radial-offset": 1.1,
-      "text-justify": "auto",
-      "text-max-width": 15,
-      "text-allow-overlap": true,
-      "text-ignore-placement": true,
-    },
-    paint: {
-      "text-color": "#0f172a",
-      "text-halo-color": "#ffffff",
-      "text-halo-width": 3,
-      "text-halo-blur": 0.5,
-    },
-  } as any);
 }
 
 function updatePlaceSource(map: MapLibreMap, places: Place[]) {
@@ -294,7 +316,7 @@ function updatePlaceSource(map: MapLibreMap, places: Place[]) {
   if (!source) return;
   source.setData({
     type: "FeatureCollection",
-    features: places.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).slice(0, 500).map((place) => ({
+    features: places.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map((place) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [place.lng, place.lat] },
       properties: {
@@ -318,7 +340,7 @@ function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    <p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source} · {place.queryDate}</p>}
+    <p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}
     <div className="map-place-actions">
       {place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
       <a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>

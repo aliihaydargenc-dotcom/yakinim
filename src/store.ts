@@ -15,22 +15,22 @@ function readSaved(): string[] {
   }
 }
 
-function readLastLocation(): Coordinates | null {
+function readLastLocation(): (Coordinates & { mode: "device" | "manual" }) | null {
   try {
     const raw = localStorage.getItem(LAST_LOCATION_KEY);
     if (!raw) return null;
-    const value = JSON.parse(raw) as { lat?: unknown; lng?: unknown; savedAt?: unknown };
+    const value = JSON.parse(raw) as { lat?: unknown; lng?: unknown; savedAt?: unknown; mode?: unknown };
     const lat = Number(value.lat), lng = Number(value.lng), savedAt = Number(value.savedAt);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(savedAt)) return null;
     if (Date.now() - savedAt > LAST_LOCATION_MAX_AGE_MS) return null;
-    return { lat, lng };
+    return { lat, lng, mode: value.mode === "manual" ? "manual" : "device" };
   } catch {
     return null;
   }
 }
 
-function persistLastLocation(location: Coordinates) {
-  try { localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({ ...location, savedAt: Date.now() })); } catch {}
+function persistLastLocation(location: Coordinates, mode: "device" | "manual") {
+  try { localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({ ...location, mode, savedAt: Date.now() })); } catch {}
 }
 
 const initialLocation = readLastLocation();
@@ -40,6 +40,7 @@ type AppState = {
   category: CategoryId;
   search: string;
   location: Coordinates | null;
+  locationMode: "device" | "manual";
   locationLabel: string;
   locationError: string;
   pickingLocation: boolean;
@@ -47,7 +48,7 @@ type AppState = {
   setSection: (section: Section) => void;
   setCategory: (category: CategoryId) => void;
   setSearch: (search: string) => void;
-  setLocation: (location: Coordinates, label?: string) => void;
+  setLocation: (location: Coordinates, label?: string, mode?: "device" | "manual") => void;
   setLocationError: (message: string) => void;
   setPickingLocation: (value: boolean) => void;
   toggleSaved: (id: string) => void;
@@ -58,6 +59,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   category: "market",
   search: "",
   location: initialLocation,
+  locationMode: initialLocation?.mode ?? "device",
   locationLabel: initialLocation ? "Son konum hazırlanıyor" : "Konum seçilmedi",
   locationError: "",
   pickingLocation: false,
@@ -65,9 +67,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSection: (section) => set({ section }),
   setCategory: (category) => set({ category }),
   setSearch: (search) => set({ search }),
-  setLocation: (location, label = "Konum hazır") => {
-    persistLastLocation(location);
-    set({ location, locationLabel: label, locationError: "" });
+  setLocation: (location, label = "Konum hazır", mode = "device") => {
+    persistLastLocation(location, mode);
+    set({ location, locationMode: mode, locationLabel: label, locationError: "" });
   },
   setLocationError: (locationError) => set({ locationError }),
   setPickingLocation: (pickingLocation) => set({ pickingLocation }),

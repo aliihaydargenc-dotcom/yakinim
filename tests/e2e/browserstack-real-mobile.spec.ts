@@ -118,7 +118,7 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
   await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
   await expect(page.locator(".map-category-dock")).toBeVisible();
-  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layers");
+  await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-stable-markers");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".user-marker")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".place-marker")).toHaveCount(0);

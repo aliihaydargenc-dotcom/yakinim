@@ -7,6 +7,7 @@ const TILE_CONCURRENCY = 6;
 const MAX_RESULTS = 300;
 const MIN_CONFIDENCE = 0.55;
 const MARKET_NAME_EXCLUSIONS = require('../lib/market-name-exclusions.json').map(pattern => new RegExp(pattern, 'iu'));
+const EXCLUDED_PLACE_IDS = new Set(require('../lib/place-exclusions.json').map(place => place.id));
 
 let modulesPromise;
 let archivePromise;
@@ -180,9 +181,11 @@ async function readTile(tile, origin, radiusM) {
       const distanceM = Math.round(distanceMeters(origin.lat, origin.lng, lat, lng));
       if (distanceM > radiusM * 1.12) continue;
       const placeId = cleanText(properties.id) || String(feature.id || `${tile.z}:${tile.x}:${tile.y}:${index}`);
+      if (EXCLUDED_PLACE_IDS.has(`overture:${placeId}`)) continue;
       places.push({
         id: `overture:${placeId}`,
-        name,
+        name: category === "atm" && !/\batm\b|bankamatik/i.test(name) ? `${name} ATM` : name,
+        source: "Overture Maps",
         category,
         lat,
         lng,

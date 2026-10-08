@@ -1,0 +1,10 @@
+[
+  {
+    "id": "overture:73208e05-796d-44c1-acce-814c39c0ba06",
+    "name": "Akbank ATM",
+    "address": "Yıldız Mahallesi Hamidiye Caddesi No:53, Antalya",
+    "reportedAt": "2026-10-08",
+    "reason": "User reports this ATM is absent. Exact Overture coordinates match the reported Maps destination. The associated Soğuksu branch is listed as closed by the directory below; ATM absence has not been independently confirmed by Akbank. Suppress this record until reviewed.",
+    "evidenceUrl": "https://www.trbanka.com/akbank-soguksu-antalya-subesi.html"
+  }
+]
