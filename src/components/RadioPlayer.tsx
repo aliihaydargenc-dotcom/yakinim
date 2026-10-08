@@ -18,6 +18,7 @@ export function RadioPlayer({ station, onClose }: { station: RadioStation | null
     void audio.play().catch(() => {
       setPlaying(false);
       setLoading(false);
+      setFailed(true);
     });
   }, [station?.id, station?.streamUrl]);
 
@@ -71,7 +72,7 @@ export function RadioPlayer({ station, onClose }: { station: RadioStation | null
       <audio
         ref={audioRef}
         preload="none"
-        onPlay={() => { setPlaying(true); setLoading(false); setFailed(false); }}
+        onPlaying={() => { setPlaying(true); setLoading(false); setFailed(false); }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setLoading(true)}
         onCanPlay={() => setLoading(false)}

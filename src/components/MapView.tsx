@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigation, Phone, X } from "lucide-react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
+import type { ViewportBounds } from "../services/api";
 import type { Coordinates, Place } from "../types";
 
 const PLACES_SOURCE = "nearby-places";
@@ -12,7 +13,7 @@ const INITIAL_LAYER = "nearby-place-initials";
 const LABEL_LAYER = "nearby-place-labels";
 const SELECTED_LABEL_LAYER = "nearby-place-selected-label";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor" }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates) => void; loading?: boolean; loadingText?: string }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor" }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
@@ -35,7 +36,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       style: "https://tiles.openfreemap.org/styles/positron",
       center: location ? [location.lng, location.lat] : [35, 39],
       zoom: location ? 14.6 : 5.2,
-      attributionControl: false,
+      attributionControl: { compact: true },
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -93,7 +94,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const handleMoveEnd = () => {
       if (pickingRef.current) return;
       const center = map.getCenter();
-      onViewportChangeRef.current({ lat: center.lat, lng: center.lng });
+      const bounds = map.getBounds();
+      onViewportChangeRef.current({ lat: center.lat, lng: center.lng }, { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
     };
 
     map.on("load", setup);
@@ -179,7 +181,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     data: emptyFeatureCollection(),
     cluster: true,
     clusterRadius: 52,
-    clusterMaxZoom: 15,
+    clusterMaxZoom: 13,
   });
 
   map.addLayer({
@@ -188,7 +190,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     source: PLACES_SOURCE,
     filter: ["has", "point_count"],
     paint: {
-      "circle-color": "#111827",
+      "circle-color": "#79576d",
       "circle-radius": ["step", ["get", "point_count"], 20, 10, 23, 30, 27],
       "circle-stroke-color": "rgba(255,255,255,.95)",
       "circle-stroke-width": 3,
@@ -217,8 +219,8 @@ function ensurePlaceLayers(map: MapLibreMap) {
     filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], "__none__"]],
     paint: {
       "circle-radius": 23,
-      "circle-color": "rgba(37,99,235,.14)",
-      "circle-stroke-color": "rgba(37,99,235,.34)",
+      "circle-color": "rgba(121,87,109,.14)",
+      "circle-stroke-color": "rgba(121,87,109,.34)",
       "circle-stroke-width": 2,
     },
   } as any);
@@ -230,7 +232,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     filter: ["!", ["has", "point_count"]],
     paint: {
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 14, 16, 17, 18, 19],
-      "circle-color": ["match", ["get", "category"], "duty", "#be123c", "pharmacy", "#7c3aed", "#1d4ed8"],
+      "circle-color": ["match", ["get", "category"], "duty", "#79576d", "pharmacy", "#79576d", "#79576d"],
       "circle-stroke-color": "#ffffff",
       "circle-stroke-width": 3,
       "circle-opacity": 0.97,
@@ -255,7 +257,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     id: LABEL_LAYER,
     type: "symbol",
     source: PLACES_SOURCE,
-    minzoom: 14,
+    minzoom: 0,
     filter: ["!", ["has", "point_count"]],
     layout: {
       "text-field": ["get", "name"],
@@ -271,7 +273,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
       "symbol-sort-key": ["get", "distanceM"],
     },
     paint: {
-      "text-color": "#111827",
+      "text-color": "#79576d",
       "text-halo-color": "rgba(255,255,255,.98)",
       "text-halo-width": 2.2,
       "text-halo-blur": 0.4,
@@ -307,7 +309,7 @@ function updatePlaceSource(map: MapLibreMap, places: Place[]) {
   if (!source) return;
   source.setData({
     type: "FeatureCollection",
-    features: places.slice(0, 500).map((place) => ({
+    features: places.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).slice(0, 500).map((place) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [place.lng, place.lat] },
       properties: {
@@ -332,7 +334,7 @@ function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    <p className="map-place-address">{place.address}</p>
+    <p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source} · {place.queryDate}</p>}
     <div className="map-place-actions">
       {place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
       <a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>

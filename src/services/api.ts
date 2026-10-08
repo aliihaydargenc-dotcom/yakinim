@@ -11,10 +11,10 @@ type OsmElement = {
 
 type ViewportResponse = { elements?: OsmElement[] };
 type SupplementalResponse = { places?: Place[] };
-type DutyResponse = { pharmacies?: Array<Record<string, unknown>> };
+type DutyResponse = { source?:string; queryDate?:string; pharmacies?: Array<Record<string, unknown>> };
 type NewsResponse = { items?: NewsItem[] };
 type RadioResponse = { stations?: RadioStation[] };
-type ViewportBounds = { south: number; west: number; north: number; east: number };
+export type ViewportBounds = { south: number; west: number; north: number; east: number };
 
 const NEARBY_LAT_SPAN = 0.045;
 const NEARBY_LNG_SPAN = 0.055;
@@ -79,10 +79,17 @@ function dedupePlaces(places: Place[]) {
   }
   return result;
 }
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<T>;
+async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = setTimeout(abort, 10000);
+  try {
+    const response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json() as T;
+  } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
 }
 function buildViewportGrid(location: Coordinates): ViewportBounds[] {
   const south = location.lat - NEARBY_LAT_SPAN, north = location.lat + NEARBY_LAT_SPAN;
@@ -130,9 +137,9 @@ function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): P
     return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
   });
 }
-async function fetchOvertureSupplement(location: Coordinates): Promise<Place[]> {
+export async function fetchOvertureSupplement(location: Coordinates, signal?: AbortSignal): Promise<Place[]> {
   const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M) });
-  const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`);
+  const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`, signal);
   return payload.places || [];
 }
 function mergePlaces(places: Place[]) {
@@ -170,9 +177,25 @@ export async function fetchDuty(location: Coordinates): Promise<Place[]> {
   const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: "20000", limit: "24" });
   const payload = await getJson<DutyResponse>(`/api/duty?${params}`);
   return (payload.pharmacies || []).flatMap((row, index) => {
-    const lat = Number(row.latitude), lng = Number(row.longitude); if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
-    return [{ id: String(row.id || `duty:${index}`), name: String(row.name || "Nöbetçi Eczane"), category: "duty", lat, lng, address: String(row.address || "Adres bilgisi yok"), phone: row.phone ? String(row.phone) : undefined, distanceM: Number.isFinite(Number(row.distance_m)) ? Number(row.distance_m) : Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
+    const lat = row.latitude==null?NaN:Number(row.latitude), lng = row.longitude==null?NaN:Number(row.longitude);
+    return [{ id: String(row.id || `duty:${index}`), name: String(row.name || "Nöbetçi Eczane"), category: "duty", lat, lng, address: String(row.address || "Adres bilgisi yok"), source: String(row.source||payload.source||""), queryDate:payload.queryDate, phone: row.phone ? String(row.phone) : undefined, distanceM: row.distance_m!=null && Number.isFinite(Number(row.distance_m)) ? Number(row.distance_m) : Number.isFinite(lat)&&Number.isFinite(lng)?Math.round(distanceMeters(location, { lat, lng })):undefined } satisfies Place];
   }).sort((a, b) => (a.distanceM || Infinity) - (b.distanceM || Infinity));
 }
 export async function fetchNews(category: string): Promise<NewsItem[]> { const payload = await getJson<NewsResponse>(`/api/news?category=${encodeURIComponent(category)}`); return payload.items || []; }
 export async function fetchRadio(): Promise<RadioStation[]> { const payload = await getJson<RadioResponse>("/api/radio?scope=turkiye"); return payload.stations || []; }
+
+export async function fetchArea(bounds: ViewportBounds, origin: Coordinates, signal?: AbortSignal): Promise<Place[]> {
+  const params = new URLSearchParams(Object.entries(bounds).map(([key,value])=>[key,String(value)]));
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = setTimeout(abort, 9000);
+  try {
+    const response = await fetch(`/api/viewport?${params}`, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload: ViewportResponse = await response.json();
+    return mergePlaces(osmPlacesFromElements(payload.elements || [], origin));
+  } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
+}
+export function combinePlaceSources(places: Place[]) { return mergePlaces(places); }

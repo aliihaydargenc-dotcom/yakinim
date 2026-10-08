@@ -56,7 +56,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const blockedUrls = activeFailedStreams();
-    const { stations, rankingSource, rankingPeriod, verifiedCount } = await queryRadio(scope, undefined, { blockedUrls, probe: true });
+    const { stations, rankingSource, rankingPeriod, verifiedCount } = await queryRadio(scope, undefined, { blockedUrls, probe: false });
     const payload = {
       scope,
       stations,

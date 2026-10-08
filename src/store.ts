@@ -55,7 +55,7 @@ type AppState = {
 
 export const useAppStore = create<AppState>((set, get) => ({
   section: "nearby",
-  category: "all",
+  category: "market",
   search: "",
   location: initialLocation,
   locationLabel: initialLocation ? "Son konum hazırlanıyor" : "Konum seçilmedi",

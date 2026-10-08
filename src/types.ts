@@ -1,4 +1,4 @@
-export type Section = "nearby" | "map" | "news" | "radio";
+export type Section = "nearby" | "map" | "news" | "radio" | "games";
 
 export type CategoryId =
   | "all"
@@ -29,6 +29,8 @@ export type Place = {
   lng: number;
   address: string;
   phone?: string;
+  source?: string;
+  queryDate?: string;
   distanceM?: number;
 };
 
@@ -49,6 +51,7 @@ export type RadioStation = {
   homepage?: string;
   codec?: string;
   bitrate?: number;
+  tags?: string[];
   liveVerified?: boolean;
   measuredRank?: number | null;
 };

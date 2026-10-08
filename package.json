@@ -1,14 +1,15 @@
 {
   "name": "yakinim",
-  "version": "4.0.0-beta.3",
+  "version": "5.0.0-model1",
   "private": true,
   "description": "Yakınım v2 — mobil öncelikli yakın çevre keşif uygulaması",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && npm run build",
+    "test": "node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && npm run build",
     "test:mobile": "playwright test",
-    "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js"
+    "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js",
+    "test:model1": "node tests/model1-browser.cjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
