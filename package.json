@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && node tests/pilot.mjs && npm run build",
+    "test": "node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && node tests/prices.mjs && node tests/pilot.mjs && npm run build",
     "test:mobile": "playwright test",
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js",
-    "test:model1": "node tests/model1-browser.cjs"
+    "test:model1": "node tests/model1-browser.cjs",
+    "refresh:transit": "python scripts/refresh-transit.py"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",

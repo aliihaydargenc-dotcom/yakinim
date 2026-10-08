@@ -51,8 +51,11 @@
     "api/transit.js": {
       "maxDuration": 60
     },
+    "api/prices.js": {
+      "maxDuration": 30
+    },
     "api/events.js": {
-      "maxDuration": 15
+      "maxDuration": 30
     }
   }
 }
