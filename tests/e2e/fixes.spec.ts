@@ -352,8 +352,8 @@ test('transit map opens arrivals and section search stays above categories',asyn
  await page.goto('/?preview');await page.getByRole('button',{name:'Ulaşım',exact:true}).click();
  const search=page.getByRole('textbox',{name:'Durak veya hat ara'});await expect(search).toBeVisible();
  expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(await page.locator('.category-rail').evaluate(el=>el.getBoundingClientRect().top));
- await page.getByRole('button',{name:'Harita',exact:true}).click();await page.locator('.stable-place-marker button').click();await page.getByRole('button',{name:'Yaklaşan otobüsler',exact:true}).click();await expect(page.locator('.bus-row')).toContainText('3 dk');
- await page.getByRole('button',{name:'Duraklar',exact:true}).click();await expect(page.locator('.pilot-map')).toBeVisible();
+ await page.getByRole('button',{name:'Harita',exact:true}).click();await page.locator('.stable-place-marker button').click();await expect(page.locator('.stop-row')).toHaveCount(0);await expect(page.locator('.map-stop-details')).not.toHaveAttribute('open','');await expect.poll(async()=>{const pin=await page.locator('.stable-place-marker button').boundingBox();const sheet=await page.locator('.map-place-sheet').boundingBox();return !!pin&&!!sheet&&pin.y+pin.height<sheet.y;}).toBe(true);await page.getByRole('button',{name:'Yaklaşan otobüsler',exact:true}).click();await expect(page.locator('.bus-row')).toContainText('3 dk');
+ await page.goBack();await expect(page.locator('.pilot-map')).toBeVisible();await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
 });
 
 test('prices open with basics and search remains sticky while scrolling',async({page})=>{

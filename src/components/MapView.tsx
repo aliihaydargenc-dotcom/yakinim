@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { Navigation, Phone, X } from "lucide-react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { ViewportBounds } from "../services/api";
+import {useBackLayer} from "../hooks/useBackLayer";
 import type { Coordinates, Place } from "../types";
 
+const cameras=new Map<string,{center:[number,number];zoom:number;selected?:Place|null}>();
 const PLACES_SOURCE = "nearby-places";
 const CLUSTER_LAYER = "nearby-place-clusters";
 const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
 type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string }) {
+  const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
@@ -18,7 +21,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
   const onViewportChangeRef = useRef(onViewportChange);
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(()=>memoryKey?cameras.get(memoryKey)?.selected??null:null);
+  useBackLayer(!!selectedPlace,()=>setSelectedPlace(null));
   const selectedRef = useRef<Place | null>(null);
   const markersRef = useRef(new Map<string, PlaceMarker>());
   const syncMarkersRef = useRef<() => void>(() => {});
@@ -77,7 +81,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       const labelHeight = entry.label.offsetHeight || 32;
       const rect = {left:point.x-labelWidth/2-4,right:point.x+labelWidth/2+4,top:point.y+14,bottom:point.y+14+labelHeight+4};
       const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
-      entry.label.style.visibility = overlap ? "hidden" : "visible";
+      entry.label.style.visibility = (place.id !== selectedRef.current?.id && (overlap || place.category==='transit'&&map.getZoom()<15.8)) ? "hidden" : "visible";
       if (!overlap) occupied.push(rect);
     }
   };
@@ -90,11 +94,12 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const saved=memoryKey?cameras.get(memoryKey):undefined;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: "https://tiles.openfreemap.org/styles/positron",
-      center: location ? [location.lng, location.lat] : [35, 39],
-      zoom: location ? 14.6 : 5.2,
+      center: saved?.center ?? (location ? [location.lng, location.lat] : [35, 39]),
+      zoom: saved?.zoom ?? (location ? 14.6 : 5.2),
       attributionControl: { compact: true },
     });
 
@@ -162,6 +167,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       syncMarkersRef.current();
       if (pickingRef.current) return;
       const center = map.getCenter();
+      if(memoryKey)cameras.set(memoryKey,{center:[center.lng,center.lat],zoom:map.getZoom(),selected:selectedRef.current});
       const bounds = map.getBounds();
       onViewportChangeRef.current({ lat: center.lat, lng: center.lng }, { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
     };
@@ -218,7 +224,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
     const center = map.getCenter();
     const alreadyCentered = Math.abs(center.lat - location.lat) < 0.0008 && Math.abs(center.lng - location.lng) < 0.0008;
-    if (!alreadyCentered || map.getZoom() < 13.8) {
+    if (!(memoryKey&&cameras.has(memoryKey)) && (!alreadyCentered || map.getZoom() < 13.8)) {
       map.easeTo({ center: [location.lng, location.lat], zoom: Math.max(map.getZoom(), 14.6), duration: 280 });
     }
   }, [location?.lat, location?.lng]);
@@ -255,13 +261,16 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const map = mapRef.current;
     if (!map) return;
     syncMarkersRef.current();
+    if(!selectedPlace||!sheetRef.current)return;
+    const focus=()=>{const height=sheetRef.current?.getBoundingClientRect().height||0;map.easeTo({center:[selectedPlace.lng,selectedPlace.lat],offset:[0,-height/2],duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:220});};
+    const observer=new ResizeObserver(focus);observer.observe(sheetRef.current);focus();return ()=>observer.disconnect();
   }, [selectedPlace?.id]);
 
   return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
-    {selectedPlace && <MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} />}
+    {selectedPlace && <div ref={sheetRef} className="map-sheet-holder"><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} /></div>}
   </div>;
 }
 
@@ -346,10 +355,10 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    <p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}
+    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
     <div className="map-place-actions">
       {onOpen ? <button className="solid-button" onClick={onOpen}>Yaklaşan otobüsler</button> : place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
-      <a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>
+      {place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>}
     </div>
   </aside>;
 }

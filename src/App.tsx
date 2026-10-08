@@ -5,6 +5,7 @@ import { CategoryRail } from "./components/CategoryRail";
 import { RadioPlayer } from "./components/RadioPlayer";
 import { combinePlaceSources, fetchArea, fetchDuty, fetchOvertureSupplement, fetchRadio, type ViewportBounds } from "./services/api";
 import { useAppStore } from "./store";
+import {useBackLayer} from "./hooks/useBackLayer";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
 const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
@@ -41,6 +42,8 @@ export default function App() {
   const [mapOpen,setMapOpen] = useState(false);
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
+  useBackLayer(mapOpen,()=>{setMapOpen(false);setPicking(false);});
+  useBackLayer(!!selected,()=>setSelected(null));
   const [locating,setLocating] = useState(false);
   const [currentRadio,setCurrentRadio] = useState<RadioStation|null>(null);
   const radioQuery = useQuery({queryKey:["radio"],queryFn:fetchRadio,enabled:section==="radio"||!!currentRadio,staleTime:300000});
