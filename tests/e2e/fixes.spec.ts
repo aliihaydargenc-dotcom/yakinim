@@ -284,3 +284,38 @@ test('snake earns a chapter, unlocks the next and pauses without resetting the b
  await page.getByRole('button',{name:'Oyunu duraklat',exact:true}).click();const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
  await page.getByRole('button',{name:'Devam et',exact:true}).click();await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
 });
+
+for(const permissionMode of ['prompt','unsupported'] as const){
+ test(`Safari ${permissionMode} permission state does not block saved GPS refresh`,async({page})=>{
+  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+  await page.addInitScript(mode=>{
+   localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.8,lng:30.7,mode:'device',savedAt:Date.now()}));
+   Object.defineProperty(navigator,'permissions',{value:mode==='unsupported'?undefined:{query:async()=>({state:'prompt'})},configurable:true});
+   Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:36.884,longitude:30.704}} as GeolocationPosition)},configurable:true});
+  },permissionMode);
+  await page.goto('/');await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
+ });
+}
+test('denied location stays visible with cached coordinates and does not retry permission',async({page})=>{
+ await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+ await page.addInitScript(()=>{
+  localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.884,lng:30.704,mode:'manual',savedAt:Date.now()}));
+  (window as any).gpsCalls=0;
+  Object.defineProperty(navigator,'permissions',{value:{query:async()=>({state:'prompt'})},configurable:true});
+  Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(_:PositionCallback,error:PositionErrorCallback)=>{(window as any).gpsCalls++;error({code:1} as GeolocationPositionError);}},configurable:true});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'Konumumu bul'}).click();
+ await expect(page.getByRole('alert')).toContainText('Konum Servisleri');expect(await page.evaluate(()=>(window as any).gpsCalls)).toBe(1);
+ await expect(page.getByRole('button',{name:'Konumumu bul'})).toBeEnabled();await page.getByRole('button',{name:'Haritadan seç',exact:true}).click();await expect(page.getByRole('alert')).toHaveCount(0);
+});
+test('unavailable high accuracy GPS falls back to a fresh normal accuracy request',async({page})=>{
+ await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+ await page.addInitScript(()=>{
+  (window as any).gpsOptions=[];
+  Object.defineProperty(navigator,'permissions',{value:undefined,configurable:true});
+  Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(success:PositionCallback,error:PositionErrorCallback,options:PositionOptions)=>{(window as any).gpsOptions.push(options);if(options.enableHighAccuracy)error({code:3} as GeolocationPositionError);else success({coords:{latitude:36.884,longitude:30.704}} as GeolocationPosition);}},configurable:true});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'Konumumu bul'}).click();
+ await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
+ expect(await page.evaluate(()=>(window as any).gpsOptions.map((o:PositionOptions)=>[o.enableHighAccuracy,o.maximumAge]))).toEqual([[true,0],[false,0]]);
+});

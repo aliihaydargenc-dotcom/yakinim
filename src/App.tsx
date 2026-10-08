@@ -42,16 +42,26 @@ export default function App() {
   const playingGame = section === "games" && gameActive;
   const moveTimer = useRef<ReturnType<typeof setTimeout>>();
   const mounted = useRef(true);
+  const locationRequest = useRef(0);
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);};},[]);
   useEffect(()=>{
-    if (DEMO || !navigator.geolocation || !navigator.permissions) return;
+    if (DEMO || !navigator.geolocation || useAppStore.getState().locationMode==="manual") return;
     let cancelled=false;
-    void navigator.permissions.query({name:"geolocation"}).then(permission=>{
-      if(cancelled || permission.state!=="granted" || useAppStore.getState().locationMode==="manual") return;
+    const refresh=()=>{
+      if(cancelled || locationRequest.current || useAppStore.getState().locationMode==="manual") return;
+      const request=++locationRequest.current;
       navigator.geolocation.getCurrentPosition(position=>{
-        if(!cancelled && useAppStore.getState().locationMode!=="manual") setLocation({lat:position.coords.latitude,lng:position.coords.longitude});
-      },()=>{}, {enableHighAccuracy:true,timeout:10000,maximumAge:0});
-    }).catch(()=>{});
+        if(!cancelled && request===locationRequest.current && useAppStore.getState().locationMode!=="manual") setLocation({lat:position.coords.latitude,lng:position.coords.longitude});
+      },()=>{}, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+    };
+    // Safari may report "prompt" for a previously granted permission.
+    // Only revisit that permission when a device location was already saved.
+    const savedDevice=!!useAppStore.getState().location;
+    if(navigator.permissions) {
+      void navigator.permissions.query({name:"geolocation"}).then(permission=>{
+        if(permission.state==="granted" || (savedDevice && permission.state==="prompt")) refresh();
+      }).catch(()=>{if(savedDevice) refresh();});
+    } else if(savedDevice) refresh();
     return ()=>{cancelled=true;};
   },[setLocation]);
   useEffect(()=>{ if(location) setArea({center:location,bounds:boundsAround(location)}); },[location?.lat,location?.lng]);
@@ -76,15 +86,31 @@ export default function App() {
   const visible = DEMO && ["loading","error","empty"].includes(previewState) ? [] : places;
   function requestLocation() {
     if(DEMO) {setPreviewState("ready");setPicking(false);return;}
-    if(!navigator.geolocation) {setLocationError("Bu cihazda konum kullanılamıyor. Haritadan seçebilirsin.");return;}
+    if(!window.isSecureContext || !navigator.geolocation) {setLocationError("Konum için siteyi HTTPS bağlantısıyla Safari’de aç. Haritadan da seçebilirsin.");return;}
+    const request=++locationRequest.current;
     setLocating(true);setLocationError("");
-    navigator.geolocation.getCurrentPosition(p=>{if(!mounted.current)return;setLocation({lat:p.coords.latitude,lng:p.coords.longitude});setLocating(false);setPicking(false);},e=>{if(!mounted.current)return;setLocationError(e.code===1?"Konum izni kapalı. Haritadan bir nokta seçebilirsin.":"Konum alınamadı. Tekrar dene veya haritadan seç.");setLocating(false);},{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+    const current=()=>mounted.current && request===locationRequest.current;
+    const success=(p:GeolocationPosition)=>{if(!current())return;setLocation({lat:p.coords.latitude,lng:p.coords.longitude});setLocating(false);setPicking(false);};
+    const failure=(e:GeolocationPositionError)=>{
+      if(!current())return;
+      setLocationError(e.code===1
+        ? "Konum izni verilmedi. iPhone’da Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri açık olmalı. Safari’nin konum iznini ve bu sitenin konum ayarını kontrol et; ardından tekrar dene. Uygulama içi tarayıcıdaysan siteyi Safari’de aç."
+        : "Cihaz konumu alınamadı. Konum Servislerini ve bağlantını kontrol edip tekrar dene veya haritadan seç.");
+      setLocating(false);
+    };
+    // Keep the native request inside the button gesture, without a Permissions API gate.
+    navigator.geolocation.getCurrentPosition(success,e=>{
+      if(!current())return;
+      if(e.code===1){failure(e);return;}
+      navigator.geolocation.getCurrentPosition(success,failure,{enableHighAccuracy:false,timeout:15000,maximumAge:0});
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   }
+  function chooseOnMap() {++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(!picking);}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
     clearTimeout(moveTimer.current);
     moveTimer.current=setTimeout(()=>setArea({center,bounds}),450);
   }
-  function pick(c:Coordinates) {setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
+  function pick(c:Coordinates) {++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();}}
   return <div className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
@@ -94,7 +120,7 @@ export default function App() {
         {!mapOpen && <label className="search-box"><Search size={19}/><input aria-label="Yer ara" placeholder="Ara" value={search} onChange={e=>setSearch(e.target.value)}/>{search && <button onClick={()=>setSearch('')} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
         <CategoryRail value={category} onChange={c=>{setCategory(c);setSelected(null);}}/>
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
-        {(!location || picking) && <section className="state-card"><strong>{picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={()=>{setMapOpen(true);setPicking(!picking);}}>Haritadan seç</button></section>}
+        {(!location || picking || locationError) && <section className="state-card"><strong>{locationError?'Konum alınamadı':picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
         {mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>setMapOpen(true)}><MapPin size={18}/>Harita</button></div>
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
