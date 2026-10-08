@@ -41,3 +41,5 @@
 .stop-route-list .pharmacy-filter{flex-wrap:wrap;overflow:visible}.stop-route-list button{min-height:40px}.pilot-panel .pharmacy-filter{max-width:100%;overflow-x:auto}
 
 .model-header{position:sticky;top:0;z-index:45;background:#f7f5f1;height:calc(74px + env(safe-area-inset-top))}.section-search{position:sticky;top:calc(74px + env(safe-area-inset-top));z-index:44;box-shadow:0 -8px 0 8px #f7f5f1}.price-featured-label{margin:14px 0;color:var(--muted);font-size:14px}.map-place-actions button{font-size:14px}.map-place-actions{flex-wrap:wrap}
+
+.arrivals-toolbar{position:sticky;top:calc(137px + env(safe-area-inset-top));z-index:35;background:#f7f5f1;display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}.arrivals-toolbar strong,.arrivals-toolbar small{display:block}.arrivals-toolbar strong{font-size:15px}.stop-route-list summary{font-size:14px;cursor:pointer;padding:14px 0;color:var(--muted)}.stop-route-list .pharmacy-filter{gap:6px;padding:0;border:0}.stop-route-list button{padding:4px 10px;border:1px solid var(--line);border-radius:8px;min-height:36px}.bus-row{padding:12px 0}

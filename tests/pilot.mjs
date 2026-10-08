@@ -14,3 +14,5 @@ assert.equal(blogItems.length,3);assert.equal(blogItems[0].startsAt,'2026-10-13T
 const stops=await transit.query('stops',new URLSearchParams({lat:'36.9002946',lng:'30.7007151'}));
 assert.equal(stops.stops[0].id,'11265');assert.equal(stops.stops[0].distanceM,0);assert.equal(stops.stops.some(s=>s.id==='11254'),true);assert.equal(stops.stops.filter(s=>s.name.includes('TONGUÇ')).length,10);assert.ok(stops.catalogSize>4000);assert.ok(stops.coverage.length>100);assert.ok(stops.stops.every((s,i,all)=>i===0||all[i-1].distanceM<=s.distanceM));
 console.log('Antalya pilot PASS: fresh/stale arrivals, directions, valid stops, verified dates, expired events and source links.');
+
+const locatedVenues=events.locateEvents([{venue:'Rockbull Performance Hall'},{venue:'Aspendos Antik Tiyatro'},{venue:'Manavgat Atatürk Kültür Merkezi'},{venue:'Konyaaltı Belediyesi Nazım Hikmet Fuar ve Kongre Merkezi'},{venue:'Antalya AKM Aspendos Salonu'}]);assert.ok(locatedVenues.every(v=>v.directionsUrl&&v.locationSource));
