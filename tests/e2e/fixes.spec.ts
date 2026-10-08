@@ -183,13 +183,13 @@ test('games fit the mobile width, blocks start full height and new games respond
  await page.goBack();
  for(const [name,selector] of [['2048 Sayı oyunu','.game-container'],['Hafıza Desen eşleştirme','#game-container']] as const){
   await page.getByRole('button',{name}).click();const frame=page.frameLocator('iframe');
-  if(name.startsWith('Hafıza'))await frame.getByRole('button',{name:'Orta',exact:true}).click();
+  if(name.startsWith('Hafıza'))await frame.getByRole('button',{name:'Bölüm 1',exact:true}).click();
   const box=await frame.locator(selector).boundingBox();expect(box?.width).toBeGreaterThan(page.viewportSize()!.width-40);expect(box!.y+box!.height).toBeLessThan(page.viewportSize()!.height);
   if(name.startsWith('2048')){await frame.locator('.game-container').click();await page.keyboard.press('ArrowLeft');await expect(frame.locator('.tile').first()).toBeVisible();}
   await page.goBack();
  }
  await page.getByRole('button',{name:'Yılan Kaydırarak oyna'}).click();const snake=page.frameLocator('iframe');
- await snake.getByRole('button',{name:'Başla',exact:true}).click();await expect(snake.locator('#status')).toContainText('Kaydır');await snake.getByRole('button',{name:'Yukarı',exact:true}).click();
+ await snake.getByRole('button',{name:'Başla',exact:true}).click();await expect(snake.locator('#score')).toContainText('elma');await snake.getByRole('button',{name:'Yukarı',exact:true}).click();
  await page.goBack();await page.getByRole('button',{name:'Mayın Tarlası Mantık oyunu'}).click();const mines=page.frameLocator('iframe');
  await expect(mines.locator('.cell')).toHaveCount(64);await mines.locator('.cell').first().click();await expect(mines.locator('.cell.bomb')).toHaveCount(0);await expect(mines.locator('.cell.open').first()).toBeVisible();
  await mines.getByRole('button',{name:'Bayrak koy'}).click();await mines.locator('.cell:not(.open)').first().click();await expect(mines.locator('#score')).toHaveText('9 mayın');
@@ -212,4 +212,75 @@ test('radio media actions publish metadata, disconnect on pause and stop without
  await page.evaluate(()=>(window as any).mediaActions.play());await expect(page.locator('audio')).toHaveAttribute('src','https://radio.example/live');
  await page.evaluate(()=>(window as any).mediaActions.stop());await expect(page.locator('.global-radio-player')).toHaveCount(0);await expect(page.locator('.model-nav')).toBeVisible();
  expect(await page.evaluate(()=>navigator.mediaSession.metadata)).toBeNull();
+});
+
+test('notification switches stations in both directions and the radio map stays within viewport',async({page})=>{
+ await page.setViewportSize({width:360,height:640});
+ await page.addInitScript(()=>{
+  const actions:Record<string,MediaSessionActionHandler|null>={};navigator.mediaSession.setActionHandler=(a,h)=>{actions[a]=h;};(window as any).mediaActions=actions;
+  HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};HTMLMediaElement.prototype.load=function(){};
+ });
+ await page.route('**/api/radio?**',r=>r.fulfill({json:{stations:[1,2,3].map(n=>({id:String(n),name:`Radyo ${n}`,streamUrl:`https://radio.example/${n}`,codec:'MP3'}))}}));
+ await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+ await page.goto('/?preview');await page.getByRole('button',{name:'Radyo',exact:true}).click();await page.locator('.station-card').first().click();
+ await expect.poll(()=>page.evaluate(()=>navigator.mediaSession.metadata?.title)).toBe('Radyo 1');
+ await page.evaluate(()=>(window as any).mediaActions.nexttrack());await expect.poll(()=>page.evaluate(()=>navigator.mediaSession.metadata?.title)).toBe('Radyo 2');
+ await page.evaluate(()=>(window as any).mediaActions.previoustrack());await expect.poll(()=>page.evaluate(()=>navigator.mediaSession.metadata?.title)).toBe('Radyo 1');
+ await page.evaluate(()=>(window as any).mediaActions.previoustrack());await expect.poll(()=>page.evaluate(()=>navigator.mediaSession.metadata?.title)).toBe('Radyo 3');
+ await page.getByRole('button',{name:'Keşfet',exact:true}).click();await page.getByRole('button',{name:'Eczane',exact:true}).click();await page.getByRole('button',{name:'Harita',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Örnek Eczane',exact:true})).toBeVisible();await page.getByRole('button',{name:'Örnek Eczane',exact:true}).click();
+ const sheet=await page.locator('.map-place-sheet').boundingBox(),player=await page.locator('.global-radio-player').boundingBox(),nav=await page.locator('.model-nav').boundingBox();
+ expect(sheet!.y+sheet!.height).toBeLessThanOrEqual(player!.y+1);expect(player!.y+player!.height).toBeLessThanOrEqual(nav!.y+1);
+ expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThanOrEqual(640);
+ await page.getByRole('button',{name:'Sonraki radyo',exact:true}).click();await expect(page.locator('.player-copy')).toContainText('Radyo 1');
+ await page.getByRole('button',{name:'Radyo oynatıcıyı kapat',exact:true}).click();
+ await expect.poll(async()=>{
+  const canvas=await page.locator('.maplibregl-canvas').boundingBox(),container=await page.locator('.map-canvas').boundingBox();
+  return Math.abs(canvas!.height-container!.height);
+ }).toBeLessThan(1);
+ await expect(page.locator('.map-place-sheet')).toContainText('Örnek Eczane');
+});
+
+test('blocks settings save inside the sandbox and survive re-opening the game',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('Blocked form'))errors.push(m.text());});
+ await page.goto('/?preview');await page.getByRole('button',{name:'Oyun',exact:true}).click();await page.getByRole('button',{name:'Düşen Bloklar Bulmaca'}).click();const f=page.frameLocator('iframe');
+ await f.getByRole('button',{name:'Başla',exact:true}).click();await f.locator('#btn-settings-mobile').click();
+ await f.getByLabel('Modern',{exact:true}).check();await f.getByLabel('Koyu',{exact:true}).check();await f.getByLabel('Oyun sesleri',{exact:true}).check();await f.getByRole('button',{name:'Kaydet',exact:true}).click();
+ await expect(f.locator('#settings-dialog')).not.toBeVisible();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('tetris:settings')||'{}'))).toMatchObject({theme:'modern',mode:'dark',sfx:true});
+ await page.goBack();await page.getByRole('button',{name:'Düşen Bloklar Bulmaca'}).click();await f.getByRole('button',{name:'Başla',exact:true}).click();await f.locator('#btn-settings-mobile').click();
+ await expect(f.getByLabel('Modern',{exact:true})).toBeChecked();await expect(f.getByLabel('Koyu',{exact:true})).toBeChecked();await expect(f.getByLabel('Oyun sesleri',{exact:true})).toBeChecked();
+ const dialog=await f.locator('#settings-dialog').boundingBox();expect(dialog!.y).toBeGreaterThanOrEqual(0);expect(dialog!.y+dialog!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+ expect(errors).toEqual([]);
+});
+
+test('memory advances chapters, keeps progress after reload and has equal cells after returning',async({page})=>{
+ await page.goto('/?preview');await page.getByRole('button',{name:'Oyun',exact:true}).click();await page.getByRole('button',{name:'Hafıza Desen eşleştirme'}).click();const f=page.frameLocator('iframe');
+ await expect(f.locator('.level')).toHaveCount(30);await expect(f.getByRole('button',{name:'Bölüm 2',exact:true})).toHaveCount(0);
+ await f.getByRole('button',{name:'Bölüm 1',exact:true}).click();await expect(f.locator('.field.lit')).toHaveCount(3);
+ const targets=await f.locator('.field').evaluateAll(cells=>cells.map((c,i)=>c.classList.contains('lit')?i:-1).filter(i=>i>=0));
+ await expect(f.locator('.field').first()).toBeEnabled();for(const index of targets)await f.locator('.field').nth(index).click();
+ await expect(f.locator('#result-title')).toHaveText('Bölüm 1 tamam!');await f.getByRole('button',{name:'Sonraki bölüm',exact:true}).click();await expect(f.locator('#level-label')).toHaveText('Bölüm 2');
+ await f.getByRole('button',{name:'Bölümler',exact:true}).click();const top=await f.locator('.level').first().boundingBox(),below=await f.locator('.level').nth(5).boundingBox();expect(below!.y-top!.y-top!.height).toBeGreaterThanOrEqual(9);
+ await page.locator('iframe').evaluate((iframe:HTMLIFrameElement)=>iframe.contentWindow!.location.reload());await expect(f.getByRole('button',{name:'Bölüm 2',exact:true})).toBeEnabled();
+ await f.getByRole('button',{name:'Bölüm 2',exact:true}).click();const rects=await f.locator('.field').evaluateAll(cells=>cells.map(c=>({w:c.getBoundingClientRect().width,h:c.getBoundingClientRect().height})));expect(Math.max(...rects.map(r=>r.h))-Math.min(...rects.map(r=>r.h))).toBeLessThan(1);expect(rects[0].h).toBeGreaterThan(40);
+});
+
+test('mines retain square, equal rows after opening numbers on a short phone',async({page})=>{
+ await page.setViewportSize({width:360,height:640});await page.goto('/?preview');await page.getByRole('button',{name:'Oyun',exact:true}).click();await page.getByRole('button',{name:'Mayın Tarlası Mantık oyunu'}).click();const f=page.frameLocator('iframe');await f.locator('.cell').first().click();await expect(f.locator('.cell.open').first()).toBeVisible();
+ const rects=await f.locator('.cell').evaluateAll(cells=>cells.map(c=>{const r=c.getBoundingClientRect();return{w:r.width,h:r.height,bottom:r.bottom};}));expect(Math.max(...rects.map(r=>r.h))-Math.min(...rects.map(r=>r.h))).toBeLessThan(1);expect(Math.abs(rects[0].h-rects[0].w)).toBeLessThan(1);expect(rects.at(-1)!.h).toBeGreaterThan(30);
+ const board=await f.locator('#board').boundingBox();expect(board!.y+board!.height).toBeLessThan(640);
+});
+
+test('snake earns a chapter, unlocks the next and pauses without resetting the board',async({page})=>{
+ await page.addInitScript(()=>{Math.random=()=>0;});await page.clock.install();await page.goto('/games/snake/index.html');await page.clock.pauseAt(new Date(Date.now()+1000));
+ await page.getByRole('button',{name:'Başla',exact:true}).click();
+ const turn=async(name:string,ticks:number)=>{await page.getByRole('button',{name,exact:true}).click();await page.clock.runFor(220*ticks+17);};
+ await turn('Yukarı',9);await turn('Sola',8);await expect(page.locator('#score')).toContainText('1 / 5');
+ await turn('Aşağı',1);await turn('Sağa',4);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('2 / 5');
+ await turn('Sola',4);await expect(page.locator('#score')).toContainText('3 / 5');
+ await turn('Aşağı',1);await turn('Sağa',5);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('4 / 5');
+ await turn('Sola',5);await expect(page.locator('#title')).toHaveText('Bölüm 1 tamam!');await page.getByRole('button',{name:'Sonraki bölüm',exact:true}).click();await expect(page.locator('#level')).toHaveText('Bölüm 2');
+ await page.getByRole('button',{name:'Oyunu duraklat',exact:true}).click();const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
+ await page.getByRole('button',{name:'Devam et',exact:true}).click();await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
 });

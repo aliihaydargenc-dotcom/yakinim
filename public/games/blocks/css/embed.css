@@ -18,3 +18,6 @@ body:has(.overlay:not([hidden])) .vpad,body.dialog-open .vpad{visibility:hidden;
 #settings-dialog input[name=server],#gameover-form label,#gameover-form button[value=submit],#gameover-form button[value=sign]{display:none!important}button{font-family:system-ui!important}
 .stage{grid-template-columns:minmax(0,1fr)!important;justify-content:stretch!important}.game-wrap{min-width:0!important;justify-content:stretch!important}.board-frame{box-shadow:none!important}
 .stage{grid-row:2!important}.mobile-bar{grid-row:1!important}.board-frame{grid-row:1!important;grid-column:1!important}
+#settings-dialog{width:calc(100% - 24px);max-width:420px;max-height:calc(100dvh - 24px);padding:16px;border:0;border-radius:16px;overflow:auto;background:#f7f5f1;color:#29262b}
+#settings-dialog h2{font-size:20px}#settings-dialog .dialog-form{gap:12px;padding:0}#settings-dialog fieldset{border-color:#d8cdcf;border-radius:12px;padding:12px}#settings-dialog legend{font-size:12px;color:#827d80}#settings-dialog label{font-size:15px;min-height:40px}#settings-dialog input{accent-color:#79576d}#settings-dialog menu{margin:0;padding:0;display:flex;justify-content:flex-end;gap:8px}#settings-dialog menu button{min-height:44px;padding:8px 16px;border-radius:10px}#settings-dialog .primary{background:#79576d;color:white}
+html[data-mode=dark] .board-frame{background:#29262b!important}

@@ -424,45 +424,31 @@ $('#btn-settings').addEventListener('click', () => {
   const f = settingsDialog.querySelector('form');
   f.querySelectorAll('input[name=theme]').forEach(i => i.checked = i.value === settings.get('theme'));
   f.querySelectorAll('input[name=mode]').forEach(i => i.checked = i.value === settings.get('mode'));
-  f.querySelector('input[name=zoom]').value = settings.get('zoom');
-  f.querySelector('output[name=zoom-out]').value = settings.get('zoom') + '%';
-  f.querySelector('input[name=fit]').checked = !!settings.get('fit');
-  f.querySelector('select[name=vpad-mode]').value = settings.get('vpadMode');
   f.querySelector('input[name=sfx]').checked = !!settings.get('sfx');
-  f.querySelector('input[name=music]').checked = !!settings.get('music');
-  f.querySelector('input[name=server]').value = settings.get('server') || '';
+  settingsDialog.returnValue = '';
   settingsDialog.showModal();
 });
 // Live-update the zoom output label as the range slider moves.
-settingsDialog.querySelector('input[name=zoom]').addEventListener('input', (e) => {
-  settingsDialog.querySelector('output[name=zoom-out]').value = e.target.value + '%';
-});
-// Live-toggle music the moment the checkbox changes (without waiting for
-// Save). Clicking the checkbox is a valid user gesture, which is what the
-// AudioContext needs to unlock on iOS/Safari — so the music can actually
-// start playing here even if the player hasn't yet hit Başla.
-settingsDialog.querySelector('input[name=music]').addEventListener('change', (e) => {
-  sound.ensure();
-  sound.setMusic(e.target.checked);
-});
-// Same for SFX — toggle live so the player hears the effect on rotate/move.
 settingsDialog.querySelector('input[name=sfx]').addEventListener('change', (e) => {
   sound.enabled = e.target.checked;
 });
 // On close, if the user clicked "Save", harvest form values and persist.
 // <dialog>'s returnValue is set by the <button value="save"> that closed it.
+settingsDialog.querySelector('form').addEventListener('submit', event => event.preventDefault());
+settingsDialog.querySelector('button[value=save]').addEventListener('click', () => settingsDialog.close('save'));
+settingsDialog.querySelector('button[value=cancel]').addEventListener('click', () => { sound.enabled = settings.get('sfx'); settingsDialog.close('cancel'); });
 settingsDialog.addEventListener('close', () => {
-  if (settingsDialog.returnValue !== 'save') return;
+  if (settingsDialog.returnValue !== 'save') { sound.enabled = settings.get('sfx'); return; }
   const f = settingsDialog.querySelector('form');
   const fd = new FormData(f);
   settings.patch({
     theme: fd.get('theme'),
     mode: fd.get('mode'),
-    zoom: Number(fd.get('zoom')),
-    fit: fd.get('fit') === 'on',
-    vpadMode: fd.get('vpad-mode'),
+    zoom: 100,
+    fit: true,
+    vpadMode: 'always',
     sfx: fd.get('sfx') === 'on',
-    music: fd.get('music') === 'on',
+    music: false,
     server: (fd.get('server') || '').toString().trim(),
   });
   sound.enabled = settings.get('sfx');

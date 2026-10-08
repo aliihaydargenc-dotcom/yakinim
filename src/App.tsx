@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Compass, LocateFixed, MapPin, Newspaper, Radio, Search, ChevronRight, Gamepad2, Cross, X, Navigation, Phone, Heart, List, Layers, ArrowLeft } from "lucide-react";
 import { CategoryRail } from "./components/CategoryRail";
 import { RadioPlayer } from "./components/RadioPlayer";
-import { combinePlaceSources, fetchArea, fetchDuty, fetchOvertureSupplement, type ViewportBounds } from "./services/api";
+import { combinePlaceSources, fetchArea, fetchDuty, fetchOvertureSupplement, fetchRadio, type ViewportBounds } from "./services/api";
 import { useAppStore } from "./store";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
@@ -37,6 +37,7 @@ export default function App() {
   const [picking,setPicking] = useState(false);
   const [locating,setLocating] = useState(false);
   const [currentRadio,setCurrentRadio] = useState<RadioStation|null>(null);
+  const radioQuery = useQuery({queryKey:["radio"],queryFn:fetchRadio,enabled:section==="radio"||!!currentRadio,staleTime:300000});
   const [gameActive,setGameActive] = useState(false);
   const playingGame = section === "games" && gameActive;
   const moveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -85,7 +86,7 @@ export default function App() {
   }
   function pick(c:Coordinates) {setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();}}
-  return <div className={`model-app ${playingGame?'game-active':currentRadio?'with-player':''}`}>
+  return <div className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
@@ -106,7 +107,7 @@ export default function App() {
       </main>
       {selected && <div className="detail-backdrop" onClick={()=>setSelected(null)}><section className="place-detail" role="dialog" aria-modal="true" aria-label={selected.name} onKeyDown={e=>{if(e.key==="Escape")setSelected(null);if(e.key==="Tab"){const nodes=e.currentTarget.querySelectorAll<HTMLElement>('button,a[href]');const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}} onClick={e=>e.stopPropagation()}><div className="detail-top"><h2>{selected.name}</h2><button autoFocus onClick={()=>setSelected(null)} aria-label="Kapat"><X size={22}/></button></div><p>{selected.address}</p><small>{distanceLabel(selected.distanceM)}{selected.distanceM!==undefined?" · kuş uçuşu":""}</small>{selected.source&&<small className="data-note">{selected.source==="legacy-fallback"?"Alternatif kaynak":selected.source}{selected.queryDate&&` · ${selected.queryDate}`}</small>}<div className="detail-buttons">{selected.phone&&!DEMO&&<a className="outline-button" href={`tel:${selected.phone}`}><Phone size={18}/>Ara</a>}{!DEMO&&Number.isFinite(selected.lat)&&Number.isFinite(selected.lng)&&<a className="solid-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={18}/>Yol tarifi</a>}<button aria-label="Yeri kaydet" aria-pressed={savedIds.includes(selected.id)} onClick={()=>toggleSaved(selected.id)}><Heart size={20} fill={savedIds.includes(selected.id)?'currentColor':'none'}/></button></div></section></div>}
     </> : <main className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView onActiveChange={setGameActive}/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
-    <RadioPlayer station={currentRadio} onClose={()=>setCurrentRadio(null)}/>
+    <RadioPlayer station={currentRadio} stations={radioQuery.data||[]} onSelect={setCurrentRadio} onClose={()=>setCurrentRadio(null)}/>
     {!playingGame && <nav className="model-nav" aria-label="Ana menü">{[{id:'nearby' as const,label:'Keşfet',Icon:Compass},{id:'news' as const,label:'Haber',Icon:Newspaper},{id:'radio' as const,label:'Radyo',Icon:Radio},{id:'games' as const,label:'Oyun',Icon:Gamepad2}].map(({id,label,Icon})=><button key={id} onClick={()=>setSection(id)} aria-current={section===id?'page':undefined}><Icon size={22}/><span>{label}</span></button>)}</nav>}
   </div>;
 }

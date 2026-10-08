@@ -134,56 +134,30 @@
   <!-- Settings dialog -->
   <dialog id="settings-dialog" class="dialog">
     <form method="dialog" class="dialog-form">
-      <h2>Settings</h2>
+      <h2>Ayarlar</h2>
 
       <fieldset>
-        <legend>Theme</legend>
-        <label><input type="radio" name="theme" value="classic" /> <span>Classic — pure B&amp;W, Game Boy / terminal</span></label>
-        <label><input type="radio" name="theme" value="color" /> <span>Color — Game Boy Color, pixel art</span></label>
-        <label><input type="radio" name="theme" value="modern" /> <span>Modern — glass blocks, animations</span></label>
+        <legend>Blok görünümü</legend>
+        <label><input type="radio" name="theme" value="classic" /> <span>Klasik</span></label>
+        <label><input type="radio" name="theme" value="color" /> <span>Renkli</span></label>
+        <label><input type="radio" name="theme" value="modern" /> <span>Modern</span></label>
       </fieldset>
 
       <fieldset>
-        <legend>Mode</legend>
-        <label><input type="radio" name="mode" value="dark" /> <span>Dark</span></label>
-        <label><input type="radio" name="mode" value="light" /> <span>Light</span></label>
+        <legend>Tahta</legend>
+        <label><input type="radio" name="mode" value="dark" /> <span>Koyu</span></label>
+        <label><input type="radio" name="mode" value="light" /> <span>Açık</span></label>
       </fieldset>
 
-      <fieldset>
-        <legend>Display</legend>
-        <label class="row"><span>Zoom</span>
-          <input type="range" name="zoom" min="60" max="160" step="5" />
-          <output name="zoom-out">100%</output>
-        </label>
-        <label class="row"><span>Fit to screen</span>
-          <input type="checkbox" name="fit" />
-        </label>
-        <label class="row"><span>Show virtual pad</span>
-          <select name="vpad-mode">
-            <option value="auto">Auto (touch only)</option>
-            <option value="always">Always</option>
-            <option value="never">Never</option>
-          </select>
-        </label>
+<fieldset>
+        <legend>Ses</legend>
+        <label class="row"><span>Oyun sesleri</span><input type="checkbox" name="sfx" /></label>
+
       </fieldset>
 
-      <fieldset>
-        <legend>Audio</legend>
-        <label class="row"><span>Sound effects</span><input type="checkbox" name="sfx" /></label>
-        <label class="row"><span>Music</span><input type="checkbox" name="music" /></label>
-      </fieldset>
-
-      <fieldset>
-        <legend>Server</legend>
-        <label class="row"><span>Scoreboard server</span>
-          <input type="url" name="server" placeholder="(auto — same origin /api)" />
-        </label>
-        <p class="hint">Leave blank to use the same-origin scoreboard server (works on tetris.rocks out of the box), or paste your own server URL. Falls back to a local unsigned receipt when offline.</p>
-      </fieldset>
-
-      <menu>
-        <button value="cancel">Close</button>
-        <button value="save" class="primary">Save</button>
+<menu>
+        <button type="button" value="cancel">Vazgeç</button>
+        <button type="button" value="save" class="primary">Kaydet</button>
       </menu>
     </form>
   </dialog>
@@ -214,7 +188,7 @@
   </dialog>
 
   <!-- Footer -->
-  
+
 
   <script type="module" src="js/app.js"></script>
 <script src="translate.js"></script></body>

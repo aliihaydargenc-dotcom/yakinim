@@ -174,8 +174,14 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       for (const entry of markersRef.current.values()) entry.marker.getElement().hidden = map.getZoom() < 13;
     };
     map.on("zoom", handleZoom);
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+      syncMarkersRef.current();
+    });
+    resizeObserver.observe(containerRef.current);
 
     return () => {
+      resizeObserver.disconnect();
       map.off("load", setup);
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);

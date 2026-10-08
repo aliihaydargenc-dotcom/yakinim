@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Play, X, SkipBack, SkipForward } from "lucide-react";
 import type { RadioStation } from "../types";
 import type Hls from "hls.js";
 
-export function RadioPlayer({ station, onClose }: { station: RadioStation | null; onClose: () => void }) {
+export function RadioPlayer({ station, stations, onSelect, onClose }: { station: RadioStation | null; stations: RadioStation[]; onSelect: (station:RadioStation)=>void; onClose: () => void }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const requestRef = useRef(0);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const stepRef = useRef((direction:number)=>{});
+  stepRef.current = (direction:number) => {
+    if(stations.length<2 || !station) return;
+    const index=stations.findIndex(item=>item.id===station.id);
+    onSelect(stations[(Math.max(index,0)+direction+stations.length)%stations.length]);
+  };
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -112,9 +118,11 @@ export function RadioPlayer({ station, onClose }: { station: RadioStation | null
       ["play", () => { void startPlayback(); }],
       ["pause", pausePlayback],
       ["stop", closePlayer],
+      ["previoustrack", () => stepRef.current(-1)],
+      ["nexttrack", () => stepRef.current(1)],
     ];
     for (const [action, handler] of handlers) {
-      try { session.setActionHandler(action, handler); } catch { /* Optional browser action. */ }
+      try { session.setActionHandler(action, (action==="nexttrack"||action==="previoustrack")&&stations.length<2 ? null : handler); } catch { /* Optional browser action. */ }
     }
     return () => {
       for (const [action] of handlers) {
@@ -123,7 +131,7 @@ export function RadioPlayer({ station, onClose }: { station: RadioStation | null
       session.metadata = null;
       session.playbackState = "none";
     };
-  }, [station?.name, startPlayback, pausePlayback, closePlayer]);
+  }, [station?.name, startPlayback, pausePlayback, closePlayer, stations.length]);
 
   if (!station) return null;
 
@@ -151,6 +159,8 @@ export function RadioPlayer({ station, onClose }: { station: RadioStation | null
         <small>{failed ? "Yayın açılamadı" : loading ? "Bağlanıyor" : playing ? "Şimdi çalıyor" : "Duraklatıldı"}</small>
         <strong>{station.name}</strong>
       </div>
+      <button type="button" className="player-step" disabled={stations.length<2} onClick={()=>stepRef.current(-1)} aria-label="Önceki radyo"><SkipBack size={18}/></button>
+      <button type="button" className="player-step" disabled={stations.length<2} onClick={()=>stepRef.current(1)} aria-label="Sonraki radyo"><SkipForward size={18}/></button>
       <button type="button" className="player-close" onClick={closePlayer} aria-label="Radyo oynatıcıyı kapat"><X size={19} /></button>
       <audio
         ref={audioRef}
