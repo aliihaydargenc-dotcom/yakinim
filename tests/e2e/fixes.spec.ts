@@ -344,3 +344,21 @@ test('market prices compare exact products in nearby branches inside the app',as
  await expect(page.getByRole('heading',{name:'İçim Süt 1 Lt'})).toBeVisible();await expect(page.locator('.product-offer')).toHaveCount(2);await expect(page.locator('.offer-price').first()).toContainText('65,95');await expect(page.locator('.product-offer').first()).toContainText('Antalya Muratpaşa Çağlayan');await expect(page.getByRole('link',{name:'Market Fiyatı’nda ara'})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.getByRole('button',{name:'Marketler',exact:true}).click();await expect(page.locator('.place-row')).toHaveCount(1);
 });
+
+test('transit map opens arrivals and section search stays above categories',async({page})=>{
+ const stop={id:'11265',name:'TONGUÇ CD-6',lat:36.8615,lng:30.6377,routes:['511'],distanceM:0};
+ await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+ await page.route('**/api/transit?**',r=>r.fulfill({json:new URL(r.request().url()).searchParams.get('action')==='arrivals'?{fresh:true,sourceAt:new Date().toISOString(),buses:[{id:'bus',code:'511',name:'Test güzergahı',direction:0,minutes:3,stops:2}]}:{stops:[stop],coverage:['511'],partial:false}}));
+ await page.goto('/?preview');await page.getByRole('button',{name:'Ulaşım',exact:true}).click();
+ const search=page.getByRole('textbox',{name:'Durak veya hat ara'});await expect(search).toBeVisible();
+ expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(await page.locator('.category-rail').evaluate(el=>el.getBoundingClientRect().top));
+ await page.getByRole('button',{name:'Harita',exact:true}).click();await page.locator('.stable-place-marker button').click();await page.getByRole('button',{name:'Yaklaşan otobüsler',exact:true}).click();await expect(page.locator('.bus-row')).toContainText('3 dk');
+ await page.getByRole('button',{name:'Duraklar',exact:true}).click();await expect(page.locator('.pilot-map')).toBeVisible();
+});
+
+test('prices open with basics and search remains sticky while scrolling',async({page})=>{
+ const queries:string[]=[];
+ await page.route('**/api/prices?**',r=>{queries.push(new URL(r.request().url()).searchParams.get('q')||'');return r.fulfill({json:{products:Array.from({length:12},(_,i)=>({id:String(i),title:'Temel ürün '+i,quantity:'1 LT',offers:[{id:'migros-1',name:'Antalya Şube',market:'migros',lat:36.85,lng:30.75,distanceM:200,price:50,unitPrice:'50 ₺/Lt',updatedAt:new Date().toISOString()}]})),depotCount:1,total:12,hasMore:false,radius:3}});});
+ await page.goto('/?preview');await page.getByRole('button',{name:'Ürün fiyatları',exact:true}).click();await expect(page.locator('.product-price-card')).toHaveCount(12);expect(queries[0]).toBe('');await page.evaluate(()=>window.scrollTo(0,800));
+ const search=page.getByRole('textbox',{name:'Ürün ara'});expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(74);expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(140);await search.fill('kahve');await expect.poll(()=>queries.includes('kahve')).toBe(true);
+});

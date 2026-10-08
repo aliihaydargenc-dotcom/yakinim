@@ -10,7 +10,7 @@ const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
 type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor" }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
@@ -261,7 +261,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
-    {selectedPlace && <MapPlaceSheet place={selectedPlace} onClose={() => setSelectedPlace(null)} />}
+    {selectedPlace && <MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} />}
   </div>;
 }
 
@@ -339,7 +339,7 @@ function emptyFeatureCollection() {
   return { type: "FeatureCollection", features: [] } as any;
 }
 
-function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }) {
+function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () => void; onOpen?: () => void }) {
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   return <aside className="map-place-sheet" aria-label={`${place.name} detayları`}>
     <div className="map-place-heading">
@@ -348,7 +348,7 @@ function MapPlaceSheet({ place, onClose }: { place: Place; onClose: () => void }
     </div>
     <p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}
     <div className="map-place-actions">
-      {place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
+      {onOpen ? <button className="solid-button" onClick={onOpen}>Yaklaşan otobüsler</button> : place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
       <a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>
     </div>
   </aside>;
