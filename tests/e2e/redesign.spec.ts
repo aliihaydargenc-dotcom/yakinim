@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('Model 1 opens with a list and nests duty under pharmacy',async({page})=>{
  await page.goto('/?preview');
- await expect(page.locator('.place-row')).toHaveCount(1);
+ await expect(page.locator('.place-row')).toHaveCount(7);
  await expect(page.locator('.map-canvas')).toHaveCount(0);
  await page.getByRole('button',{name:'Eczane',exact:true}).click();
  await expect(page.getByRole('button',{name:'Nöbetçi',exact:true})).toBeVisible();

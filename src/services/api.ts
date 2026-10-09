@@ -54,6 +54,7 @@ function displayNameFromTags(tags: Record<string, string> = {}) {
   return cleanText(tags["name:tr"] || tags.name || tags.brand || tags.operator || tags.network);
 }
 function fallbackInfrastructureName(category: Exclude<CategoryId, "all" | "duty"> | null) {
+  if (category === "fuel") return "Akaryakıt istasyonu";
   if (category === "atm") return "ATM";
   if (category === "parking") return "Otopark";
   if (category === "park") return "Park";

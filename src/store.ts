@@ -56,7 +56,7 @@ type AppState = {
 
 export const useAppStore = create<AppState>((set, get) => ({
   section: "nearby",
-  category: "market",
+  category: "all",
   search: "",
   location: initialLocation,
   locationMode: initialLocation?.mode ?? "device",

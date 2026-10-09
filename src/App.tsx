@@ -37,7 +37,7 @@ export default function App() {
   const [sectionSearch,setSectionSearch]=useState<Record<string,string>>({});
   const [productMode,setProductMode] = useState(false);
   const [transitMode,setTransitMode]=useState<"stops"|"traffic">("stops");
-  const searchMode=category==='market'&&productMode?'prices':category;
+  const searchMode=category==='transit'&&transitMode==='traffic'?'traffic':category==='market'&&productMode?'prices':category;
   const activeSearch=sectionSearch[searchMode]||'';
   const pilot = category === "transit" || category === "events" || category === "outages" || category === "market" && productMode;
   const [mapOpen,setMapOpen] = useState(false);
@@ -79,18 +79,19 @@ export default function App() {
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
   const areaQuery = useQuery({queryKey:["area-v6",...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !pilot && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:600000,retry:0});
   const supplementQuery = useQuery({queryKey:["supplement-v6",area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !pilot && !!location && !!area && category!=="duty",placeholderData:keepPreviousData,staleTime:1800000,retry:0});
+  const fuelQuery=useQuery({queryKey:['fuel-area',location?.lat.toFixed(3),location?.lng.toFixed(3)],queryFn:({signal})=>fetchArea({south:location!.lat-.04,north:location!.lat+.04,west:location!.lng-.05,east:location!.lng+.05},location!,signal),enabled:!DEMO&&active&&category==='fuel'&&!mapOpen&&!!location,staleTime:600000,retry:1});
   const dutyDate=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Istanbul"}).format(new Date());
   const dutyQuery = useQuery({queryKey:["duty-v5",dutyDate,area?.center.lat.toFixed(3),area?.center.lng.toFixed(3)],queryFn:()=>fetchDuty(area!.center),enabled:!DEMO && active && !!location && !!area && category==="duty",staleTime:300000,refetchInterval:300000,retry:0});
   const areaData = useRetainedPlaces(areaQuery.data, "area");
   const supplementData = useRetainedPlaces(supplementQuery.data, "supplement");
   const dutyData = useRetainedPlaces(dutyQuery.data, dutyDate);
   const matchingPlaces = useMemo(()=>{
-    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData]);
+    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(category==='fuel'?fuelQuery.data||[]:[])]);
     const term=search.trim().toLocaleLowerCase("tr");
     return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
-  },[category,search,areaData,supplementData,dutyData,location?.lat,location?.lng]);
-  const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area]);
-  const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyData.length : !areaData.length && !supplementData.length && (areaQuery.isFetching||supplementQuery.isFetching);
+  },[category,search,areaData,supplementData,dutyData,fuelQuery.data,location?.lat,location?.lng]);
+  const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || (category==="fuel"&&!mapOpen) || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area,mapOpen]);
+  const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyData.length : category==='fuel'?!matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||fuelQuery.isFetching):!areaData.length && !supplementData.length && (areaQuery.isFetching||supplementQuery.isFetching);
   const failed = DEMO ? previewState==="error" : category==="duty" ? dutyQuery.isError : areaQuery.isError && supplementQuery.isError;
   const updating = !DEMO && (areaQuery.isFetching || supplementQuery.isFetching);
   const visible = DEMO && ["loading","error","empty"].includes(previewState) ? [] : places;
@@ -127,7 +128,7 @@ export default function App() {
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
       <main className={mapOpen?'map-workspace':'list-workspace'}>
-        {!mapOpen && !(category==='transit'&&transitMode==='traffic') && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':category==='outages'?'Kesinti ara':'Yer ara'} placeholder={searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='outages'?'İlçe veya mahalle ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
+        {!mapOpen && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='traffic'?'Trafikte yer ara':searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':category==='outages'?'Kesinti ara':'Yer ara'} placeholder={searchMode==='traffic'?'Cadde veya yer ara':searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='outages'?'İlçe veya mahalle ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
         <CategoryRail value={category} onChange={c=>{setCategory(c);setSearch(sectionSearch[c]||'');setSelected(null);if(c==="transit"||c==="events"||c==="outages")setMapOpen(false);setPicking(false);}}/>
         {category==='market'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}

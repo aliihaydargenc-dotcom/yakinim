@@ -17,3 +17,11 @@ Kesinti kaynakları 5 dakikalık sunucu önbelleğiyle kontrol edilir; ekran gö
 İlk gerçek kaynak örneğinde 27 su bildirimi, tek elektrik kesintisine bağlı 30 trafo ve 32 alan poligonu bulundu. Daha sonraki elektrik sorgusu boş döndü. Bunlar test anı sayılarıdır; uygulamaya sabit veri olarak eklenmedi.
 
 Backend doğrulaması: `npm test`. Mobil akışlar: `tests/e2e/city-services.spec.ts`; kaynak hatası ve tekrar deneme, arama/ilçe filtresi, elektrik alan haritası, trafik sekmesi ve yenileme, etkinlik türü ve resmi koordinat bağlantısı. Emüle Android Chrome 360×800 ve 412×915 doğrulandı; fiziksel telefon/iOS testi yerine geçmez.
+
+## 9 Ekim mobil sadeleştirme
+
+Açılış ve ilk kategori Tümü. Trafikte arama sabit kalır, durak ve trafik arama değerleri ayrı tutulur. Trafik yer araması Yandex widget'ın `mode=search&text=` parametrelerine aktarılır. Gömülü haritaya yalnızca Yandex origin'i için konum izni devredilir; izin politikası tüm sitelere açılmaz.
+
+Etkinlikte tarih/tür filtreleri kaldırıldı; Tümü ve serbest metin araması kaldı. Ürün fiyatlarının üst açıklamaları ve alt raf farkı metni kaldırıldı. Kesinti ekranında ilçe seçimi, genel harita geçişi, kaynak/sorgu saatleri ve uzun açıklamalar kaldırıldı; kayıt tarihi ve tahmini bitiş gibi kayıt verileri duruyor. Elektrik alanı yalnızca ilgili kayıt içinden açılır.
+
+Akaryakıt listesi başlangıçtaki küçük harita sınırıyla daraltılmaz, bağımsız geniş çevre sorgusu da kullanır. Sorgu sürerken erken boş sonuç mesajı göstermez. Adsız OSM yakıt istasyonlarına genel ad verilir. Antalya merkez kontrolünde geniş sorgu 59 ham yakıt kaydı döndürdü; bu sayı yinelenen veya isimsiz kayıt içerebilir ve kullanıcıya 59 farklı doğrulanmış istasyon vaadi değildir.

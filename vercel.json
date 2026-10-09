@@ -23,7 +23,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(self)"
+          "value": "geolocation=(self \"https://yandex.com.tr\")"
         },
         {
           "key": "X-Frame-Options",
