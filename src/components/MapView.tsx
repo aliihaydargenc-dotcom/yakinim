@@ -17,6 +17,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
+  const previousLocation = useRef(location);
   const placesRef = useRef<Place[]>(places);
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
@@ -222,9 +223,12 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       locationMarkerRef.current.setLngLat([location.lng, location.lat]);
     }
 
+    const previous = previousLocation.current;
+    const locationChanged = !!previous && (previous.lat !== location.lat || previous.lng !== location.lng);
+    previousLocation.current = location;
     const center = map.getCenter();
     const alreadyCentered = Math.abs(center.lat - location.lat) < 0.0008 && Math.abs(center.lng - location.lng) < 0.0008;
-    if (!(memoryKey&&cameras.has(memoryKey)) && (!alreadyCentered || map.getZoom() < 13.8)) {
+    if ((locationChanged || !(memoryKey&&cameras.has(memoryKey))) && (!alreadyCentered || map.getZoom() < 13.8)) {
       map.easeTo({ center: [location.lng, location.lat], zoom: Math.max(map.getZoom(), 14.6), duration: 280 });
     }
   }, [location?.lat, location?.lng]);

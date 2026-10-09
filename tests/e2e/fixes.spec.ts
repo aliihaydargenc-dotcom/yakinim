@@ -362,3 +362,29 @@ test('prices open with basics and search remains sticky while scrolling',async({
  await page.goto('/?preview');await page.getByRole('button',{name:'Market',exact:true}).click();await page.getByRole('button',{name:'Ürün fiyatları',exact:true}).click();await expect(page.locator('.product-price-card')).toHaveCount(12);expect(queries[0]).toBe('');await page.evaluate(()=>window.scrollTo(0,800));
  const search=page.getByRole('textbox',{name:'Ürün ara'});expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(74);expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(140);await search.fill('kahve');await expect.poll(()=>queries.includes('kahve')).toBe(true);
 });
+
+
+test('one location tap refines a coarse fix and rejects worse later fixes',async({page})=>{
+ await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
+ await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+ await page.addInitScript(()=>{
+  localStorage.removeItem('yakinim:v2:last-location');
+  Object.defineProperty(navigator,'permissions',{value:undefined,configurable:true});
+  (window as any).cleared=[];
+  Object.defineProperty(navigator,'geolocation',{value:{
+   getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:36.8,longitude:30.7,accuracy:1200}} as GeolocationPosition),
+   watchPosition:(success:PositionCallback)=>{(window as any).gpsUpdate=success;return 42;},
+   clearWatch:(id:number)=>(window as any).cleared.push(id)
+  },configurable:true});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'Konumumu bul'}).click();
+ const latitude=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat);
+ await expect.poll(latitude).toBe(36.8);
+ await page.evaluate(()=>(window as any).gpsUpdate({coords:{latitude:36.88,longitude:30.704,accuracy:100}}));
+ await expect.poll(latitude).toBe(36.88);
+ await page.evaluate(()=>(window as any).gpsUpdate({coords:{latitude:36.7,longitude:30.7,accuracy:2000}}));
+ expect(await latitude()).toBe(36.88);
+ await page.evaluate(()=>(window as any).gpsUpdate({coords:{latitude:36.884,longitude:30.704,accuracy:15}}));
+ await expect.poll(latitude).toBe(36.884);
+ expect(await page.evaluate(()=>(window as any).cleared)).toContain(42);
+});

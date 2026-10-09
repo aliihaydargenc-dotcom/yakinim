@@ -53,16 +53,19 @@ export default function App() {
   const moveTimer = useRef<ReturnType<typeof setTimeout>>();
   const mounted = useRef(true);
   const locationRequest = useRef(0);
-  useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);};},[]);
+  const locationWatch = useRef<number|null>(null);
+  const locationWatchTimer = useRef<ReturnType<typeof setTimeout>>();
+  function stopLocationWatch() {
+    if(locationWatch.current!==null) navigator.geolocation.clearWatch(locationWatch.current);
+    locationWatch.current=null;clearTimeout(locationWatchTimer.current);
+  }
+  useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);stopLocationWatch();};},[]);
   useEffect(()=>{
     if (DEMO || !navigator.geolocation || useAppStore.getState().locationMode==="manual") return;
     let cancelled=false;
     const refresh=()=>{
       if(cancelled || locationRequest.current || useAppStore.getState().locationMode==="manual") return;
-      const request=++locationRequest.current;
-      navigator.geolocation.getCurrentPosition(position=>{
-        if(!cancelled && request===locationRequest.current && useAppStore.getState().locationMode!=="manual") setLocation({lat:position.coords.latitude,lng:position.coords.longitude});
-      },()=>{}, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+      requestLocation();
     };
     // Safari may report "prompt" for a previously granted permission.
     // Only revisit that permission when a device location was already saved.
@@ -84,7 +87,7 @@ export default function App() {
   const dutyQuery = useQuery({queryKey:["duty-v5",dutyDate,area?.center.lat.toFixed(3),area?.center.lng.toFixed(3)],queryFn:()=>fetchDuty(area!.center),enabled:!DEMO && active && !!location && !!area && category==="duty",staleTime:300000,refetchInterval:300000,retry:0});
   const areaData = useRetainedPlaces(areaQuery.data, "area");
   const supplementData = useRetainedPlaces(supplementQuery.data, "supplement");
-  const dutyData = useRetainedPlaces(dutyQuery.data, dutyDate);
+  const dutyData = dutyQuery.isPlaceholderData ? [] : dutyQuery.data ?? [];
   const matchingPlaces = useMemo(()=>{
     const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(category==='fuel'?fuelQuery.data||[]:[])]);
     const term=search.trim().toLocaleLowerCase("tr");
@@ -98,10 +101,31 @@ export default function App() {
   function requestLocation() {
     if(DEMO) {setPreviewState("ready");setPicking(false);return;}
     if(!window.isSecureContext || !navigator.geolocation) {setLocationError("Konum için siteyi HTTPS bağlantısıyla Safari’de aç. Haritadan da seçebilirsin.");return;}
+    stopLocationWatch();
     const request=++locationRequest.current;
     setLocating(true);setLocationError("");
     const current=()=>mounted.current && request===locationRequest.current;
-    const success=(p:GeolocationPosition)=>{if(!current())return;setLocation({lat:p.coords.latitude,lng:p.coords.longitude});setLocating(false);setPicking(false);};
+    let bestAccuracy=Infinity;
+    let refining=false;
+    const accept=(p:GeolocationPosition)=>{
+      if(!current())return;
+      const {latitude,longitude,accuracy}=p.coords;
+      if(!Number.isFinite(latitude)||!Number.isFinite(longitude))return;
+      const precision=Number.isFinite(accuracy)?accuracy:Infinity;
+      if(precision>bestAccuracy)return;
+      bestAccuracy=precision;
+      clearTimeout(moveTimer.current);
+      setLocation({lat:latitude,lng:longitude});setLocating(false);setPicking(false);
+      if(precision<=30)stopLocationWatch();
+    };
+    const success=(p:GeolocationPosition)=>{
+      accept(p);
+      // The first device fix can be coarse. Keep receiving better fixes after one tap.
+      if(!current()||bestAccuracy<=30||refining||!navigator.geolocation.watchPosition)return;
+      refining=true;
+      locationWatch.current=navigator.geolocation.watchPosition(accept,()=>{}, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+      locationWatchTimer.current=setTimeout(stopLocationWatch,20000);
+    };
     const failure=(e:GeolocationPositionError)=>{
       if(!current())return;
       setLocationError(e.code===1
@@ -116,12 +140,12 @@ export default function App() {
       navigator.geolocation.getCurrentPosition(success,failure,{enableHighAccuracy:false,timeout:15000,maximumAge:0});
     },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   }
-  function chooseOnMap() {++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(!picking);}
+  function chooseOnMap() {stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
     clearTimeout(moveTimer.current);
     moveTimer.current=setTimeout(()=>setArea({center,bounds}),450);
   }
-  function pick(c:Coordinates) {++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
+  function pick(c:Coordinates) {stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();}}
   return <div className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
@@ -133,7 +157,7 @@ export default function App() {
         {category==='market'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
         {((!location&&!pilot) || picking || locationError) && <section className="state-card"><strong>{locationError?'Konum alınamadı':picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {pilot?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':category==='outages'?'outages':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense><button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button></div> : location && !picking ? <>
+        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':category==='outages'?'outages':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense>{!picking&&<button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button>}</div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>setMapOpen(true)}><MapPin size={18}/>Harita</button></div>
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}

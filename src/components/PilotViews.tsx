@@ -1,5 +1,5 @@
 import {lazy,Suspense,useEffect,useMemo,useState} from 'react';
-import {keepPreviousData,useQuery} from '@tanstack/react-query';
+import {useQuery} from '@tanstack/react-query';
 import {ArrowLeft,ArrowUpRight,MapPin,Navigation,RefreshCw} from 'lucide-react';
 import type {Coordinates,Place} from '../types';
 import {useBackLayer} from '../hooks/useBackLayer';
@@ -38,7 +38,7 @@ function TransitStopsView({location,search}:{location:Coordinates|null;search:st
  useEffect(()=>{setSelected(null);setRoute(null);},[location?.lat,location?.lng]);
  const inPilotArea=!!location&&location.lat>=36.7&&location.lat<=37.2&&location.lng>=30.3&&location.lng<=31.1;
  const coords=location?new URLSearchParams({lat:String(location.lat),lng:String(location.lng)}).toString():'';
- const stops=useQuery({queryKey:['transit-stops',location?.lat,location?.lng],queryFn:({signal})=>get<{stops:Stop[];coverage:string[];partial:boolean;catalogAt:string;catalogSize:number;stale:boolean}>(`/api/transit?${coords}`,signal),enabled:inPilotArea,staleTime:300000,retry:1,placeholderData:keepPreviousData});
+ const stops=useQuery({queryKey:['transit-stops',location?.lat,location?.lng],queryFn:({signal})=>get<{stops:Stop[];coverage:string[];partial:boolean;catalogAt:string;catalogSize:number;stale:boolean}>(`/api/transit?${coords}`,signal),enabled:inPilotArea,staleTime:300000,retry:1});
  const buses=useQuery({queryKey:['transit-arrivals',selected?.id,location?.lat,location?.lng],queryFn:({signal})=>get<{buses:Bus[];fresh:boolean;sourceAt:string|null}>(`/api/transit?action=arrivals&stop=${selected!.id}&${coords}`,signal),enabled:!!selected&&!!location,refetchInterval:20000,retry:0});
  const path=useQuery({queryKey:['transit-route',route?.code,route?.direction],queryFn:({signal})=>get<{name:string;stops:Stop[]}>(`/api/transit?action=route&code=${encodeURIComponent(route!.code)}&direction=${route!.direction}&${coords}`,signal),enabled:!!route&&!!location,staleTime:3600000,retry:0});
  const filtered=(stops.data?.stops||[]).filter(s=>`${s.name} ${s.id} ${s.routes.join(' ')}`.toLocaleLowerCase('tr').includes(search.toLocaleLowerCase('tr')));
