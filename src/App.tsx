@@ -87,7 +87,11 @@ export default function App() {
   const dutyQuery = useQuery({queryKey:["duty-v5",dutyDate,area?.center.lat.toFixed(3),area?.center.lng.toFixed(3)],queryFn:()=>fetchDuty(area!.center),enabled:!DEMO && active && !!location && !!area && category==="duty",staleTime:300000,refetchInterval:300000,retry:0});
   const areaData = useRetainedPlaces(areaQuery.data, "area");
   const supplementData = useRetainedPlaces(supplementQuery.data, "supplement");
-  const dutyData = dutyQuery.isPlaceholderData ? [] : dutyQuery.data ?? [];
+  // Panning changes the request center, not the day's duty roster. Preserve
+  // map markers during partial/empty viewport replies, but never across days
+  // or a change of the user's actual location. Lists use the latest reply.
+  const retainedDuty = useRetainedPlaces(dutyQuery.isPlaceholderData ? undefined : dutyQuery.data, `duty:${dutyDate}:${location?.lat}:${location?.lng}`);
+  const dutyData = mapOpen ? retainedDuty : dutyQuery.isPlaceholderData ? [] : dutyQuery.data ?? [];
   const matchingPlaces = useMemo(()=>{
     const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(category==='fuel'?fuelQuery.data||[]:[])]);
     const term=search.trim().toLocaleLowerCase("tr");

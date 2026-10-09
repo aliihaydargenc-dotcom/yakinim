@@ -239,7 +239,9 @@ function scheduleApplyBoardSize() {
   _resizeRaf = requestAnimationFrame(() => { _resizeRaf = 0; applyBoardSize(); });
 }
 window.addEventListener('resize', scheduleApplyBoardSize);
-new ResizeObserver(scheduleApplyBoardSize).observe(document.querySelector('.board-frame'));
+// ResizeObserver runs before paint. Fit immediately so an iframe resize never
+// paints the old, taller board over the touch controls for one frame.
+new ResizeObserver(applyBoardSize).observe(document.querySelector('.board-frame'));
 window.addEventListener('orientationchange', scheduleApplyBoardSize);
 
 // ---------------------------------------------------------------------------
@@ -432,13 +434,15 @@ $('#btn-settings').addEventListener('click', () => {
 settingsDialog.querySelector('input[name=sfx]').addEventListener('change', (e) => {
   sound.enabled = e.target.checked;
 });
-// On close, if the user clicked "Save", harvest form values and persist.
-// <dialog>'s returnValue is set by the <button value="save"> that closed it.
+// Cancel restores the previewed sound option; Save commits the form below.
 settingsDialog.querySelector('form').addEventListener('submit', event => event.preventDefault());
-settingsDialog.querySelector('button[value=save]').addEventListener('click', () => settingsDialog.close('save'));
 settingsDialog.querySelector('button[value=cancel]').addEventListener('click', () => { sound.enabled = settings.get('sfx'); settingsDialog.close('cancel'); });
 settingsDialog.addEventListener('close', () => {
-  if (settingsDialog.returnValue !== 'save') { sound.enabled = settings.get('sfx'); return; }
+  if (settingsDialog.returnValue !== 'save') sound.enabled = settings.get('sfx');
+});
+// Persist before dismissing the dialog. The asynchronous close event could
+// otherwise leave a visible successful save without stored preferences yet.
+settingsDialog.querySelector('button[value=save]').addEventListener('click', () => {
   const f = settingsDialog.querySelector('form');
   const fd = new FormData(f);
   settings.patch({
@@ -455,6 +459,7 @@ settingsDialog.addEventListener('close', () => {
   sound.setMusic(false);
   scoreboard.setServer(settings.get('server'));
   applySettings();
+  settingsDialog.close('save');
 });
 
 // Quick-access buttons in the header bar (skip the dialog).
