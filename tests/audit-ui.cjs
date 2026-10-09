@@ -18,6 +18,8 @@ function load(path){
   if(name.includes('useBackLayer'))return {useBackLayer:()=>{}};
   if(name.includes('useRetainedPlaces'))return {useRetainedPlaces:()=>[{id:'obsolete',category:'duty',name:'Eski nöbetçi',lat:36.884,lng:30.704,address:'Eski adres'}]};
   if(name.includes('services/api'))return {combinePlaceSources:()=>[],fetchArea:()=>{},fetchDuty:()=>{},fetchOvertureSupplement:()=>{},fetchRadio:()=>{}};
+  if(name.includes('PlaceFacts'))return {PlaceFacts:()=>null};
+  if(name.includes('discovery-categories'))return {default:require('../lib/discovery-categories.json')};
   if(name.includes('LocationStatus'))return {LocationStatus:()=>null};
   if(name.includes('CategoryRail'))return {CategoryRail:()=>null};
   if(name.includes('RadioPlayer'))return {RadioPlayer:()=>null};

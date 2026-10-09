@@ -1,0 +1,14 @@
+[
+  {"id":"toilets","label":"Tuvalet","fallback":"Tuvalet","tag":"amenity","value":"toilets"},
+  {"id":"water","label":"İçme suyu","fallback":"İçme suyu noktası","tag":"amenity","value":"drinking_water"},
+  {"id":"charging","label":"Şarj","fallback":"Şarj istasyonu","tag":"amenity","value":"charging_station"},
+  {"id":"playground","label":"Oyun alanı","fallback":"Oyun alanı","tag":"leisure","value":"playground"},
+  {"id":"sports","label":"Spor","fallback":"Spor merkezi","tag":"leisure","value":"sports_centre"},
+  {"id":"veterinary","label":"Veteriner","fallback":"Veteriner","tag":"amenity","value":"veterinary"},
+  {"id":"recycling","label":"Geri dönüşüm","fallback":"Geri dönüşüm noktası","tag":"amenity","value":"recycling"},
+  {"id":"camping","label":"Kamp","fallback":"Kamp alanı","tag":"tourism","value":"camp_site"},
+  {"id":"picnic","label":"Piknik","fallback":"Piknik alanı","tag":"tourism","value":"picnic_site"},
+  {"id":"viewpoint","label":"Manzara","fallback":"Seyir noktası","tag":"tourism","value":"viewpoint"},
+  {"id":"museum","label":"Müze","fallback":"Müze","tag":"tourism","value":"museum"},
+  {"id":"beach","label":"Plaj","fallback":"Plaj","tag":"natural","value":"beach"}
+]

@@ -1,6 +1,8 @@
 export type Section = "nearby" | "map" | "news" | "radio" | "games";
 
 export type CategoryId =
+  | "toilets" | "water" | "charging" | "playground" | "sports" | "veterinary"
+  | "recycling" | "camping" | "picnic" | "viewpoint" | "museum" | "beach"
   | "fishing"
   | "transit"
   | "events"
@@ -36,6 +38,9 @@ export type Place = {
   source?: string;
   queryDate?: string;
   distanceM?: number;
+  facts?: string[];
+  availability?: {free:number|null;total:number|null;open:boolean|null;fetchedAt:string};
+  licenseUrl?:string;
 };
 
 export type NewsItem = {

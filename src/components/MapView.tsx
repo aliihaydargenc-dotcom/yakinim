@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import {PlaceFacts} from "./PlaceFacts";
 import { Navigation, Phone, X } from "lucide-react";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { ViewportBounds } from "../services/api";
 import {useBackLayer} from "../hooks/useBackLayer";
+import discoveryCategories from '../../lib/discovery-categories.json';
 import type { Coordinates, Place } from "../types";
 
 const cameras=new Map<string,{center:[number,number];zoom:number;selected?:Place|null}>();
@@ -359,7 +361,7 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
+    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
     <div className="map-place-actions">
       {onOpen ? <button className="solid-button" onClick={onOpen}>Yaklaşan otobüsler</button> : place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
       {place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>}
@@ -368,7 +370,7 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
 }
 
 function categoryLabel(category: Place["category"]) {
-  return ({ transit:"Durak", events:"Etkinlik", duty: "Nöbetçi Eczane", market: "Market", food: "Yemek", cafe: "Kafe", atm: "ATM", pharmacy: "Eczane", hospital: "Sağlık", fuel: "Akaryakıt", parking: "Otopark", park: "Park", bakery: "Fırın", greengrocer: "Manav", shopping: "Alışveriş" } as Record<Place["category"], string>)[category];
+  return ({ ...Object.fromEntries(discoveryCategories.map(c=>[c.id,c.label])),transit:"Durak", events:"Etkinlik", duty: "Nöbetçi Eczane", market: "Market", food: "Yemek", cafe: "Kafe", atm: "ATM", pharmacy: "Eczane", hospital: "Sağlık", fuel: "Akaryakıt", parking: "Otopark", park: "Park", bakery: "Fırın", greengrocer: "Manav", shopping: "Alışveriş" } as Record<Place["category"], string>)[category];
 }
 
 function distanceLabel(value: number) {

@@ -43,6 +43,18 @@ function categoryText(properties = {}) {
 function categoryFromOvertureProperties(properties = {}) {
   const text = categoryText(properties);
   if (!text) return null;
+  if (/electric vehicle charging|ev charging/.test(text)) return "charging";
+  if (/public restroom|public toilet/.test(text)) return "toilets";
+  if (/drinking water fountain/.test(text)) return "water";
+  if (/playground/.test(text)) return "playground";
+  if (/sports center|sports centre/.test(text)) return "sports";
+  if (/veterinar/.test(text)) return "veterinary";
+  if (/recycling center|recycling centre/.test(text)) return "recycling";
+  if (/campground|camp site/.test(text)) return "camping";
+  if (/picnic site|picnic area/.test(text)) return "picnic";
+  if (/scenic lookout|viewpoint/.test(text)) return "viewpoint";
+  if (/museum/.test(text)) return "museum";
+  if (/\bbeach\b/.test(text)) return "beach";
   if (/\batm\b|cash machine/.test(text)) return "atm";
   if (/pharmacy|drugstore/.test(text)) return "pharmacy";
   if (/hospital|medical clinic|health clinic|urgent care|doctor|medical center/.test(text)) return "hospital";
@@ -162,7 +174,7 @@ async function decodeTile(tile) {
   return new vectorTileModule.VectorTile(new Reader(new Uint8Array(response.data)));
 }
 
-async function readTile(tile, origin, radiusM) {
+async function readTile(tile, origin, radiusM, targetCategory) {
   const parsed = await decodeTile(tile);
   if (!parsed) return [];
   const places = [];
@@ -172,6 +184,7 @@ async function readTile(tile, origin, radiusM) {
       const properties = feature.properties || {};
       if (!isUsable(properties)) continue;
       const category = categoryFromOvertureProperties(properties);
+      if (targetCategory && category !== targetCategory) continue;
       const name = primaryName(properties);
       if (!category || !name) continue;
       const geojson = feature.toGeoJSON(tile.x, tile.y, tile.z);
@@ -179,13 +192,14 @@ async function readTile(tile, origin, radiusM) {
       const [lng, lat] = geojson.geometry.coordinates;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       const distanceM = Math.round(distanceMeters(origin.lat, origin.lng, lat, lng));
-      if (distanceM > radiusM * 1.12) continue;
+      if (distanceM > radiusM * (targetCategory ? 1 : 1.12)) continue;
       const placeId = cleanText(properties.id) || String(feature.id || `${tile.z}:${tile.x}:${tile.y}:${index}`);
       if (EXCLUDED_PLACE_IDS.has(`overture:${placeId}`)) continue;
       places.push({
         id: `overture:${placeId}`,
         name: category === "atm" && !/\batm\b|bankamatik/i.test(name) ? `${name} ATM` : name,
         source: "Overture Maps",
+        licenseUrl: "https://docs.overturemaps.org/attribution/",
         category,
         lat,
         lng,
@@ -206,7 +220,7 @@ function dedupePlaces(places) {
     .slice(0, MAX_RESULTS);
 }
 
-async function queryOverturePlaces(lat, lng, radiusM = DEFAULT_RADIUS_M) {
+async function queryOverturePlaces(lat, lng, radiusM = DEFAULT_RADIUS_M, targetCategory) {
   const radius = Math.max(500, Math.min(MAX_RADIUS_M, Number(radiusM) || DEFAULT_RADIUS_M));
   const tiles = buildTileList(lat, lng, radius, TILE_ZOOM);
   const places = [];
@@ -218,7 +232,7 @@ async function queryOverturePlaces(lat, lng, radiusM = DEFAULT_RADIUS_M) {
     while (cursor < tiles.length) {
       const tile = tiles[cursor++];
       try {
-        const result = await readTile(tile, { lat, lng }, radius);
+        const result = await readTile(tile, { lat, lng }, radius, targetCategory);
         successfulTiles += 1;
         places.push(...result);
       } catch (error) {
@@ -238,12 +252,14 @@ async function handler(req, res) {
   const lat = Number(requestUrl.searchParams.get("lat"));
   const lng = Number(requestUrl.searchParams.get("lng"));
   const radius = Math.max(500, Math.min(MAX_RADIUS_M, Number(requestUrl.searchParams.get("radius")) || DEFAULT_RADIUS_M));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+  const targetCategory = requestUrl.searchParams.get('category') || undefined;
+  if(targetCategory&&!require('../lib/discovery-categories.json').some(c=>c.id===targetCategory))return res.status(400).json({error:'invalid_category'});
+  if (!requestUrl.searchParams.get('lat')?.trim() || !requestUrl.searchParams.get('lng')?.trim() || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     return res.status(400).json({ error: "invalid_coordinates" });
   }
 
   try {
-    const result = await queryOverturePlaces(lat, lng, radius);
+    const result = await queryOverturePlaces(lat, lng, radius, targetCategory);
     res.setHeader("Cache-Control", "public, s-maxage=21600, stale-while-revalidate=86400");
     res.setHeader("X-Yakinim-Places-Source", "overture-places");
     return res.status(200).json({

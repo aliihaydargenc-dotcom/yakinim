@@ -1,6 +1,7 @@
 import type { CategoryId, Coordinates, NewsItem, Place, RadioStation } from "../types";
 import marketExclusions from "../../lib/market-name-exclusions.json";
 import placeExclusions from "../../lib/place-exclusions.json";
+import discoveryCategories from '../../lib/discovery-categories.json';
 const marketNameExclusions = marketExclusions.map(pattern=>new RegExp(pattern,'iu'));
 const excludedPlaceIds = new Set(placeExclusions.map(place=>place.id));
 
@@ -32,6 +33,8 @@ const VIEWPORT_CONCURRENCY = 3;
 const OVERTURE_RADIUS_M = 4500;
 
 function categoryFromTags(tags: Record<string, string> = {}): Exclude<CategoryId, "all" | "duty"> | null {
+  const discovery=discoveryCategories.find(c=>tags[c.tag]===c.value);
+  if(discovery)return discovery.id as Exclude<CategoryId,"all"|"duty">;
   const amenity = tags.amenity || "";
   const shop = tags.shop || "";
   if (amenity === "cafe") return "cafe";
@@ -54,11 +57,24 @@ function displayNameFromTags(tags: Record<string, string> = {}) {
   return cleanText(tags["name:tr"] || tags.name || tags.brand || tags.operator || tags.network);
 }
 function fallbackInfrastructureName(category: Exclude<CategoryId, "all" | "duty"> | null) {
+  const discovery=discoveryCategories.find(c=>c.id===category);if(discovery)return discovery.fallback;
   if (category === "fuel") return "Akaryakıt istasyonu";
   if (category === "atm") return "ATM";
   if (category === "parking") return "Otopark";
   if (category === "park") return "Park";
   return "";
+}
+function factsFromTags(tags:Record<string,string>){
+ const facts:string[]=[];
+ if(tags.fee==='yes')facts.push('Ücretli');else if(tags.fee==='no')facts.push('Ücretsiz');
+ if(tags.wheelchair==='yes')facts.push('Tekerlekli sandalye erişimi');else if(tags.wheelchair==='limited')facts.push('Kısıtlı engelsiz erişim');else if(tags.wheelchair==='no')facts.push('Tekerlekli sandalye erişimi yok');
+ if(tags.changing_table==='yes')facts.push('Bebek bakım alanı');
+ if(tags.access==='customers')facts.push('Müşterilere özel');
+ for(const [tag,label] of [['socket:type2','Type 2'],['socket:type2_combo','CCS'],['socket:chademo','CHAdeMO']]){
+  const n=tags[tag];if(n==='yes'||n&&Number.isFinite(Number(n))&&Number(n)>0){facts.push(label);if(tags[tag+':output'])facts.push(tags[tag+':output'].slice(0,40));}
+ }
+ if(tags.opening_hours)facts.push(`Saatler: ${tags.opening_hours.slice(0,100)}`);
+ return [...new Set(facts)];
 }
 function addressFromTags(tags: Record<string, string> = {}) {
   return [[tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" "), tags["addr:suburb"] || tags["addr:district"] || tags["addr:neighbourhood"]]
@@ -77,6 +93,7 @@ function placeQuality(place: Place) {
   let score = 0;
   if (place.address && place.address !== "Adres bilgisi yok") score += 2;
   if (place.phone) score += 1;
+  if (place.availability) score += 3;
   return score;
 }
 function dedupePlaces(places: Place[]) {
@@ -142,14 +159,16 @@ function osmPlacesFromElements(elements: OsmElement[], location: Coordinates): P
   return elements.flatMap((element) => {
     const lat = Number(element.lat ?? element.center?.lat), lng = Number(element.lon ?? element.center?.lon);
     const category = categoryFromTags(element.tags), tags = element.tags || {};
+    if(discoveryCategories.some(c=>c.id===category)&&(['private','no'].includes(tags.access)||category==='water'&&tags.drinking_water==='no'))return [];
     const rawName = displayNameFromTags(tags) || fallbackInfrastructureName(category);
     const name = category === "atm" && !/\batm\b|bankamatik/i.test(rawName) ? `${rawName} ATM` : rawName;
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || !category || !name) return [];
-    return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, source: "OpenStreetMap", distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
+    return [{ id: `osm:${element.type}:${element.id}`, name, category, lat, lng, address: addressFromTags(tags), phone: tags.phone || tags["contact:phone"] || undefined, source: "OpenStreetMap", facts:factsFromTags(tags),licenseUrl:'https://www.openstreetmap.org/copyright',distanceM: Math.round(distanceMeters(location, { lat, lng })) } satisfies Place];
   });
 }
-export async function fetchOvertureSupplement(location: Coordinates, signal?: AbortSignal): Promise<Place[]> {
+export async function fetchOvertureSupplement(location: Coordinates, signal?: AbortSignal, category?:string): Promise<Place[]> {
   const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M), quality:"3" });
+  if(category)params.set('category',category);
   const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`, signal);
   return payload.places || [];
 }
@@ -210,3 +229,7 @@ export async function fetchArea(bounds: ViewportBounds, origin: Coordinates, sig
   } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
 }
 export function combinePlaceSources(places: Place[]) { return mergePlaces(places); }
+
+export async function fetchMunicipalPlaces(location:Coordinates,kind:string,signal?:AbortSignal):Promise<{places:Place[];partial?:boolean}>{return getJson(`/api/nearby?layer=municipal&lat=${location.lat}&lng=${location.lng}&kind=${kind}`,signal);}
+
+export async function fetchDiscoveryPlaces(location:Coordinates,signal?:AbortSignal):Promise<Place[]>{const data=await getJson<ViewportResponse>(`/api/nearby?lat=${location.lat}&lng=${location.lng}&radius=5000&kind=discovery`,signal);return osmPlacesFromElements(data.elements||[],location);}
