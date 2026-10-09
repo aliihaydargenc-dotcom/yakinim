@@ -1,0 +1,7 @@
+import {useQuery} from '@tanstack/react-query';
+import type {Coordinates} from '../types';
+export function LocationStatus({location,manual,demo,onChooseMap}:{location:Coordinates|null;manual:boolean;demo:boolean;onChooseMap:()=>void}){
+ const lat=location?.lat.toFixed(2),lng=location?.lng.toFixed(2);
+ const label=useQuery({queryKey:['location-label',lat,lng],queryFn:async({signal})=>{const r=await fetch(`/api/location?lat=${lat}&lng=${lng}`,{signal});if(!r.ok)throw Error('location');return r.json() as Promise<{label:string}>;},enabled:!!location&&!demo,staleTime:86400000,retry:0});
+ return <div className="location-status"><span>{!location?'Konum seçilmedi':demo?'Konyaaltı, Antalya · örnek konum':<>{label.data?.label||`${location.lat.toFixed(3)}, ${location.lng.toFixed(3)}`}<small>{manual?'Haritadan seçilen konum':'Cihaz konumu'}</small></>}</span><button aria-label="Konumu haritadan seç" onClick={onChooseMap}>Haritadan seç</button></div>;
+}

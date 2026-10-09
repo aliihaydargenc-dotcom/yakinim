@@ -101,3 +101,9 @@ Balıkçılık sekmesi Konyaaltı, Lara, Kemer, Kaş, Side ve Alanya için canl�
 Open-Meteo bölgesel model verisidir, kıyı ölçümü veya av verimi değildir. Ay evresinden başarı puanı türetilmez. MGM'nin deniz sayfası ve BSGM resmî sayfası kullanıcıya kaynak olarak sunulur. Tür bazında güncel boy/miktar yasakları doğrulanmadan sayısal sınır eklenmemiştir; avdan önce yürürlükteki düzenleme kontrol edilmelidir.
 
 Ürün fiyatları kategori aramalarıyla kaynak ürün kimliğine göre birleştirilir; yalnızca aynı kimlik/paketin farklı zincir teklifleri karşılaştırılır. Kaynaktaki farklı kimlikler aynı marka adıyla zorla eşleştirilmez. Tek zincirde bulunan ürünler alternatifler altında ayrı görünür. Kategori sınıflaması ürün adından yapılır ve kaynak kapsamı tüm ürünleri içermez.
+
+## Onaylanan genişletme: Türkiye kıyıları ve karşılaştırma
+
+Antalya sınırı kaldırıldı; Akdeniz, Ege, Marmara ve Karadeniz için 18 başlangıç kıyısı ve haritadan kıyı seçimi eklendi. Bugün/Yarın, saat seçimi ve kısa saatlik tablo; swell, rüzgâr dalgası, akıntı, deniz seviyesi, görüş ve UV ayrıntıları gösterilir. Akıntı m/s isteğinde m/s gelir; km/h yanıtı da açık birim kontrolüyle m/s'ye çevrilir. Model noktası kullanıcı noktasından 50 km'den uzaktaysa deniz koşulları yerel tahmin olarak gösterilmez. Konyaaltı, İzmir, Trabzon ve Ankara hava modu canlı test edildi.
+
+Favori kıyılar ve en son 200 av kaydı yalnızca cihazdaki tarayıcıda saklanır. Av kaydına eklenen koşullar seçilen saate ait bölgesel tahmindir; geçmiş gözlem veya gerçekleşmiş av havası olarak sunulmaz. Günlüğün tarihindeki tahmin günü uyuşmazsa koşul eklenmez.

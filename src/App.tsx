@@ -2,12 +2,14 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Compass, LocateFixed, MapPin, Newspaper, Radio, Search, ChevronRight, Gamepad2, Cross, X, Navigation, Phone, Heart, List, Layers, ArrowLeft } from "lucide-react";
 import { CategoryRail } from "./components/CategoryRail";
+import { LocationStatus } from "./components/LocationStatus";
 import { RadioPlayer } from "./components/RadioPlayer";
 import { combinePlaceSources, fetchArea, fetchDuty, fetchOvertureSupplement, fetchRadio, type ViewportBounds } from "./services/api";
 import { useAppStore } from "./store";
 import {useBackLayer} from "./hooks/useBackLayer";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
+const WeatherSummary = lazy(()=>import("./components/WeatherSummary"));
 const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
 const MapView = lazy(() => import("./components/MapView").then(m => ({ default: m.MapView })));
 const NewsView = lazy(() => import("./components/NewsView").then(m => ({ default: m.NewsView })));
@@ -55,6 +57,8 @@ export default function App() {
   const locationRequest = useRef(0);
   const locationWatch = useRef<number|null>(null);
   const locationWatchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [pickedCoast,setPickedCoast]=useState<Coordinates|null>(null);
+  const coastPick=useRef(false);
   function stopLocationWatch() {
     if(locationWatch.current!==null) navigator.geolocation.clearWatch(locationWatch.current);
     locationWatch.current=null;clearTimeout(locationWatchTimer.current);
@@ -144,24 +148,27 @@ export default function App() {
       navigator.geolocation.getCurrentPosition(success,failure,{enableHighAccuracy:false,timeout:15000,maximumAge:0});
     },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   }
-  function chooseOnMap() {stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
+  function chooseOnMap() {coastPick.current=false;stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
+  function chooseCoast(){chooseOnMap();coastPick.current=true;}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
     clearTimeout(moveTimer.current);
     moveTimer.current=setTimeout(()=>setArea({center,bounds}),450);
   }
-  function pick(c:Coordinates) {stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
+  function pick(c:Coordinates) {if(coastPick.current){setPickedCoast(c);coastPick.current=false;}stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c)});setPicking(false);setMapOpen(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();}}
   return <div className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
+      {!mapOpen&&<LocationStatus location={location} manual={useAppStore.getState().locationMode==="manual"} demo={DEMO} onChooseMap={chooseOnMap}/>}
       <main className={mapOpen?'map-workspace':'list-workspace'}>
         {!mapOpen && category!=="fishing" && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='traffic'?'Trafikte yer ara':searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':category==='outages'?'Kesinti ara':'Yer ara'} placeholder={searchMode==='traffic'?'Cadde veya yer ara':searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='outages'?'İlçe veya mahalle ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
         <CategoryRail value={category} onChange={c=>{setCategory(c);setSearch(sectionSearch[c]||'');setSelected(null);if(c==="fishing"||c==="transit"||c==="events"||c==="outages")setMapOpen(false);setPicking(false);}}/>
+        {category==='all'&&location&&!mapOpen&&!picking&&<Suspense fallback={null}><WeatherSummary location={location}/></Suspense>}
         {category==='market'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
         {((!location&&!pilot) || picking || locationError) && <section className="state-card"><strong>{locationError?'Konum alınamadı':picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='fishing'?'fishing':category==='transit'?'transit':category==='events'?'events':category==='outages'?'outages':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense>{!picking&&<button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button>}</div> : location && !picking ? <>
+        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='fishing'?'fishing':category==='transit'?'transit':category==='events'?'events':category==='outages'?'outages':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode} onChooseCoast={chooseCoast} pickedCoast={pickedCoast}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={loading}/></Suspense>{!picking&&<button className="map-list-button" onClick={()=>setMapOpen(false)}><List size={18}/>Liste · {visible.length}</button>}</div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>setMapOpen(true)}><MapPin size={18}/>Harita</button></div>
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}
