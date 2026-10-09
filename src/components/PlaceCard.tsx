@@ -1,7 +1,7 @@
 import { Heart, Navigation } from "lucide-react";
 import type { Place } from "../types";
 
-const LABELS: Record<Place["category"], string> = { outages:"Kesinti",transit:"Durak", events:"Etkinlik",
+const LABELS: Record<Place["category"], string> = { fishing:"Balıkçılık",outages:"Kesinti",transit:"Durak", events:"Etkinlik",
   duty: "Nöbetçi Eczane", market: "Market", food: "Yemek", cafe: "Kafe", atm: "ATM", pharmacy: "Eczane",
   hospital: "Sağlık", fuel: "Akaryakıt", parking: "Otopark", park: "Park", bakery: "Fırın", greengrocer: "Manav", shopping: "Alışveriş",
 };

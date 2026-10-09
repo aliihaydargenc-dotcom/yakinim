@@ -59,6 +59,9 @@
     },
     "api/outages.js": {
       "maxDuration": 60
+    },
+    "api/fishing.js": {
+      "maxDuration": 30
     }
   }
 }

@@ -1,0 +1,11 @@
+[
+  {"id":"all","label":"Tümü","terms":[]},
+  {"id":"meat-fish","label":"Et ve balık","terms":["dana","tavuk","balık","ton balığı"],"pattern":"dana|kuzu|tavuk|piliç|balı[kğ]|somon|levrek|çipura|hamsi|köfte|kıyma|sucuk|salam|sosis|dardanel"},
+  {"id":"dairy","label":"Süt ve süt ürünleri","terms":["süt","yoğurt","peynir","tereyağı"],"pattern":"süt|yoğurt|peynir|tereyağ|ayran|kefir|kaymak|krema"},
+  {"id":"eggs","label":"Yumurta","terms":["yumurta"],"pattern":"yumurta"},
+  {"id":"produce","label":"Meyve ve sebze","terms":["domates","patates","elma","muz"],"pattern":"domates|patates|soğan|elma|muz|biber|salatalık|portakal|limon|havuç|marul|mandalina|üzüm|armut|kabak|patlıcan"},
+  {"id":"pantry","label":"Temel gıda","terms":["makarna","pirinç","un","ayçiçek yağı"],"pattern":"makarna|pirinç|bulgur|mercimek|nohut|fasulye|\\bun\\b|şeker|yağı|salça|tuz"},
+  {"id":"drinks","label":"İçecek","terms":["çay","kahve","meyve suyu","su"],"pattern":"çay|kahve|nescafe|su |suyu|cola|pepsi|gazoz|maden|limonata"},
+  {"id":"snacks","label":"Atıştırmalık","terms":["bisküvi","çikolata","cips"],"pattern":"bisküvi|çikolata|cips|kraker|gofret|kek|kurabiye"},
+  {"id":"cleaning","label":"Temizlik","terms":["deterjan","bulaşık","tuvalet kağıdı"],"pattern":"deterjan|bulaşık|temizleyici|tuvalet kağıdı|kağıt havlu|sabun|çamaşır"}
+]

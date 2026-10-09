@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {normalize,query} from '../lib/fishing.cjs';
+import {inCategory} from '../lib/prices.cjs';
+const now=Date.parse('2026-10-09T09:00:00Z'),t=now/1000;
+const weather={hourly:{time:[t-3600,t,t+3600],wind_speed_10m:[1,0,null],wind_gusts_10m:[3,5,8]},hourly_units:{wind_speed_10m:'m/s',wind_gusts_10m:'m/s'},daily:{time:[t],sunrise:[t-10800],sunset:[t+32400],moon_phase:[.5]}};
+const marine={hourly:{time:[t],wave_height:[.6],wave_period:[4]},hourly_units:{wave_height:'m',wave_period:'s'}};
+let data=normalize(weather,marine,now);assert.equal(data.hourly.length,2);assert.equal(data.hourly[0].wind,0);assert.equal(data.hourly[0].wave,.6);assert.equal(data.hourly[1].wave,null);assert.equal(data.hourly[1].wind,null);assert.equal(data.partial,true);assert.equal(data.daily[0].moonPhase,.5);
+assert.equal(normalize(null,marine,now).hourly[0].wind,null);assert.equal(normalize({...weather,hourly_units:{wind_speed_10m:'km/h'}},marine,now).hourly[0].wind,null);
+assert.equal(inCategory({title:'Sütlü çikolata'},'dairy'),false);assert.equal(inCategory({title:'Pınar Süt 1 L'},'dairy'),true);assert.equal(inCategory({title:'Ton balığı 160 G'},'meat-fish'),true);assert.equal(inCategory({title:'Dana kıyma'},'dairy'),false);
+await assert.rejects(query(new URLSearchParams({lat:'40',lng:'29'})),/invalid_location/);
+let calls=0;data=await query(new URLSearchParams({lat:'36.862',lng:'30.641'}),{now,fetchImpl:async url=>{calls++;if(url.includes('marine-api'))throw Error('offline');return {ok:true,json:async()=>weather};}});assert.equal(data.partial,true);assert.equal(data.hourly[0].wave,null);await query(new URLSearchParams({lat:'36.862',lng:'30.641'}),{now,fetchImpl:async()=>{throw Error('cache expected');}});assert.equal(calls,2);
+await assert.rejects(query(new URLSearchParams({lat:'36.863',lng:'30.642'}),{now,fetchImpl:async()=>({ok:false})}),/fishing_unavailable/);
+console.log('Fishing PASS: time alignment, zero vs missing, units, partial sources, bounded location, cache and source failures; price category exclusion.');

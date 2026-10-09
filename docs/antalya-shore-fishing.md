@@ -1,6 +1,6 @@
 # Antalya kıyı balıkçılığı: veri ve ürün araştırması
 
-Araştırma tarihi: 9 Ekim 2026. Kapsam: Antalya kıyılarında karadan amatör olta balıkçılığı. Bu çalışma bir özellik eklemiyor; uygulanabilir veri kaynaklarını, kullanıcıya gösterilecek bilgileri ve doğrulama adımlarını belirliyor.
+Araştırma tarihi: 9 Ekim 2026. Kapsam: Antalya kıyılarında karadan amatör olta balıkçılığı. Araştırma tamamlandı; balıkçılık ekranı ve canlı tahmin API entegrasyonu uygulamaya eklendi. Aşağıda kaynaklar, model sınırları ve sonraki geliştirme önerileri yer alıyor.
 
 ## Öneri
 
@@ -10,7 +10,7 @@ Bu verilerden Antalya için doğrulanmış bir “balık tutma olasılığı” 
 
 ## Kaynak kodundan doğrulanan bulgular
 
-Tersine mühendislik çalışması Open-Meteo'nun herkese açık sunucu kodundaki istek işleme, değişken eşleme ve model seçimi akışının incelenmesine dayanıyor. İncelenen sürüm: [`454d6ef3ef683587afac067f31627088cd111637`](https://github.com/open-meteo/open-meteo/tree/454d6ef3ef683587afac067f31627088cd111637). Aşağıdaki bulgular koddan doğrulandı; Antalya için canlı API yanıtı alınamadı.
+Tersine mühendislik çalışması Open-Meteo'nun herkese açık sunucu kodundaki istek işleme, değişken eşleme ve model seçimi akışının incelenmesine dayanıyor. İncelenen sürüm: [`454d6ef3ef683587afac067f31627088cd111637`](https://github.com/open-meteo/open-meteo/tree/454d6ef3ef683587afac067f31627088cd111637). Aşağıdaki bulgular koddan doğrulandı; Antalya için hava ve deniz API yanıtları da canlı alınıp birimler ve zaman damgaları kontrol edildi.
 
 | Bilgi | Kodda doğrulanan alan | Kıyı balıkçılığı ekranında kullanım |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ Tersine mühendislik çalışması Open-Meteo'nun herkese açık sunucu kodundak
 | Deniz yüzeyi sıcaklığı | `sea_surface_temperature` | Günler arası eğilim; dip suyu sıcaklığı olarak adlandırmama |
 | Rüzgâr ve hava | `wind_speed_10m`, `wind_gusts_10m`, `wind_direction_10m`, `precipitation_probability`, `weather_code`, `pressure_msl` | Atış koşulları, hava değişimi ve basınç eğilimi |
 | Güneş | `sunrise`, `sunset` | Sabah/akşam saatlerini seçme; av verimini garanti eden bir kural kurmama |
-| Ay | `moonrise`, `moonset`, `moon_phase` | Astronomik bilgi kartı; bu alanlar için canlı servis desteği ayrıca doğrulanmalı |
+| Ay | `moonrise`, `moonset`, `moon_phase` | Astronomik bilgi kartı; canlı servis desteği doğrulandı; ilk sürüm ay evresini gösterir |
 
 Kaynaklar: [saatlik alanlar](https://github.com/open-meteo/open-meteo/blob/454d6ef3ef683587afac067f31627088cd111637/Sources/App/Controllers/VariableHourly.swift), [günlük alanlar](https://github.com/open-meteo/open-meteo/blob/454d6ef3ef683587afac067f31627088cd111637/Sources/App/Controllers/VariableDaily.swift), [deniz değişkenleri ve birimleri](https://github.com/open-meteo/open-meteo/blob/454d6ef3ef683587afac067f31627088cd111637/Sources/App/MfWave/MfWaveVariable.swift), [istek işleme ve ay/güneş hesabı](https://github.com/open-meteo/open-meteo/blob/454d6ef3ef683587afac067f31627088cd111637/Sources/App/Controllers/ForecastapiController.swift).
 
@@ -45,9 +45,9 @@ Kaynak: [model ızgarası, zaman adımı ve güncelleme aralığı](https://gith
 
 | Kaynak | Amaç | Bu oturumdaki durum |
 | --- | --- | --- |
-| Open-Meteo Weather + Marine | Birleştirilebilir açık hava/deniz tahmini | Açık kaynak kodu ve README incelendi; dokümantasyon sitesi ve canlı API erişimi ağ iznine bağlı |
-| [MGM](https://www.mgm.gov.tr/) | Resmî deniz tahmini ve meteorolojik uyarılar | Siteye erişim izni gerekiyor; resmî otomatik veri sözleşmesi doğrulanmadı |
-| [Tarım ve Orman Bakanlığı / BSGM](https://www.tarimorman.gov.tr/BSGM) | Amatör avcılık mevzuatı, tür/boy/miktar/zaman kısıtları | Resmî belge içeriği bu ortamda doğrulanamadı; güncel sayısal limitler rapora eklenmedi |
+| Open-Meteo Weather + Marine | Birleştirilebilir açık hava/deniz tahmini | Açık kaynak kodu ve README incelendi; Antalya hava/deniz API yanıtları canlı doğrulandı |
+| [MGM](https://www.mgm.gov.tr/) | Resmî deniz tahmini ve meteorolojik uyarılar | Deniz sayfasına canlı erişim doğrulandı; resmî otomatik veri sözleşmesi doğrulanmadı |
+| [Tarım ve Orman Bakanlığı / BSGM](https://www.tarimorman.gov.tr/BSGM) | Amatör avcılık mevzuatı, tür/boy/miktar/zaman kısıtları | BSGM ana sayfasına erişim doğrulandı; yürürlükteki tebliğ ve tüm değişiklikler doğrulanmadığından sayısal limitler eklenmedi |
 | [Resmî Gazete](https://www.resmigazete.gov.tr/) | Tebliğ metni ve sonraki değişiklikler | Belge ve değişiklikler birlikte kontrol edilmeli; erişim izni gerekiyor |
 | OpenStreetMap / mevcut harita | Kıyı geometrisi ve çevre bağlamı | Proje zaten kullanıyor; bir noktanın ava açık olduğu veya erişilebilir olduğu çıkarılamaz |
 
@@ -55,15 +55,15 @@ Ay/solunar bilgisi için ayrı ücretli sağlayıcı zorunlu görünmüyor: ince
 
 ## Uygulamaya uyacak veri akışı
 
-Mevcut Vercel API düzenine `/api/fishing` eklenebilir. Sunucu koordinatı doğrular, hava ve deniz isteklerini ayrı yapar, sonuçları UTC zaman damgasıyla birleştirir; ekranda saatler `Europe/Istanbul` ile gösterilir. Tarayıcı keyfi bir kaynak URL'si göndermemeli.
+Mevcut Vercel API düzenine `/api/fishing` eklendi. Sunucu koordinatı doğrular, hava ve deniz isteklerini ayrı yapar, sonuçları UTC zaman damgasıyla birleştirir; ekranda saatler `Europe/Istanbul` ile gösterilir. Tarayıcı keyfi bir kaynak URL'si göndermemeli.
 
-Başlangıç istek taslağı — **canlı çalıştığı doğrulanmış örnek değildir**:
+Canlı yanıtları doğrulanan başlangıç istekleri (uygulama ilk sürümde dalga, rüzgâr, yağış, sıcaklık, güneş ve ay evresini kullanır):
 
 ```text
 https://api.open-meteo.com/v1/forecast
   ?latitude=36.86&longitude=30.64
   &hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,precipitation_probability,weather_code,pressure_msl
-  &daily=sunrise,sunset
+  &daily=sunrise,sunset,moon_phase
   &forecast_days=2&timezone=Europe%2FIstanbul&timeformat=unixtime&wind_speed_unit=ms
 
 https://marine-api.open-meteo.com/v1/marine
@@ -93,3 +93,11 @@ Bu oturumda `open-meteo.com` ve Bakanlık alan adına yapılan istekler ağ poli
 5. Ardından kıyı ekranı ve av günlüğünü eklemek. Tür/yem/sezon önerilerini yerel uzman ve gözlem kayıtlarıyla doğrulamak.
 
 Mevcut sonuç: ilk sürümün temel veri alanları ve mimarisi belirlenmiştir; canlı Antalya verisi, mevzuat ve yerel tür önerileri henüz doğrulanmamıştır.
+
+## Uygulamaya alınan özellik (9 Ekim 2026)
+
+Balıkçılık sekmesi Konyaaltı, Lara, Kemer, Kaş, Side ve Alanya için canlı Open-Meteo hava/deniz model tahminlerini sunar. İki günlük saatlik dalga yüksekliği/periyodu/yönü, rüzgâr/hamle/yönü, yağış olasılığı ve deniz sıcaklığı; günlük gün doğumu/batımı ve ay evresi gösterilir. API çıktıları canlı kontrol edildi: saatler Unix saniyesi, rüzgâr m/s, dalga metre, periyot saniye. Eksik alanlar sıfır yapılmaz; kaynaklardan biri çalışmazsa kısmi veri belirtilir. Önbellek 15 dakika, konum kapsamı Antalya çevresiyle sınırlıdır.
+
+Open-Meteo bölgesel model verisidir, kıyı ölçümü veya av verimi değildir. Ay evresinden başarı puanı türetilmez. MGM'nin deniz sayfası ve BSGM resmî sayfası kullanıcıya kaynak olarak sunulur. Tür bazında güncel boy/miktar yasakları doğrulanmadan sayısal sınır eklenmemiştir; avdan önce yürürlükteki düzenleme kontrol edilmelidir.
+
+Ürün fiyatları kategori aramalarıyla kaynak ürün kimliğine göre birleştirilir; yalnızca aynı kimlik/paketin farklı zincir teklifleri karşılaştırılır. Kaynaktaki farklı kimlikler aynı marka adıyla zorla eşleştirilmez. Tek zincirde bulunan ürünler alternatifler altında ayrı görünür. Kategori sınıflaması ürün adından yapılır ve kaynak kapsamı tüm ürünleri içermez.
