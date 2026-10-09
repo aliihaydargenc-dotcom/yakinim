@@ -59,6 +59,13 @@ export default function App() {
   const locationWatchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [pickedCoast,setPickedCoast]=useState<Coordinates|null>(null);
   const coastPick=useRef(false);
+  const workspace=useRef<HTMLElement>(null);
+  useEffect(()=>{
+    const node=workspace.current;
+    if(!node?.animate||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const animation=node.animate([{opacity:.55},{opacity:1}],{duration:160,easing:'ease-out'});
+    return ()=>animation.cancel();
+  },[section,category,productMode,mapOpen]);
   function stopLocationWatch() {
     if(locationWatch.current!==null) navigator.geolocation.clearWatch(locationWatch.current);
     locationWatch.current=null;clearTimeout(locationWatchTimer.current);
@@ -161,7 +168,7 @@ export default function App() {
     {active ? <>
       <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
       {!mapOpen&&<LocationStatus location={location} manual={useAppStore.getState().locationMode==="manual"} demo={DEMO} onChooseMap={chooseOnMap}/>}
-      <main className={mapOpen?'map-workspace':'list-workspace'}>
+      <main ref={workspace} className={mapOpen?'map-workspace':'list-workspace'}>
         {!mapOpen && category!=="fishing" && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='traffic'?'Trafikte yer ara':searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':category==='outages'?'Kesinti ara':'Yer ara'} placeholder={searchMode==='traffic'?'Cadde veya yer ara':searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='outages'?'İlçe veya mahalle ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
         <CategoryRail value={category} onChange={c=>{setCategory(c);setSearch(sectionSearch[c]||'');setSelected(null);if(c==="fishing"||c==="transit"||c==="events"||c==="outages")setMapOpen(false);setPicking(false);}}/>
         {category==='all'&&location&&!mapOpen&&!picking&&<Suspense fallback={null}><WeatherSummary location={location}/></Suspense>}
@@ -179,7 +186,7 @@ export default function App() {
         </> : null}
       </main>
       {selected && <div className="detail-backdrop" onClick={()=>setSelected(null)}><section className="place-detail" role="dialog" aria-modal="true" aria-label={selected.name} onKeyDown={e=>{if(e.key==="Escape")setSelected(null);if(e.key==="Tab"){const nodes=e.currentTarget.querySelectorAll<HTMLElement>('button,a[href]');const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}} onClick={e=>e.stopPropagation()}><div className="detail-top"><h2>{selected.name}</h2><button autoFocus onClick={()=>setSelected(null)} aria-label="Kapat"><X size={22}/></button></div><p>{selected.address}</p><small>{distanceLabel(selected.distanceM)}{selected.distanceM!==undefined?" · yaklaşık":""}</small>{selected.source&&<small className="data-note">{selected.source==="legacy-fallback"?"Alternatif kaynak":selected.source}{selected.queryDate&&` · ${selected.queryDate}`}</small>}<div className="detail-buttons">{selected.phone&&!DEMO&&<a className="outline-button" href={`tel:${selected.phone}`}><Phone size={18}/>Ara</a>}{!DEMO&&Number.isFinite(selected.lat)&&Number.isFinite(selected.lng)&&<a className="solid-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={18}/>Yol tarifi</a>}<button aria-label="Yeri kaydet" aria-pressed={savedIds.includes(selected.id)} onClick={()=>toggleSaved(selected.id)}><Heart size={20} fill={savedIds.includes(selected.id)?'currentColor':'none'}/></button></div></section></div>}
-    </> : <main className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView onActiveChange={setGameActive}/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
+    </> : <main ref={workspace} className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView onActiveChange={setGameActive}/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
     <RadioPlayer station={currentRadio} stations={radioQuery.data||[]} onSelect={setCurrentRadio} onClose={()=>setCurrentRadio(null)}/>
     {!playingGame && <nav className="model-nav" aria-label="Ana menü">{[{id:'nearby' as const,label:'Keşfet',Icon:Compass},{id:'news' as const,label:'Haber',Icon:Newspaper},{id:'radio' as const,label:'Radyo',Icon:Radio},{id:'games' as const,label:'Oyun',Icon:Gamepad2}].map(({id,label,Icon})=><button key={id} onClick={()=>setSection(id)} aria-current={section===id?'page':undefined}><Icon size={22}/><span>{label}</span></button>)}</nav>}
   </div>;

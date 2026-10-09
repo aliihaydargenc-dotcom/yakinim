@@ -1,0 +1,644 @@
+{
+  "checked_at": "2026-10-09T12:29:40.774176+00:00",
+  "charge": {
+    "repository": "openchargemap/ocm-export",
+    "commit": "8e3bedca48ca94807d96b2f5e7ee02cffe63ae54",
+    "country_file_count": 2098,
+    "sample_size": 60,
+    "sampling": "60 evenly spaced filenames; not a random or representative sample",
+    "sample_files": [
+      "OCM-107953.json",
+      "OCM-130580.json",
+      "OCM-147901.json",
+      "OCM-161826.json",
+      "OCM-165165.json",
+      "OCM-165201.json",
+      "OCM-165237.json",
+      "OCM-165276.json",
+      "OCM-174598.json",
+      "OCM-174730.json",
+      "OCM-174774.json",
+      "OCM-176002.json",
+      "OCM-191996.json",
+      "OCM-207760.json",
+      "OCM-211218.json",
+      "OCM-235450.json",
+      "OCM-238227.json",
+      "OCM-260202.json",
+      "OCM-260281.json",
+      "OCM-267129.json",
+      "OCM-273399.json",
+      "OCM-274254.json",
+      "OCM-274616.json",
+      "OCM-279918.json",
+      "OCM-295730.json",
+      "OCM-295906.json",
+      "OCM-299258.json",
+      "OCM-300552.json",
+      "OCM-303569.json",
+      "OCM-303607.json",
+      "OCM-303643.json",
+      "OCM-304321.json",
+      "OCM-306766.json",
+      "OCM-308474.json",
+      "OCM-311167.json",
+      "OCM-312483.json",
+      "OCM-460338.json",
+      "OCM-461117.json",
+      "OCM-461864.json",
+      "OCM-461902.json",
+      "OCM-462000.json",
+      "OCM-462050.json",
+      "OCM-463800.json",
+      "OCM-463841.json",
+      "OCM-463877.json",
+      "OCM-463913.json",
+      "OCM-463949.json",
+      "OCM-464188.json",
+      "OCM-471604.json",
+      "OCM-475846.json",
+      "OCM-475957.json",
+      "OCM-475992.json",
+      "OCM-476031.json",
+      "OCM-476068.json",
+      "OCM-476151.json",
+      "OCM-477227.json",
+      "OCM-477263.json",
+      "OCM-477982.json",
+      "OCM-481166.json",
+      "OCM-95657.json"
+    ],
+    "field_counts": {
+      "coordinates": 60,
+      "provider_id": 60,
+      "connection_type": 60,
+      "power_kw": 55,
+      "last_verified": 60,
+      "contributor_cc_by": 51
+    },
+    "providers": [
+      {
+        "id": 1,
+        "sample_count": 51,
+        "title": "Open Charge Map Contributors",
+        "open_data_claim": true,
+        "license": "Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)"
+      },
+      {
+        "id": 34,
+        "sample_count": 3,
+        "title": "Toger.co",
+        "open_data_claim": true,
+        "license": "Licensed under CC0  by data sharing agreement"
+      },
+      {
+        "id": 42,
+        "sample_count": 6,
+        "title": "Otopriz",
+        "open_data_claim": true,
+        "license": "CC-0"
+      }
+    ],
+    "verification_year_counts": {
+      "2017": 1,
+      "2019": 1,
+      "2020": 7,
+      "2021": 4,
+      "2022": 1,
+      "2023": 10,
+      "2024": 5,
+      "2025": 12,
+      "2026": 19
+    },
+    "contributor_license": "Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "limits": [
+      "Snapshot, not live occupancy",
+      "Each provider has its own license",
+      "Record date is not repository update date"
+    ]
+  },
+  "transit": {
+    "repository": "MobilityData/mobility-database-catalogs",
+    "commit": "c6aa6792758f7c1ad5dbb5877b843cc83d617dc7",
+    "catalog_count": 25,
+    "sources": [
+      {
+        "path": "catalogs/sources/gtfs/realtime/tr-sivas-sivas-belediye-baskanlg-sivas-belediye-baskanlg-gtfs-rt-vp-3481.json",
+        "provider": "Sivas Belediye Başkanlığı",
+        "type": "gtfs-rt",
+        "official_claim": "True",
+        "city": null,
+        "url": "https://mobilapi.sivas.bel.tr/gtfs/realtime/vehicle-positions.pb",
+        "license_url": null,
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-adana-kentkart-gtfs-3407.json",
+        "provider": "KentKart Adana - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Adana",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/adana.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-antalya-kentkart-gtfs-3406.json",
+        "provider": "KentKart Antalya - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Antalya",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/antalya.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-burdur-kentkart-gtfs-3405.json",
+        "provider": "KentKart Burdur - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Burdur",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/burdur.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-canakkale-kentkart-gtfs-3404.json",
+        "provider": "KentKart Canakkale - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Canakkale",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/canakkale.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-duzce-kentkart-gtfs-3403.json",
+        "provider": "KentKart Duzce - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Duzce",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/duzce.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-erzurum-kentkart-gtfs-3402.json",
+        "provider": "KentKart Erzurum - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Erzurum",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/erzurum.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-gaziantep-kentkart-gtfs-3401.json",
+        "provider": "KentKart Gaziantep - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Gaziantep",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/gaziantep.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-isparta-bus-gtfs-2381.json",
+        "provider": "Isparta Özel Halk Otobüsleri",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Isparta",
+        "url": "https://ots.kentekspress.com.tr/gtsf/4_gtfs.zip",
+        "license_url": null,
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-istanbul-gtfs-3128.json",
+        "provider": "Istanbul IETT GTFS Data",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Istanbul",
+        "url": "https://data.ibb.gov.tr/en/dataset/iett-gtfs-verisi",
+        "license_url": null,
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kastamonu-kentkart-gtfs-3400.json",
+        "provider": "KentKart Kastamonu - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Kastamonu",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/kastamonu.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kirklareli-kentkart-gtfs-3399.json",
+        "provider": "KentKart Kirklareli - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Kirklareli",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/kirklareli.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-eshot-gtfs-1823.json",
+        "provider": "Eshot",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Izmir",
+        "url": "https://www.eshot.gov.tr/gtfs/bus-eshot-gtfs.zip",
+        "license_url": "https://acikveri.bizizmir.com/dataset/toplu-ulasim-gtfs-verileri/resource/822f89be-48bf-4b36-8ed8-1912511032c4",
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-izban-gtfs-1828.json",
+        "provider": "IZBAN",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Izmir",
+        "url": "https://www.izban.com.tr/gtfs/rail-izban-gtfs.zip",
+        "license_url": "https://acikveri.bizizmir.com/dataset/toplu-ulasim-gtfs-verileri/resource/0809d6dc-ab87-4690-9aee-28abf64f484c",
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-kentkart-gtfs-3398.json",
+        "provider": "KentKart Kocaeli - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Kocaeli",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/kocaeli.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-kocaeli-gtfs-1122.json",
+        "provider": "Kocaeli",
+        "type": "gtfs",
+        "official_claim": null,
+        "city": "Kocaeli",
+        "url": "http://kocaeli.bel.tr/webfiles/userfiles/files/birimler/bilgi-islem-dairesi-baskanligi/kocaeli-gtfs.zip",
+        "license_url": null,
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-kocaeli-gtfs-2710.json",
+        "provider": "Kocaeli Toplu Taşıma",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Kocaeli",
+        "url": "https://veri.kocaeli.bel.tr/dataset/toplu-ulasim-verisi",
+        "license_url": "https://opendefinition.org/licenses/cc-by/",
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-metro-izmir-gtfs-1824.json",
+        "provider": "METRO İZMİR",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Izmir",
+        "url": "https://www.izmirmetro.com.tr/gtfs/rail-metro-gtfs.zip",
+        "license_url": "https://acikveri.bizizmir.com/dataset/toplu-ulasim-gtfs-verileri/resource/c2995cbe-2e89-451b-86e7-2cc2a4f4a94a",
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-kocaeli-tram-izmir-gtfs-1829.json",
+        "provider": "TRAM İZMİR",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Izmir",
+        "url": "https://www.tramizmir.com/gtfs/rail-tramizmir-gtfs.zip",
+        "license_url": "https://acikveri.bizizmir.com/dataset/toplu-ulasim-gtfs-verileri/resource/87cf8842-8d4b-4b09-b34f-5c8a4c9478e1",
+        "suspicious_catalog_bounds": false
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-mardin-kentkart-gtfs-3397.json",
+        "provider": "KentKart Mardin - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Mardin",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/mardin.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-mugla-kentkart-gtfs-3396.json",
+        "provider": "KentKart Muğla - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Muğla",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/mugla.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-ordu-kentkart-gtfs-3395.json",
+        "provider": "KentKart Ordu - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Ordu",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/ordu.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-osmaniye-kentkart-gtfs-3394.json",
+        "provider": "KentKart Osmaniye - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Osmaniye",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/osmaniye.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-safranbolu-kentkart-gtfs-3393.json",
+        "provider": "KentKart Safranbolu - Third party generated from KentKart",
+        "type": "gtfs",
+        "official_claim": "False",
+        "city": "Safranbolu ",
+        "url": "https://github.com/Egezenn/kk-gtfs/raw/main/data/safranbolu.zip",
+        "license_url": "https://github.com/Egezenn/kk-gtfs/blob/main/DATA_LICENSE",
+        "suspicious_catalog_bounds": true
+      },
+      {
+        "path": "catalogs/sources/gtfs/schedule/tr-turkiye-flixbus-turkiye-gtfs-2922.json",
+        "provider": "Flixbus Türkiye",
+        "type": "gtfs",
+        "official_claim": "True",
+        "city": "Türkiye",
+        "url": "http://gtfs.gis.flix.tech/gtfs_generic_turkey.zip",
+        "license_url": null,
+        "suspicious_catalog_bounds": false
+      }
+    ],
+    "generated_repository": "Egezenn/kk-gtfs",
+    "generated_commit": "2136bb543e64600792a05c095316daa13958c25a",
+    "declared_license": "CC0 1.0; upstream rights still need review",
+    "examples": [
+      {
+        "city": "antalya",
+        "stop_count": 4618,
+        "route_count": 167,
+        "bounds": {
+          "south": 36.200684,
+          "north": 37.234866,
+          "west": 29.320068,
+          "east": 32.3175112
+        },
+        "service_start": "20261001",
+        "service_end": "20261130",
+        "sha256": "fe19ae334bb57ad807b42c545efb593730c74a38991c9ea49417ca700c10b048"
+      },
+      {
+        "city": "mugla",
+        "stop_count": 3467,
+        "route_count": 383,
+        "bounds": {
+          "south": 36.3354465,
+          "north": 37.5409921,
+          "west": 27.2365875,
+          "east": 29.7393514
+        },
+        "service_start": "20261001",
+        "service_end": "20261130",
+        "sha256": "4ac11a8b1244b4f3bcacfdfa5c44354225757f9dd94e76997a9f21a8a44938b2"
+      }
+    ],
+    "limits": [
+      "Catalogue discovery is not live feed validation",
+      "Third-party generated schedules are not live arrivals",
+      "Apache software license does not license every listed feed"
+    ]
+  },
+  "osm": {
+    "repository": "openstreetmap/id-tagging-schema",
+    "commit": "459e7ecd9b94219d1d214d6105133566a402d6d9",
+    "presets": [
+      {
+        "path": "amenity/toilets",
+        "tags": {
+          "amenity": "toilets"
+        },
+        "fields": [
+          "toilets/disposal",
+          "access_simple",
+          "gender",
+          "changing_table",
+          "wheelchair",
+          "building_area_yes"
+        ],
+        "more_fields": [
+          "charge_fee",
+          "fee",
+          "level",
+          "opening_hours",
+          "operator",
+          "payment_multi_fee",
+          "portable",
+          "toilets/handwashing",
+          "toilets/hands_drying",
+          "toilets/menstrual_products",
+          "toilets/position"
+        ]
+      },
+      {
+        "path": "amenity/drinking_water",
+        "tags": {
+          "amenity": "drinking_water"
+        },
+        "fields": [
+          "operator",
+          "access_simple",
+          "fee",
+          "payment_multi_fee",
+          "charge_fee",
+          "seasonal",
+          "wheelchair"
+        ],
+        "more_fields": [
+          "bottle",
+          "covered",
+          "dog_check",
+          "indoor",
+          "level",
+          "lit"
+        ]
+      },
+      {
+        "path": "amenity/charging_station",
+        "tags": {
+          "amenity": "charging_station"
+        },
+        "fields": [
+          "brand",
+          "operator",
+          "capacity",
+          "access_simple",
+          "fee",
+          "payment_multi_fee",
+          "charge_fee",
+          "ref",
+          "ref/EU/EVSE-EU"
+        ],
+        "more_fields": [
+          "covered",
+          "level",
+          "manufacturer",
+          "maxstay",
+          "network"
+        ]
+      },
+      {
+        "path": "leisure/playground",
+        "tags": {
+          "leisure": "playground"
+        },
+        "fields": [
+          "name",
+          "operator",
+          "surface",
+          "access_simple",
+          "min_age",
+          "max_age"
+        ],
+        "more_fields": [
+          "playground/theme",
+          "blind",
+          "dog",
+          "gnis/feature_id-US",
+          "indoor",
+          "opening_hours",
+          "wheelchair"
+        ]
+      },
+      {
+        "path": "tourism/picnic_site",
+        "tags": {
+          "tourism": "picnic_site"
+        },
+        "fields": [
+          "name",
+          "operator",
+          "address",
+          "access_simple",
+          "capacity"
+        ],
+        "more_fields": [
+          "{@templates/internet_access}",
+          "charge_fee",
+          "fee",
+          "gnis/feature_id-US",
+          "level",
+          "payment_multi_fee",
+          "phone",
+          "reservation",
+          "smoking",
+          "wheelchair"
+        ]
+      },
+      {
+        "path": "tourism/viewpoint",
+        "tags": {
+          "tourism": "viewpoint"
+        },
+        "fields": [
+          "direction"
+        ],
+        "more_fields": [
+          "level"
+        ]
+      },
+      {
+        "path": "tourism/camp_site",
+        "tags": {
+          "tourism": "camp_site"
+        },
+        "fields": [
+          "name",
+          "operator",
+          "camp_site",
+          "address",
+          "access_simple",
+          "capacity/persons",
+          "tents",
+          "capacity/tents",
+          "caravans",
+          "capacity/caravans",
+          "static_caravans",
+          "fee",
+          "payment_multi_fee",
+          "charge_fee"
+        ],
+        "more_fields": [
+          "{@templates/contact}",
+          "{@templates/internet_access}",
+          "backcountry",
+          "dog",
+          "drinking_water_available",
+          "gnis/feature_id-US",
+          "group_only",
+          "cabins",
+          "nudism",
+          "openfire",
+          "opening_hours",
+          "picnic_table",
+          "power_supply",
+          "ref/vatin",
+          "reservation",
+          "sanitary_dump_station",
+          "shower",
+          "stars",
+          "toilets",
+          "wheelchair"
+        ]
+      },
+      {
+        "path": "amenity/recycling_container",
+        "tags": {
+          "amenity": "recycling",
+          "recycling_type": "container"
+        },
+        "fields": [
+          "operator",
+          "recycling_accepts",
+          "opening_hours",
+          "collection_times"
+        ],
+        "more_fields": [
+          "colour",
+          "covered",
+          "indoor",
+          "level",
+          "manufacturer",
+          "material",
+          "ref"
+        ]
+      },
+      {
+        "path": "amenity/veterinary",
+        "tags": {
+          "amenity": "veterinary"
+        },
+        "fields": [
+          "name",
+          "operator",
+          "address",
+          "building_area_yes",
+          "opening_hours"
+        ],
+        "more_fields": [
+          "{@templates/poi}",
+          "charge_fee",
+          "fee"
+        ]
+      }
+    ],
+    "limits": [
+      "Schema verification only; no Turkey record counts",
+      "Map data ODbL conditions are separate from schema code license",
+      "Missing accessibility/opening-hours tags mean unknown"
+    ]
+  }
+}
