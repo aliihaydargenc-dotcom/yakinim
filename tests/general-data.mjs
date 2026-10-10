@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const events=require('../lib/general-events.cjs'),nearby=require('../lib/nearby.cjs'),tiles=require('../lib/traffic-tiles.cjs'),handler=require('../api/traffic.js');
+const url='https://etkinlik.io/etkinlik/123/test';
+const feed=`<rss><channel><item><title><![CDATA[Konser &amp; oyun]]></title><link>${url}</link><pubDate>Sat, 10 Oct 2026 13:00:00 +0300</pubDate></item><item><title>Unsafe</title><link>https://evil.test/etkinlik/1/test</link></item></channel></rss>`;
+const [item]=events.parseRss(feed);assert.equal(item.title,'Konser & oyun');assert.equal(item.startsAt,null);assert.equal(events.parseRss(feed).length,1);assert.throws(()=>events.parseRss('<html>error</html>'));
+const schema={"@type":'Event',url,startDate:'2026-10-10T14:00:00+03:00',location:{name:'Test salonu',address:{addressRegion:'Ankara'}}};
+const html=e=>'<script type="application/ld+json">'+JSON.stringify(e)+'</script>';
+const enriched=events.parseDetail(html(schema),item,{name:'Ankara'});assert.equal(enriched.startsAt,schema.startDate);assert.equal(enriched.venue,'Test salonu');assert.equal(enriched.endsAt,'2026-10-10T23:59:59+03:00');
+assert.equal(events.parseDetail(html(schema),item,{name:'Antalya'}).startsAt,null);
+assert.equal(events.parseDetail(html({...schema,url:'https://evil.test'}),item).startsAt,null);
+assert.equal(events.parseDetail(html({...schema,eventStatus:'https://schema.org/EventCancelled'}),item),null);
+assert.equal(events.parseDetail(html({...schema,startDate:'bad'}),item).startsAt,null);
+assert.equal(events.parseDetail(html({...schema,startDate:'2026-02-30T14:00:00+03:00'}),item).startsAt,null);
+let calls=0;const data=await events.query('7',{now:Date.parse('2026-10-10T09:00:00Z'),fetchImpl:async u=>{calls++;assert.ok(u.startsWith('https://etkinlik.io/'));return {ok:true,text:async()=>u.includes('/rss/')?feed:html(schema)}}});
+assert.equal(data.items.length,1);assert.equal(data.items[0].venue,'Test salonu');await events.query('7',{now:Date.parse('2026-10-10T09:05:00Z'),fetchImpl:async()=>{throw Error('cache was missed')}});assert.equal(calls,2);
+await assert.rejects(()=>events.query('999'),/invalid_city/);
+let firstAborted=false;const found=await nearby.queryNearby({lat:41,lng:29},1000,(endpoint,{signal})=>endpoint===nearby.ENDPOINTS[0]?new Promise((_,reject)=>signal.addEventListener('abort',()=>{firstAborted=true;reject(Object.assign(Error('abort'),{name:'AbortError'}));},{once:true})):Promise.resolve({ok:true,json:async()=>({elements:[{id:1}]})}));
+assert.equal(found.provider,new URL(nearby.ENDPOINTS[1]).hostname);assert.equal(firstAborted,true);
+const empty=await nearby.queryNearby({lat:41,lng:29},1000,async()=>({ok:true,json:async()=>({elements:[]})}));assert.equal(empty.elements.length,0);
+await assert.rejects(()=>nearby.queryNearby({lat:41,lng:29},1000,async()=>({ok:true,json:async()=>({elements:[],remark:'timed out'})})),/Incomplete response/);
+const original=process.env.TOMTOM_API_KEY;
+try{
+ process.env.TOMTOM_API_KEY='test-secret';
+ const params=new URLSearchParams({z:'12',x:'2044',y:'1360'});const png=Buffer.from([137,80,78,71,13,10,26,10,0]);
+ const image=await tiles.tile(params,{fetchImpl:async u=>{assert.equal(u.hostname,'api.tomtom.com');assert.equal(u.searchParams.get('key'),'test-secret');assert.match(u.pathname,/relative0\/12\/2044\/1360.png$/);return {ok:true,arrayBuffer:async()=>png};}});assert.deepEqual(image,png);
+ assert.ok(!JSON.stringify(tiles.metadata()).includes('test-secret'));
+ await assert.rejects(()=>tiles.tile(new URLSearchParams({z:'2',x:'4',y:'0'})),/invalid_tile/);
+ await assert.rejects(()=>tiles.tile(params,{fetchImpl:async()=>({ok:true,arrayBuffer:async()=>Buffer.from('<html>error</html>')})}),/traffic_invalid_tile/);
+ const res={headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.code=n;return this;},json(x){this.body=x;return this;}};
+ await handler({method:'GET',url:'/api/traffic?lat=36.88&lng=30.70'},res);assert.equal(res.code,200);assert.equal(res.body.scope,'road');assert.ok(!JSON.stringify(res.body).includes('test-secret'));
+ delete process.env.TOMTOM_API_KEY;await assert.rejects(()=>tiles.tile(params),/traffic_not_configured/);
+}finally{if(original===undefined)delete process.env.TOMTOM_API_KEY;else process.env.TOMTOM_API_KEY=original;}
+console.log('General data PASS: RSS metadata vs verified event dates, city/source validation, provider hedging/cancellation, traffic tile validation and server-only key.');

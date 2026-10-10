@@ -63,3 +63,5 @@
 .transit-map-open .model-app>.single-workspace{display:flex;flex-direction:column;flex:1;min-height:0}
 .transit-map-open .shell-body .model-app{height:calc(100dvh - 76px - env(safe-area-inset-bottom))}
 @media(min-width:1100px){.transit-map-open .shell-body .model-app{height:100dvh}}
+ .event-city-filter{display:flex;align-items:center;gap:12px;margin:12px 0;font-size:14px}
+ .event-city-filter select{max-width:100%;min-width:0;flex:1;padding:10px;border:1px solid var(--border,#d5e5dc);border-radius:10px;background:var(--surface,#fff);color:inherit;font:inherit}

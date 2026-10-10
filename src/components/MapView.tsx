@@ -14,7 +14,7 @@ const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
 type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -30,8 +30,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const markersRef = useRef(new Map<string, PlaceMarker>());
   const syncMarkersRef = useRef<() => void>(() => {});
   const sourceSignatureRef = useRef("");
+  const trafficStateRef=useRef(onTrafficState);trafficStateRef.current=onTrafficState;
   selectedRef.current = selectedPlace;
-
   // Native markers retain their DOM identity through zooming and GeoJSON tile
   // rebuilds. Updating one place never removes the other clickable markers.
   syncMarkersRef.current = () => {
@@ -210,6 +210,27 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       locationMarkerRef.current = null;
     };
   }, []);
+
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!map||!trafficTiles)return;
+    let disposed=false,failed=false;
+    const sourceId='traffic-flow',layerId='traffic-flow-layer';
+    const url=()=>trafficTiles+'&_v='+Math.floor(Date.now()/120000);
+    const setup=()=>{
+      if(disposed||map.getSource(sourceId))return;
+      trafficStateRef.current?.('loading');
+      map.addSource(sourceId,{type:'raster',tiles:[url()],tileSize:256,minzoom:0,maxzoom:18,attribution:'© TomTom'});
+      const before=map.getStyle().layers?.find(l=>l.type==='symbol')?.id;
+      map.addLayer({id:layerId,type:'raster',source:sourceId,paint:{'raster-opacity':0.85,'raster-fade-duration':0}},before);
+    };
+    const data=(e:maplibregl.MapSourceDataEvent)=>{if(!failed&&e.sourceId===sourceId&&e.isSourceLoaded){if(map.getLayer(layerId)&&map.getLayoutProperty(layerId,'visibility')!=='visible')map.setLayoutProperty(layerId,'visibility','visible');trafficStateRef.current?.('ready');}};
+    const error=(e:maplibregl.ErrorEvent)=>{const source=(e as unknown as {sourceId?:string}).sourceId;if(source===sourceId||e.error?.message?.includes('/api/traffic')){failed=true;if(map.getLayer(layerId))map.setLayoutProperty(layerId,'visibility','none');trafficStateRef.current?.('error');}};
+    map.on('style.load',setup);map.on('sourcedata',data);map.on('error',error);
+    if(map.isStyleLoaded())setup();
+    const timer=setInterval(()=>{const source=map.getSource(sourceId) as maplibregl.RasterTileSource|undefined;if(source){failed=false;trafficStateRef.current?.('loading');source.setTiles([url()]);}},120000);
+    return ()=>{disposed=true;clearInterval(timer);map.off('style.load',setup);map.off('sourcedata',data);map.off('error',error);if(mapRef.current===map&&map.getStyle()){if(map.getLayer(layerId))map.removeLayer(layerId);if(map.getSource(sourceId))map.removeSource(sourceId);}};
+  },[trafficTiles]);
 
   useEffect(() => {
     const map = mapRef.current;

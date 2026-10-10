@@ -20,6 +20,7 @@ function load(path){
   if(name.includes('services/api'))return {combinePlaceSources:()=>[],fetchArea:()=>{},fetchDuty:()=>{},fetchOvertureSupplement:()=>{},fetchRadio:()=>{}};
   if(name.includes('PlaceFacts'))return {PlaceFacts:()=>null};
   if(name.includes('discovery-categories'))return {default:require('../lib/discovery-categories.json')};
+  if(name.includes('event-cities'))return {default:require('../lib/event-cities.json')};
   if(name.includes('LocationStatus'))return {LocationStatus:()=>null};
   if(name.includes('CategoryRail'))return {CategoryRail:()=>null};
   if(name.includes('RadioPlayer'))return {RadioPlayer:()=>null};

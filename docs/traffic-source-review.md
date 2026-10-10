@@ -6,14 +6,14 @@
 
 Keşif, ulaşım, kesinti ve yol görünümü MapLibre/OpenFreeMap Liberty temel haritasını kullanır. Yandex iframe ve veri paylaşımı kaldırıldı. Temel harita renkleri, yol yoğunluğu anlamına gelmez. POI listesi mevcut Overpass, Overture ve belediye adaptörlerinden gelir; bir temel harita temasını değiştirmek bu kaynakların kapsamını artırmaz.
 
-`/api/traffic` İBB’nin anahtarsız, belgelenmiş trafik endeksi servisini kullanır. Bu bir İstanbul geneli endekstir; yol kesimi yoğunluğu veya Antalya kapsamı değildir. İstanbul sınırları için yaklaşık koordinat kontrolü yapılır (40.7–41.6 N, 27.9–30 E); belediye sınırı tespiti iddiası yoktur. İstanbul dışında kapsama yok yanıtı verilir ve upstream çağrılmaz.
+`TOMTOM_API_KEY` yapılandırılmadığında `/api/traffic` İBB’nin anahtarsız, belgelenmiş trafik endeksi servisini kullanır. Bu bir İstanbul geneli endekstir; yol kesimi yoğunluğu veya Antalya kapsamı değildir. İstanbul sınırları için yaklaşık koordinat kontrolü yapılır (40.7–41.6 N, 27.9–30 E); belediye sınırı tespiti iddiası yoktur. İstanbul dışında kapsama yok yanıtı verilir ve upstream çağrılmaz.
 
 Kaynak tarihleri saat dilimi verilmemişse Türkiye UTC+03 olarak yorumlanır. En yeni geçerli gözlem kullanılır; 15 dakikadan eski veri canlı olarak gösterilmez, gelecekteki/geçersiz değerler reddedilir. Sıfır bir geçerli ölçümdür. Sunucu yanıtı bir dakika önbelleklenir; istemci dakikada bir yeniler. İstek hata verdiğinde eski kart canlı veri olarak tutulmaz. Hiçbir kullanıcı koordinatı İBB isteğine eklenmez; sabit şehir endeksi URL’si kullanılır.
 
 ## Kaynaklar ve bulgular
 
 - Kullanıcının paylaştığı katalog: https://github.com/public-apis/public-apis
-- TomTom katalogda Maps, Directions, Places and Traffic APIs olarak yer alır ve `apiKey` gerektirir. Resmî akış dokümanı: https://developer.tomtom.com/traffic-api/documentation/traffic-flow/flow-segment-data . Anahtar, plan/kota ve Türkiye kapsamı ayrıca doğrulanmadan entegre edilmedi.
+- TomTom katalogda Maps, Directions, Places and Traffic APIs olarak yer alır ve `apiKey` gerektirir. Resmî akış dokümanı: https://developer.tomtom.com/traffic-api/documentation/traffic-flow/flow-segment-data . Türkiye kapsamı resmî tabloda doğrulandı; aynı haritada sunucu anahtarlı akış katmanı eklendi. Gerçek trafik isteği anahtar olmadan test edilemedi; plan/kota ve lisans kontrolü etkinleştirme öncesinde yapılmalı. Ayrıntılar: [public-data-integration.md](public-data-integration.md).
 - Katalogdaki AZ511, Road511 ve LiveTrafficCam Türkiye geneli kaynağı değildir. Bir liste kaydı, hizmetin bugün çalıştığını veya hedef şehir kapsamını garanti etmez.
 - OpenStreetMap, mevcut POI adaptörlerine uygundur; canlı trafik yoğunluğu sağlamaz. OSM düzenleme API’si ile salt okunur Overpass sorguları karıştırılmamalıdır.
 - Open-Meteo mevcut hava/deniz adaptörlerinde zaten kullanılıyor; sırf katalogda yer aldığı için ikinci bir bağlantı eklenmedi.
@@ -29,4 +29,4 @@ Kaynak endpoint’i HTTP 200 ve XML gözlem verisi döndürdü. Yeni sunucu adap
 
 Birim testleri kapsam, sıfır, UTC+03 dönüşümü, eski/gelecek/bozuk veri ve önbelleği kontrol eder. Tarayıcı testleri endeks kartı, kaynak hatası ve eski verinin canlı gibi görünmemesini kontrol eder. Gerçek iPhone testi bu çalışma kapsamında yapılmadı.
 
-Antalya/Türkiye geneli yol bazlı canlı yoğunluk için anahtarsız ve kullanılabilir bir kaynak doğrulanamadı. Harita üzerinde bu kapsama ait yoğunluk çizgileri eklenmedi. İleride sağlayıcı bağlanırsa aynı MapLibre haritasında lisanslı trafik katmanı gösterilmeli; kullanıcı başka bir harita uygulamasına geçirilmemeli.
+Antalya/Türkiye geneli yol bazlı canlı yoğunluk için anahtarsız ve kullanılabilir bir kaynak doğrulanamadı. Sunucu anahtarı sağlandığında aynı MapLibre haritasında TomTom akış katmanı açılır. Anahtar yoksa canlı yoğunluk renkleri gösterilmez.
