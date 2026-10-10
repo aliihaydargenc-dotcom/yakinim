@@ -49,7 +49,7 @@ export function ProductPrices({input}:{location:Coordinates|null;input:string}){
    <select aria-label="Karşılaştırma ili" value={choice.id} onChange={e=>chooseRegion(e.target.value)}>{REGIONS.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select>
   </label>
   <small className="price-coverage">{choice.name} merkezinin 5 km çevresindeki kaynak şubeleri · Telefon konumu kullanılmaz.</small>
-  <div className="pharmacy-filter" aria-label="Ürün görünümü"><button aria-pressed={view==='all'} onClick={()=>{setView('all');setVisibleCount(24);}}>Bulunan ürünler</button><button aria-pressed={view==='shared'} onClick={()=>{setView('shared');setVisibleCount(24);}}>Ortak ürünler</button></div>
+  <p className="data-note">Kaynakta bildirilen fiyatlardır; güncel raf fiyatı ve stok garantisi değildir. Şubeye gitmeden önce doğrula.</p><div className="pharmacy-filter" aria-label="Ürün görünümü"><button aria-pressed={view==='all'} onClick={()=>{setView('all');setVisibleCount(24);}}>Bulunan ürünler</button><button aria-pressed={view==='shared'} onClick={()=>{setView('shared');setVisibleCount(24);}}>Ortak ürünler</button></div>
   <div className="pharmacy-filter feature-categories" aria-label="Ürün kategorileri">{categories.filter(c=>['all','meat-fish','dairy',category].includes(c.id)).map(c=><button key={c.id} aria-label={c.label} aria-pressed={category===c.id} onClick={()=>chooseCategory(c.id)}>{c.id==='dairy'?'Süt ürünleri':c.label}</button>)}<button aria-label="Diğer kategoriler" onClick={()=>setCategoryOpen(true)}>•••</button></div>
   {search.length===1?<p>En az iki harf yaz.</p>:<>
    {prices.isPending&&<p role="status">Fiyatlar yükleniyor…</p>}

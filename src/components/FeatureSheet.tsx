@@ -1,7 +1,7 @@
 import {useEffect,useRef,type ReactNode} from 'react';
 import {X} from 'lucide-react';
 import {useBackLayer} from '../hooks/useBackLayer';
-export function FeatureSheet({open,title,onClose,children}:{open:boolean;title:string;onClose:()=>void;children:ReactNode}){
+export function FeatureSheet({open,title,onClose,children,closeLabel}:{open:boolean;title:string;onClose:()=>void;children:ReactNode;closeLabel?:string}){
  const ref=useRef<HTMLDialogElement>(null);
  useBackLayer(open,onClose);
  useEffect(()=>{
@@ -20,5 +20,5 @@ export function FeatureSheet({open,title,onClose,children}:{open:boolean;title:s
    if(previousFocus?.isConnected&&!dialog.contains(previousFocus))previousFocus.focus({preventScroll:true});
   };
  },[open]);
- return <dialog ref={ref} className="feature-dialog" aria-label={title} onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><section><div className="feature-sheet-header"><h2>{title}</h2><button autoFocus onClick={onClose} aria-label={`${title} kapat`}><X size={20}/></button></div>{children}</section></dialog>;
+ return <dialog ref={ref} className="feature-dialog" aria-label={title} onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><section><div className="feature-sheet-header"><h2>{title}</h2><button autoFocus onClick={onClose} aria-label={closeLabel||`${title} kapat`}><X size={20}/></button></div>{children}</section></dialog>;
 }

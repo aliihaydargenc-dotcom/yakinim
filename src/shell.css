@@ -1,4 +1,4 @@
-.shell-app{min-height:100dvh;--shell-nav:76px;--nav:76px;--accent:#365d7b;--accent-deep:#243e53;--accent-soft:#e8f0f6;--muted:#657987;--line:#e2eaef;--surface:#ffffff;--text:#243e53;--ui-radius:16px;--ui-motion:cubic-bezier(.2,.8,.2,1)}
+.shell-app{min-height:100dvh;--shell-nav:76px;--nav:76px;--accent:#127765;--accent-deep:#174b43;--accent-soft:#e8f4ee;--muted:#526960;--line:#e2eaef;--surface:#ffffff;--text:#243e53;--ui-radius:16px;--ui-motion:cubic-bezier(.2,.8,.2,1)}
 .shell-body{min-width:0;padding-bottom:calc(var(--shell-nav) + env(safe-area-inset-bottom))}
 .shell-sidebar{display:none}
 .shell-body .model-app{max-width:none;padding-bottom:0}
@@ -83,12 +83,12 @@
 .shell-nav--mobile button{border-radius:14px;font-size:11px;gap:5px}
 .shell-nav--mobile button[aria-current=page]{background:#e8eff4;color:#365d7b}
 @media(max-width:1099px){
- .shell-app[data-tab=explore] .shell-body{height:calc(100dvh - 76px - env(safe-area-inset-bottom));overflow:hidden;padding-bottom:0}
- .shell-app[data-tab=explore] .model-app.map-active{height:100%;min-height:0;display:flex;flex-direction:column}
- .shell-app[data-tab=explore] .map-workspace{height:auto;flex:1;min-height:0}
- .shell-app[data-tab=explore] .single-workspace{flex:1;min-height:0}
- .shell-app[data-tab=explore] .model-map{flex:1;min-height:0;overflow:hidden}
- .shell-app[data-tab=explore] .model-header{flex-shrink:0}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .shell-body{height:calc(100dvh - 76px - env(safe-area-inset-bottom));overflow:hidden;padding-bottom:0}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .model-app.map-active{height:100%;min-height:0;display:flex;flex-direction:column}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .map-workspace{height:auto;flex:1;min-height:0}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .single-workspace{flex:1;min-height:0}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .model-map{flex:1;min-height:0;overflow:hidden}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .model-header{flex-shrink:0}
  .shell-service-grid{gap:11px;margin-top:20px}
  .shell-service-grid>button{min-height:82px;padding:13px 15px;border-radius:16px;grid-template-columns:44px minmax(0,1fr) 18px;gap:12px}
  .shell-card-icon{width:44px;height:44px;border-radius:14px}
@@ -102,6 +102,66 @@
 .shell-app .shell-nav button[aria-current=page]{color:var(--accent-deep)}
 
 @media(max-width:1099px){
- .shell-app[data-tab=explore] .shell-app-host{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
- .shell-app[data-tab=explore] .shell-app-host>.model-app{flex:1;min-height:0}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .shell-app-host{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+ .shell-app[data-tab=explore]:has(.model-app[data-view=map]) .shell-app-host>.model-app{flex:1;min-height:0}
 }
+
+/* Mobile foundation: scrollable lists, explicit map navigation and readable controls. */
+.shell-app{background:#f5f8f5}
+.shell-app-host>.model-app:not(.map-active){min-height:0}
+.shell-app .shell-nav button[aria-current=page]{background:var(--accent-soft);color:var(--accent-deep)}
+.shell-app .search-box input{font-size:16px}
+.shell-app .category-navigation{display:flex;align-items:center;gap:8px;min-width:0;margin:10px 0 16px}
+.shell-app .category-rail{flex:1;min-width:0;gap:8px;border:0;padding:0;scroll-padding:12px}
+.shell-app .category-rail button{border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-height:44px;font-size:14px;background:white}
+.shell-app .category-rail button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep)}
+.shell-app .category-menu-button{width:auto;display:flex;align-items:center;justify-content:center;gap:5px;flex:none;min-height:44px;padding:8px;border:1px solid var(--line);border-radius:12px;font-size:12px;background:white}
+.shell-app .discovery-intro{padding:10px 0 14px}
+.shell-app .discovery-intro h1{font-size:24px;margin:4px 0}
+.shell-app .location-status{gap:8px;padding:10px 16px;font-size:13px;align-items:center}
+.shell-app .location-status>span{min-width:0;overflow-wrap:anywhere}
+.shell-app .location-actions{gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.shell-app .location-actions button{padding:4px 8px;min-height:44px;font-size:12px}
+.shell-app .location-gate{padding:20px;text-align:left}
+.shell-app .location-gate>strong{display:block;font-size:18px}
+.shell-app .location-gate>p{font-size:14px;line-height:1.6;margin:8px 0 14px}
+.shell-app .location-gate>button{width:100%;display:flex;justify-content:center;align-items:center;min-height:48px;margin-top:8px}
+.shell-app .results-toolbar{gap:12px;margin-top:12px}
+.shell-app .results-toolbar>button{border:1px solid var(--line);border-radius:12px;padding:6px 10px;flex:none}
+.shell-app .data-note{display:block;font-size:12px;line-height:1.6;margin:10px 0;overflow-wrap:anywhere}
+.shell-app .place-row{background:white;border:1px solid var(--line);border-radius:16px;padding:14px;gap:10px}
+.shell-app .places-list{display:grid;grid-template-columns:1fr;gap:10px}
+.shell-app .place-row strong{overflow-wrap:anywhere;line-height:1.5}
+.shell-app .pharmacy-filter{gap:14px;overflow-x:auto;flex-shrink:0}
+.shell-app .pharmacy-filter button{flex:none;min-height:44px}
+.shell-app .map-main-header>button:first-child{display:flex;gap:8px;width:auto;border:0;background:transparent;padding:0;font-size:14px}
+.shell-backbar{position:sticky;top:0;z-index:42;padding:6px 16px}
+.shell-backbar button{min-height:44px}
+.shell-app .pilot-panel>small{line-height:1.6}
+.shell-app .shell-content>p{font-size:14px;line-height:1.6}
+.feature-dialog .place-detail{position:static;max-height:none;padding:0;border:0;border-radius:0;box-shadow:none}
+.feature-dialog .place-detail>p,.feature-dialog .place-detail>small{display:block;line-height:1.6;margin:12px 0;overflow-wrap:anywhere}
+.feature-dialog .detail-buttons{display:flex;flex-wrap:wrap;gap:10px}
+.feature-dialog .detail-buttons a,.feature-dialog .detail-buttons button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;border-radius:12px;padding:10px 14px}
+.feature-dialog .detail-buttons button{border:1px solid var(--line);color:var(--accent)}
+@media(max-width:1099px){
+ .shell-body .model-app.map-active{min-height:0;display:flex;flex-direction:column}
+ .shell-body .model-app.map-active .map-workspace{display:flex;flex-direction:column;height:auto;min-height:0;flex:1}
+ .shell-body .model-app.map-active .model-map{flex:1;min-height:0}
+ .shell-app .list-workspace{padding:8px 16px 24px}
+ .shell-app .shell-body .with-player{padding-bottom:96px}
+ .shell-app .shell-body:has(.with-player[data-view=map]){height:calc(100dvh - 76px - 82px - env(safe-area-inset-bottom))}
+ .shell-body .transit-map-panel .pilot-map{height:350px;min-height:280px;flex:none}
+ .transit-map-open .shell-body .model-app:not(.map-active){height:auto}
+}
+@media(min-width:1100px){.shell-app .places-list{grid-template-columns:repeat(2,minmax(0,1fr))}.shell-app .split-list-workspace .places-list{grid-template-columns:1fr}}
+
+.shell-body:has(.shell-backbar) .model-header{top:56px}
+
+.map-data-scope{position:absolute;z-index:30;top:60px;left:14px;right:14px;width:max-content;max-width:calc(100% - 28px);padding:8px 10px;background:white;border:1px solid var(--line);border-radius:10px;font-size:12px}
+
+.shell-app .search-box:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.shell-app .maplibregl-ctrl-group button{width:44px;height:44px}
+
+.shell-body:has(.shell-backbar) .section-search{top:calc(130px + env(safe-area-inset-top))}
+.shell-body .transit-map-panel>small{display:block}

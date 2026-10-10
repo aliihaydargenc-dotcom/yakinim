@@ -18,6 +18,7 @@ function load(path){
   if(name.includes('useBackLayer'))return {useBackLayer:()=>{}};
   if(name.includes('useRetainedPlaces'))return {useRetainedPlaces:()=>[{id:'obsolete',category:'duty',name:'Eski nöbetçi',lat:36.884,lng:30.704,address:'Eski adres'}]};
   if(name.includes('services/api'))return {combinePlaceSources:()=>[],fetchArea:()=>{},fetchDuty:()=>{},fetchOvertureSupplement:()=>{},fetchRadio:()=>{}};
+  if(name.includes('FeatureSheet'))return {FeatureSheet:({open,children})=>open?children:null};
   if(name.includes('PlaceFacts'))return {PlaceFacts:()=>null};
   if(name.includes('discovery-categories'))return {default:require('../lib/discovery-categories.json')};
   if(name.includes('event-cities'))return {default:require('../lib/event-cities.json')};
@@ -56,3 +57,12 @@ const {TransitView}=load('src/components/PilotViews.tsx');
 const stops=renderToStaticMarkup(React.createElement(TransitView,{location:store.location,search:'',mode:'stops',setMode:()=>{}}));
 assert.match(stops,/Duraklar yükleniyor/);assert.doesNotMatch(stops,/stop-row/);
 console.log('Audit UI PASS: manual picker on service tabs, empty duty replaces obsolete cache, partial outages and loading stops.');
+const PlaceFacts=load('src/components/PlaceFacts.tsx').PlaceFacts;
+const parking={id:'parking:test',name:'Otopark',category:'parking',lat:41,lng:29,address:'İstanbul'};
+for(const fetchedAt of ['not-a-date',new Date(Date.now()+60000).toISOString(),new Date(Date.now()-600000).toISOString()]){
+ const html=renderToStaticMarkup(React.createElement(PlaceFacts,{place:{...parking,availability:{free:0,total:100,open:true,fetchedAt}}}));
+ assert.match(html,/Eski ölçüm/);assert.doesNotMatch(html,/Invalid Date/);
+}
+const freshParking=renderToStaticMarkup(React.createElement(PlaceFacts,{place:{...parking,availability:{free:0,total:100,open:true,fetchedAt:new Date().toISOString()}}}));
+assert.match(freshParking,/0 boş/);assert.doesNotMatch(freshParking,/Eski ölçüm/);
+console.log('Data clarity PASS: zero availability, expired/invalid/future timestamps and honest stale labeling.');

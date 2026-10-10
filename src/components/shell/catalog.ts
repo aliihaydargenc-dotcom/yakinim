@@ -20,9 +20,9 @@ export const tabs:NavOption[] = [
   {id:'more',label:'Diğer',Icon:Ellipsis},
 ];
 export const services:{id:Service;label:string;description:string;Icon:LucideIcon}[] = [
-  {id:'prices',label:'Market fiyatları',description:'Ürünleri karşılaştır',Icon:TrendingDown},
-  {id:'transit',label:'Toplu ulaşım',description:'Durak ve araç bilgileri',Icon:BusFront},
-  {id:'traffic',label:'Trafik',description:'Haritadaki yoğunluk',Icon:Navigation},
+  {id:'prices',label:'Market fiyatları',description:'Kaynakta bildirilen ürün fiyatları',Icon:TrendingDown},
+  {id:'transit',label:'Toplu ulaşım',description:'Antalya durakları ve geliş tahminleri',Icon:BusFront},
+  {id:'traffic',label:'Trafik',description:'Kaynak kapsamı ve yol haritası',Icon:Navigation},
   {id:'events',label:'Etkinlikler',description:'Duyurular ve program',Icon:CalendarDays},
 ];
 export const categories:{id:CategoryId;label:string;Icon:LucideIcon}[] = [
