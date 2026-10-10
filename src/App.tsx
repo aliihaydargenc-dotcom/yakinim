@@ -12,6 +12,7 @@ import {useBackLayer} from "./hooks/useBackLayer";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
 const WeatherSummary = lazy(()=>import("./components/WeatherSummary"));
+const MapWeatherChip = lazy(()=>import("./components/MapWeatherChip").then(m=>({default:m.MapWeatherChip})));
 const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
 const MapView = lazy(() => import("./components/MapView").then(m => ({ default: m.MapView })));
 const NewsView = lazy(() => import("./components/NewsView").then(m => ({ default: m.NewsView })));
@@ -229,6 +230,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
         {((!location&&!pilot&&!mapOpen) || (picking&&!mapOpen) || (locationError&&!mapOpen)) && <section className="state-card"><strong>{locationError?(location?'Konum güncellenemedi':'Konum alınamadı'):picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}{location?" · Önceki konum kullanılmaya devam ediyor.":""}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
         {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map">
         {!location&&!picking&&<button type="button" className="map-origin-prompt" onClick={requestLocation}><LocateFixed size={16}/>Konumumu kullan</button>}
+        {location&&!picking&&<Suspense fallback={null}><MapWeatherChip location={location}/></Suspense>}
         {locationError&&<div className="map-location-error" role="alert">{locationError}</div>}
         <Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} location={category==="transit"?(location&&inAntalya(location)?location:null):location} initialCenter={area?.center||ANTALYA_CENTER} focusTarget={category==="transit"?{key:"transit",position:location&&inAntalya(location)?location:ANTALYA_CENTER}:undefined} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} enableList={!picking} selectionScope={category} onSavePlace={p=>toggleSaved(p.id,p,!DEMO)} savedPlaceIds={savedIds} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>{setMapOpen(true);onMapChange?.(true);}}><MapPin size={18}/>{embedded?'Haritaya bak':'Harita'}</button></div>
