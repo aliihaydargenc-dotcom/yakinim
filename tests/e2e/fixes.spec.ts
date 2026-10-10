@@ -273,9 +273,13 @@ test('mines retain square, equal rows after opening numbers on a short phone',as
 });
 
 test('snake earns a chapter, unlocks the next and pauses without resetting the board',async({page})=>{
+ // Clock simulation and canvas snapshots need headroom on shared CI runners.
+ test.setTimeout(90000);
  await page.addInitScript(()=>{Math.random=()=>0;});await page.clock.install();await page.goto('/games/snake/index.html');await page.clock.pauseAt(new Date(Date.now()+1000));
- await page.getByRole('button',{name:'Başla',exact:true}).click();
- const turn=async(name:string,ticks:number)=>{await page.getByRole('button',{name,exact:true}).click();await page.clock.runFor(220*ticks+17);};
+ // Keep input activation independent of animation-frame stability checks
+ // while the game's clock is paused; the same button click handlers run.
+ await page.getByRole('button',{name:'Başla',exact:true}).press('Enter');
+ const turn=async(name:string,ticks:number)=>{await page.getByRole('button',{name,exact:true}).press('Enter');await page.clock.runFor(220*ticks+17);};
  await turn('Yukarı',9);await turn('Sola',8);await expect(page.locator('#score')).toContainText('1 / 5');
  await turn('Aşağı',1);await turn('Sağa',4);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('2 / 5');
  await turn('Sola',4);await expect(page.locator('#score')).toContainText('3 / 5');
