@@ -19,12 +19,15 @@ const LABEL_LAYER = "nearby-place-short-labels";
 const SELECTED_LAYER = "nearby-place-selected-halo";
 const HIT_LAYER = "nearby-place-touch-targets";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,dataError,selectionScope,initialCenter,focusTarget,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;dataError?:string;selectionScope?:string;initialCenter?:Coordinates;focusTarget?:{key:string;position:Coordinates};onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,dataError,selectionScope,initialCenter,focusTarget,onSavePlace,savedPlaceIds=[],recenterKey=0,minimalPOI=false }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;dataError?:string;selectionScope?:string;initialCenter?:Coordinates;focusTarget?:{key:string;position:Coordinates};onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[];recenterKey?:number;minimalPOI?:boolean }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
-  const previousLocation = useRef(location);
+  const previousLocation = useRef<Coordinates|null>(null);
+  const following=useRef(true);
+  const previousRecenter=useRef(recenterKey);
+  const openPlaceRef=useRef(onPlaceOpen);openPlaceRef.current=onPlaceOpen;
   const lastAutoFit=useRef('');
   const lastFocusKey=useRef<string|null>(null);
   const placesRef = useRef<Place[]>(places);
@@ -84,6 +87,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       }
     };
     const setup = () => {
+      if(minimalPOI)for(const layer of map.getStyle().layers||[])if(layer.type==='symbol'&&'source-layer' in layer&&layer['source-layer']==='poi')map.setLayoutProperty(layer.id,'visibility','none');
       registerMapIcons(map);
       ensurePlaceLayers(map);
       syncSource();
@@ -118,6 +122,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         setSelectedPlace(null);setSheetLevel("peek");return;
       }
       const place=placesRef.current.find(p=>p.id===String(props.id));
+      if(place&&place.category==='transit'&&openPlaceRef.current){openPlaceRef.current(place);return;}
       if(place){setSelectedPlace(place);setSheetLevel("half");const pos=map.project([place.lng,place.lat]);if(pos.y>map.getContainer().clientHeight-190)map.easeTo({center:[place.lng,place.lat],offset:[0,-110],duration:240});}
     };
     const handlePointer=(event:maplibregl.MapMouseEvent)=>{
@@ -126,6 +131,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const handleMoveEnd = () => {
       syncSource();
       visibleRef.current();
+      containerRef.current?.setAttribute('data-map-zoom',map.getZoom().toFixed(2));
       if (pickingRef.current) return;
       const center = map.getCenter();
       if(memoryKey)cameras.set(memoryKey,{center:[center.lng,center.lat],zoom:map.getZoom(),selected:selectedRef.current});
@@ -133,6 +139,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       onViewportChangeRef.current({ lat: center.lat, lng: center.lng }, { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
     };
 
+    map.on("dragstart",()=>{following.current=false;});
     map.on("load", setup);
     map.on("click", handleClick);
     map.on("mousemove", handlePointer);
@@ -153,6 +160,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       map.remove();
       mapRef.current = null;
       locationMarkerRef.current = null;
+      previousLocation.current = null;
     };
   }, []);
 
@@ -179,33 +187,32 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !location) return;
+    if (!map) return;
+    if (!location) {locationMarkerRef.current?.remove();locationMarkerRef.current=null;previousLocation.current=null;return;}
 
     if (!locationMarkerRef.current) {
       const el = document.createElement("div");
       el.className = "user-marker";
       el.setAttribute("role", "img");
       el.setAttribute("aria-label", "Konumun");
-      const logo = document.createElement("img");
-      logo.src = "/icons/icon.svg";
-      logo.alt = "";
-      logo.width = 32;
-      logo.height = 32;
-      el.append(logo);
       locationMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(map);
     } else {
       locationMarkerRef.current.setLngLat([location.lng, location.lat]);
     }
 
     const previous = previousLocation.current;
-    const locationChanged = !!previous && (previous.lat !== location.lat || previous.lng !== location.lng);
-    previousLocation.current = location;
-    const center = map.getCenter();
-    const alreadyCentered = Math.abs(center.lat - location.lat) < 0.0008 && Math.abs(center.lng - location.lng) < 0.0008;
-    if ((locationChanged || !(memoryKey&&cameras.has(memoryKey))) && (!alreadyCentered || map.getZoom() < 13.8)) {
-      map.easeTo({ center: [location.lng, location.lat], zoom: Math.max(map.getZoom(), 14.6), duration: 280 });
+    const recentered=previousRecenter.current!==recenterKey;
+    previousRecenter.current=recenterKey;
+    if(!previous)following.current=!(memoryKey&&cameras.has(memoryKey));
+    if(recentered)following.current=true;
+    const moved=!previous||previous.lat!==location.lat||previous.lng!==location.lng;
+    previousLocation.current=location;
+    if(following.current&&(moved||recentered)&&!picking){
+      const move=()=>{if(following.current)map.flyTo({center:[location.lng,location.lat],zoom:Math.max(map.getZoom(),15.1),duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:850,curve:1.35});};
+      if(map.isStyleLoaded())move();else map.once('load',move);
+      return ()=>{map.off('load',move);};
     }
-  }, [location?.lat, location?.lng]);
+  }, [location?.lat, location?.lng,recenterKey,picking]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -283,7 +290,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       <div className="map-sheet-content" id="map-sheet-content">
         {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>{setSelectedPlace(null);setSheetLevel('half');}} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/>:
           <div className="map-sheet-place-list" aria-label="Görünen yerler">
-            {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':dataError||'Bu harita alanı için kayıt bulunamadı. Veriler tüm yerleri kapsamayabilir.'}</p>:
+            {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':dataError||'Kayıt yok'}</p>:
               visiblePlaces.map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
                 setSelectedPlace(place);setSheetLevel('half');
                 const map=mapRef.current;if(map){const pos=map.project([place.lng,place.lat]);if(pos.y>map.getContainer().clientHeight-200)map.easeTo({center:[place.lng,place.lat],offset:[0,-110],duration:220});}
@@ -300,7 +307,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
   if(map.getSource(PLACES_SOURCE))return;
   map.addSource(PLACES_SOURCE,{type:'geojson',data:emptyFeatureCollection(),cluster:true,clusterRadius:56,clusterMaxZoom:14});
   map.addLayer({id:CLUSTER_LAYER,type:'circle',source:PLACES_SOURCE,filter:['has','point_count'],paint:{
-    'circle-color':['step',['get','point_count'],'#42687c',12,'#355f78',50,'#2d526d'],
+    'circle-color':['step',['get','point_count'],'#127765',12,'#174b43',50,'#174b43'],
     'circle-radius':['step',['get','point_count'],16,12,20,50,25],
     'circle-stroke-color':'white','circle-stroke-width':2.5,'circle-opacity':0.97
   }} as any);
@@ -308,12 +315,13 @@ function ensurePlaceLayers(map: MapLibreMap) {
     'text-field':['get','point_count_abbreviated'],'text-size':12,'text-allow-overlap':true,'text-ignore-placement':true
   },paint:{'text-color':'#ffffff'}} as any);
   map.addLayer({id:OVERVIEW_POINT_LAYER,type:'circle',source:PLACES_SOURCE,maxzoom:11.6,filter:['!',['has','point_count']],
-    paint:{'circle-radius':4,'circle-color':'#42687c','circle-stroke-width':1.5,'circle-stroke-color':'#ffffff'}} as any);
+    paint:{'circle-radius':4,'circle-color':'#127765','circle-stroke-width':1.5,'circle-stroke-color':'#ffffff'}} as any);
   map.addLayer({id:SELECTED_LAYER,type:'circle',source:PLACES_SOURCE,minzoom:11.5,
-    filter:['==',['get','id'],''],paint:{'circle-radius':18,'circle-color':'#ffffff','circle-opacity':0.9,'circle-stroke-width':3,'circle-stroke-color':'#42687c'}} as any);
-  map.addLayer({id:ICON_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:11.5,filter:['!',['has','point_count']],
+    filter:['==',['get','id'],''],paint:{'circle-radius':18,'circle-color':'#ffffff','circle-opacity':0.9,'circle-stroke-width':3,'circle-stroke-color':'#127765'}} as any);
+  map.addLayer({id:ICON_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:11.5,filter:['all',['!',['has','point_count']],['!=',['get','category'],'transit']],
     layout:{'icon-image':['get','icon'],'icon-size':['interpolate',['linear'],['zoom'],11.5,0.8,15.5,1.1],
       'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-padding':1}} as any);
+  map.addLayer({id:'nearby-stop-points',type:'circle',source:PLACES_SOURCE,minzoom:11.5,filter:['all',['!',['has','point_count']],['==',['get','category'],'transit']],paint:{'circle-radius':4,'circle-color':'#127765','circle-stroke-color':'#fff','circle-stroke-width':1.5}} as any);
   map.addLayer({id:LABEL_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:15.5,filter:['!',['has','point_count']],
     layout:{'text-field':['get','name'],'text-size':11.5,'text-anchor':'top','text-offset':[0,1.2],
       'text-max-width':11,'text-allow-overlap':false,'text-optional':true},
@@ -348,10 +356,10 @@ function MapPlaceSheet({ place, onClose, onOpen, onSave, saved=false }: { place:
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   return <aside className="map-place-sheet" aria-label={`${place.name} detayları`}>
     <div className="map-place-heading">
-      <div><p>{categoryLabel(place.category)}{place.distanceM!==undefined&&Number.isFinite(place.distanceM) ? ` · ${distanceLabel(place.distanceM)} · kuş uçuşu` : ""}</p><strong>{place.name}</strong></div>
+      <div><p>{categoryLabel(place.category)}{place.distanceM!==undefined&&Number.isFinite(place.distanceM) ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    {place.category==='transit'?<TransitArrivals stop={place}/>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
+    {place.category==='transit'?<TransitArrivals stop={place}/>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
     <div className="map-place-actions">{place.category!=='transit'&&(onOpen?<button type="button" className="solid-button" onClick={onOpen}>Ayrıntılar</button>:place.phone?<a href={`tel:${place.phone}`}><Phone size={17}/> Ara</a>:null)}{place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/> Yol tarifi</a>}{onSave&&<button className="map-save-place" aria-label="Yeri kaydet" aria-pressed={saved} onClick={onSave}><Heart size={19} fill={saved?'currentColor':'none'}/></button>}</div>
   </aside>;
 }

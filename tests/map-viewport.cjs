@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
+const moduleBox={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/services/map-viewport.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports:moduleBox.exports,module:moduleBox});
+const {coveredBy,requestBounds}=moduleBox.exports;
+const viewport={south:36.88,west:30.69,north:36.90,east:30.71};
+const coverage=requestBounds(viewport);
+assert.equal(coveredBy(viewport,coverage),true);
+assert.equal(coveredBy({...viewport,north:viewport.north+.0001},coverage),true);
+assert.equal(coveredBy({...viewport,east:coverage.east+.001},coverage),false);
+assert.equal(coveredBy({south:41,west:29,north:41.02,east:29.02},coverage),false);
+for(const value of Object.values(coverage))assert.equal(Number(value.toFixed(3)),value);
+const mapSource=fs.readFileSync('src/components/MapView.tsx','utf8');
+const layerFunction=mapSource.slice(mapSource.indexOf('function ensurePlaceLayers('),mapSource.indexOf('function updatePlaceSource('));
+const layers=[];
+vm.runInNewContext(ts.transpileModule(layerFunction,{compilerOptions:{target:99}}).outputText+"\nensurePlaceLayers(map)",{map:{getSource:()=>null,addSource:()=>{},addLayer:l=>layers.push(l)},emptyFeatureCollection:()=>({}),PLACES_SOURCE:'places',CLUSTER_LAYER:'clusters',CLUSTER_COUNT_LAYER:'counts',OVERVIEW_POINT_LAYER:'overview',SELECTED_LAYER:'selected',ICON_LAYER:'icons',LABEL_LAYER:'labels',HIT_LAYER:'hits'});
+const icons=layers.find(l=>l.id==='icons');
+assert.ok(icons.filter.some(f=>JSON.stringify(f)==='["!=",["get","category"],"transit"]'));
+const stops=layers.find(l=>l.id==='nearby-stop-points');assert.equal(stops.type,'circle');assert.ok(stops.filter.some(f=>JSON.stringify(f)==='["==",["get","category"],"transit"]'));
+console.log('Map stability PASS: padded coverage reuse, resize jitter, pan invalidation and no custom bus symbol over base-map stops.');
+
+const {sparsePlaces}=moduleBox.exports;
+const places=Array.from({length:30},(_,i)=>({id:String(i),category:i<15?'market':'cafe',lat:36.88+i*.001,lng:30.7}));
+const sparse=sparsePlaces([...places,{id:'stop',category:'transit',lat:36.9,lng:30.7}],{lat:36.909,lng:30.7});
+assert.equal(sparse.length,4);assert.equal(sparse.filter(p=>p.category==='market').length,2);assert.equal(sparse.filter(p=>p.category==='transit').length,0);assert.equal(sparse[0].id,'29');
+const many=sparsePlaces(Array.from({length:40},(_,i)=>({id:String(i),category:'type'+i,lat:36.88,lng:30.7})),{lat:36.88,lng:30.7});assert.equal(many.length,12);
+console.log('Sparse home PASS: nearest visible records, two per category, total limit and transit exclusion.');

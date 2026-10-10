@@ -10,30 +10,9 @@ test.beforeEach(async({page})=>{
  await page.addInitScript(c=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...c,mode:'manual',savedAt:Date.now()})),loc);
 });
 const nav=(page:Page)=>page.locator('.shell-nav--mobile');
-test('mobile opens a readable list and offers an explicit map sheet',async({page})=>{
- await page.goto('/');
- await expect(nav(page).getByRole('button')).toHaveCount(4);
- await expect(page.locator('.place-row')).toContainText('Mobil Market');
- await page.getByRole('button',{name:'Harita',exact:true}).click();
- await expect(page.locator('.map-stage')).toBeVisible();
- await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-level','peek');
- await expect(page.getByRole('textbox',{name:'Yer ara'})).toBeVisible();
- await page.locator('.map-sheet-toggle').click();
- await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-level','half');
- const market=page.locator('.map-place-chip').filter({hasText:'Mobil Market'});
- await expect(market).toBeVisible();await market.click();
- await expect(page.locator('.map-place-sheet')).toContainText('Mobil Market');
- await expect(page.getByRole('button',{name:'Yeri kaydet'})).toBeVisible();
- await page.getByRole('button',{name:'Yeri kaydet'}).click();
- await nav(page).getByRole('button',{name:'Kaydedilen'}).click();
- await expect(page.locator('.shell-saved-place')).toContainText('Mobil Market');
- await nav(page).getByRole('button',{name:'Keşfet'}).click();
- await expect(page.locator('.place-row')).toContainText('Mobil Market');
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+test('home place selection and save keep the map uncluttered on return',async({page})=>{
+ await page.goto('/');await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count','1');await page.waitForTimeout(1200);const dot=await page.locator('.user-marker').boundingBox();const zoom=Number(await page.locator('.map-canvas').getAttribute('data-map-zoom')),scale=512*2**zoom;const mercator=(lat:number)=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));await page.mouse.click(dot!.x+dot!.width/2+(30.6369-loc.lng)*scale/360,dot!.y+dot!.height/2+(mercator(loc.lat)-mercator(36.862))*scale/(2*Math.PI));await expect(page.locator('.map-place-sheet')).toContainText('Mobil Market');await page.getByRole('button',{name:'Yeri kaydet'}).click();await nav(page).getByRole('button',{name:'Kaydedilen'}).click();await expect(page.locator('.shell-saved-place')).toContainText('Mobil Market');await nav(page).getByRole('button',{name:'Keşfet'}).click();await expect(page.locator('.map-stage')).toBeVisible();await expect(page.locator('.map-place-sheet,.map-unified-sheet')).toHaveCount(0);
 });
-test('transit stays in services and exposes list, map and arrivals',async({page})=>{
- await page.goto('/');await nav(page).getByRole('button',{name:'Hizmetler'}).click();await page.getByRole('button',{name:/Toplu ulaşım/}).click();
- await expect(nav(page).getByRole('button',{name:'Hizmetler'})).toHaveAttribute('aria-current','page');await expect(page.locator('.stop-row')).toContainText('KONYAALTI DURAK');
- await page.getByRole('button',{name:'Harita',exact:true}).click();await expect(page.locator('.map-stage')).toBeVisible();await page.locator('.map-sheet-toggle').click();await page.locator('.map-place-chip').filter({hasText:'KONYAALTI DURAK'}).click();
- await expect(page.locator('.map-place-sheet')).toContainText('KONYAALTI DURAK');await expect(page.locator('.map-bus-item')).toContainText('4 dk');await page.locator('.map-sheet-close').click();await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-selected','false');
+test('transit map selection uses the same compact arrival card as the stop list',async({page})=>{
+ await page.goto('/');await nav(page).getByRole('button',{name:'Hizmetler'}).click();await page.getByRole('button',{name:'Toplu ulaşım',exact:true}).click();await page.getByRole('button',{name:'Harita',exact:true}).click();await page.waitForTimeout(1200);const dot=await page.locator('.user-marker').boundingBox();await page.mouse.click(dot!.x+dot!.width/2,dot!.y+dot!.height/2);const stop=page.getByRole('dialog',{name:'KONYAALTI DURAK',exact:true});await expect(stop).toBeVisible();await expect(stop.locator('.map-bus-item')).toContainText('4 dk');await page.goBack();await expect(stop).not.toBeVisible();await expect(page.locator('.map-stage')).toBeVisible();await page.getByRole('button',{name:'Liste',exact:true}).click();await expect(page.locator('.stop-row')).toBeVisible();
 });

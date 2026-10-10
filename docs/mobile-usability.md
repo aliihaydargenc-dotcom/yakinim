@@ -1,57 +1,25 @@
-# Mobil kullanım düzeltmesi — 10 Ekim 2026
+# Ekran sözleşmesi — 10 Ekim 2026
 
-## Bulgular ve kararlar
+| Ekran / düğme | Davranış |
+| --- | --- |
+| Keşfet | Tam alan harita; arama, kategoriler, hava durumu ve sonuç paneli yok |
+| Sol üst konum / sağ üst konum ikonu | Tek konum penceresi |
+| Konumumu kullan | Konumu alır; küçük nokta ve animasyonlu yakınlaşma; GPS değişimlerini takip eder |
+| Haritadan seç | Haritada nokta seçimi; Keşfet haritasına veya ilgili hizmete dönüş |
+| Konumu sil | Konumu, işaretini ve takibi kaldırır |
+| Haritada sürükleme | Kullanıcının kamera tercihini korur; tekrar cihaz konumu seçilince merkezlenir |
+| Harita işaretleri | Keşfet'te tür başına en fazla 2, toplam en fazla 12 kayıt |
+| Hizmetler | Yer araması, kategori seçenekleri, Market, Toplu ulaşım ve Etkinlikler |
+| Market | Tek Ürünler görünümü; il, kategori ve ürün arama; kısa fiyat satırları |
+| Fiyat satırı | Şube, birim fiyat, kaynak zamanı ve yol tarifi |
+| Toplu ulaşım | Antalya durakları; liste/harita; aynı kısa durak kartı ve geliş tahminleri |
+| Hat | Gidiş/dönüş ve durak sırası; geri ile durağa dönüş |
+| Etkinlikler | Şehir, arama, tarih, mekân, kaynak/bilet bağlantısı |
+| Kaydedilen | Kayıt listesi, yol tarifi ve kaldırma |
+| Diğer | Mevcut haber, radyo ve oyunlar |
 
-Canlı `6d0c501` sürümünde mobil Keşfet doğrudan harita ile açılıyordu. Liste 85 px kapalı paneldeydi. Konum seçilmeden Antalya merkezindeki kayıtlar “çevredeki yerler” olarak gösterilebiliyordu. Haritada görünür kayıt yoksa liste tüm yüklenmiş kayıtlara dönüyordu; sayaç 60 ile, gösterilen satırlar 36 ile sınırlanıyordu. Alt sayfalar tarayıcı geri tuşunu tutarlı karşılamıyordu. Yer ayrıntıları alt menüyle aynı belge katmanındaydı.
+Ürün araması ve tek markette bulunan ürünler korunur. Tarih, konum, stok veya geliş bilgisi üretilmez. Kayıtların açıklama paragrafları kaldırılmıştır; kısa yükleme/hata durumları ve gerekli harita atıfları kalır. Konum seçilmeden yakın çevre sorgusu yapılmaz. Antalya dışındaki cihaz noktası Antalya merkezinde kullanıcı noktası gibi çizilmez. İlçe çözümlemesinin v2 önbelleği korunur.
 
-Düzeltme yeni kaynak veya yeni işlev eklemez. Açılış okunabilir bir listedir. Konumsuz açılışta açık seçim kartı bulunur; rastgele bir şehir yakındaymış gibi sorgulanmaz. Harita açık bir düğmeyle açılır ve listeye dönülür. Harita paneli yalnızca görünür alandaki kayıtları sayar ve aynı kayıtları gösterir. Yer ayrıntısı yerel `dialog` katmanında açılır; odağı tutar, arka planı kilitler ve geri tuşuyla kapanır.
+Durak haritası için istek sınırları üç ondalığa ve tampon alana alınır. Aynı alan içindeki küçük hareketler ve yeniden boyutlandırmalar yeni istek üretmez. Sorgular iptal sinyalini kullanır. Varış yenilemesi kamerayı oynatmaz. Özel katman duraklara ikinci otobüs sembolü çizmez.
 
-## Düğme ve ekran sözleşmesi
-
-| Düğme | Açılacak ekran / davranış | Veri kuralı |
-| --- | --- | --- |
-| Keşfet | Konum seçimi veya yakın yerlerin kaydırılabilir listesi | Konum seçilmeden yakındaki yer sorgusu çalışmaz |
-| Konum / Konumumu kullan | Cihaz konumunu alır, başarısızlık açıklanır | Eski konum kullanılıyorsa açıkça belirtilir |
-| Haritadan seç | Dokunarak nokta seçimi; sonra listeye dönüş | Seçim cihaz konumu olarak adlandırılmaz |
-| Kategori | Yalnızca seçilen yer türünü gösterir | Kayıt yokluğu, yer olmadığı iddiasına dönüştürülmez |
-| Kategoriler | Tam kategori seçme penceresi | Gizli yatay seçenekler için açık alternatif |
-| Eczane → Nöbetçi | Kaynakta alınan günlük nöbet kayıtları | Alternatif kaynak ve sorgu tarihi belirtilir |
-| Harita | Aynı filtreyle harita | Görünür alan dışındaki sonuçlar görünürmüş gibi sayılmaz |
-| Listeye dön / tarayıcı geri | Haritadan listeye | Kullanıcı uygulamadan çıkmaya zorlanmaz |
-| Yer satırı | Adres, kaynak, mesafe, telefon ve yol tarifi | Mesafe kuş uçuşudur; açık olma durumu varsayılmaz |
-| Kaydet | Cihazdaki kayıt listesine ekler / kaldırır | Kaydedilen bilgi canlı veri olarak sunulmaz |
-| Hizmetler | Fiyat, toplu ulaşım, trafik, etkinlik ekranları | Her ekran kendi aramasını ve kapsamını taşır |
-| Market fiyatları | İl, ürün kategorisi ve kaynak şube fiyatları | Stok ve güncel raf fiyatı garantisi değildir |
-| Toplu ulaşım | Antalya durak listesi, isteğe bağlı harita ve araç tahminleri | Konum dışarıdaysa Antalya merkez varsayımı açıkça belirtilir; sahte kullanıcı mesafesi gösterilmez |
-| Trafik | Kaynak varsa trafik; yoksa normal yol haritası | Normal harita canlı trafik olarak adlandırılmaz |
-| Etkinlikler | Şehir seçkisi ve kaynak bağlantıları | Doğrulanmamış tarih etkinlik saati olarak sunulmaz |
-| Hizmetler / Diğer geri düğmesi | İlgili dizine döner | Aramalar başka ekranlara taşınmaz |
-| Kaydedilen | Cihazdaki kayıtlar ve kaldırma | Kaydetme zamanına ait bilgi olduğu açıklanır |
-| Diğer | Mevcut haber, radyo ve oyunlar | Çalan radyo korunur; oyun mevcut tam ekran akışını kullanır |
-
-```mermaid
-flowchart TD
- A[Keşfet] --> B{Konum seçilmiş mi?}
- B -->|Hayır| C[Cihaz konumu veya haritadan seçim]
- C --> D[Filtrelenmiş yer listesi]
- B -->|Evet| D
- D --> E[Yer ayrıntısı: kaynak, adres, kuş uçuşu mesafe]
- E --> F[Ara / Yol tarifi / Kaydet]
- D --> G[Harita]
- G -->|Listeye dön veya geri| D
- A --> H[Hizmetler]
- H --> I[Fiyat / Antalya ulaşımı / Trafik / Etkinlik]
- I -->|Geri| H
-```
-
-## Doğruluk sınırları
-
-Kamuya açık harita kayıtları gerçek zamanlı işletme doğrulaması değildir. Kaynaklar tüm yerleri veya tüm şehirleri kapsamayabilir. Başarısız istekler boş sonuçtan ayrılır. Eski veya geçersiz zamanlı otopark ölçümü güncel bilgi olarak gösterilmez. Trafik için TomTom anahtarı gerekir; bu çalışmada yeni anahtar kurulmamıştır. Fiziksel telefon doğrulaması yapılmadıkça tarayıcı emülasyonu gerçek cihaz testi diye adlandırılmaz.
-
-## Doğrulama
-
-`tests/e2e/mobile-foundation.spec.ts`: konumsuz açılış, son kayda erişme, ayrıntı katmanı, kaydetme, manuel seçim, harita/geri, servis araması ayrımı, Antalya kapsamı ve veri hatası. Mevcut kaynak/parser denetimleri `npm test` kapsamındadır. Son tarayıcı sonuçları değişikliğin PR açıklamasına eklenir.
-
-Yayın öncesinde 20 farklı senaryo 360×800 ve 412×915 Chromium emülasyonlarında doğrulandı. Harita/navigasyonun son koşusu 20/20 geçti; aynı çalışmadaki mevcut kabuk, masaüstü, trafik ve yeniden tasarım kontrollerinin 18/18 sonucu da korundu. İki boyutta kaynaklardan yalnızca birinin başarısız olduğu boş sonuç durumu da geçti. Ek olarak mevcut GPS, radyo ve oyun akışlarının 7/7 denetimi geçti. `npm test` kaynak denetimleri, zaman doğruluğu testleri, TypeScript ve üretim derlemesini geçti. Safari/WebKit indirildi fakat ortamda gerekli sistem kütüphaneleri yoktu; yönetici erişimi de olmadığından çalıştırılamadı. Gerçek iPhone/Android cihaz testi yapılmadı.
-
-Canlı kontrol ayrıca Konyaaltı örneğinin eski sorguda Muratpaşa olarak etiketlendiğini gösterdi. Nominatim sorgusu iki ondalık/şehir düzeyinden dört ondalık/ilçe düzeyine alındı; istemci ve sunucu önbellek anahtarları aynı hassasiyeti kullanır. Yeni istemci sürüm parametresi eski CDN sorgusundan ayrılır. Gerçek `36.8615,30.6377` koordinatının ilçe düzeyindeki Nominatim yanıtı Konyaaltı, Antalya olarak doğrulandı.
+`npm test` kaynak doğruluğunu, GPS takibini, harita alanı yeniden kullanımını, katman filtresini ve üretim derlemesini denetler. `mobile-foundation`, `shell`, `redesign` ve `unified-mobile` tarayıcı testleri yeni ekran sözleşmesini denetler. Tarayıcı emülasyonu fiziksel cihaz testi değildir.
