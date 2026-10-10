@@ -40,4 +40,16 @@ try{
  for(const values of [{lat:'',lng:'29'},{lat:'41',lng:'181'},{lat:'NaN',lng:'29'},{}])await assert.rejects(prices.query(new URLSearchParams(values)),/invalid_location/);
  let calls=0;globalThis.fetch=async()=>{calls++;return {ok:true,json:async()=>[]};};const d=await prices.query(new URLSearchParams({lat:'39.92',lng:'32.85',category:'dairy'}));assert.equal(calls,1);assert.equal(d.depotCount,0);assert.deepEqual(d.products,[]);assert.deepEqual(d.alternatives,[]);
 }finally{globalThis.fetch=originalFetch;}
+const nowPricing=()=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()).replaceAll('/','.');
+try {
+ globalThis.fetch=async (url,options)=>{
+  if(url.endsWith('/nearest'))return {ok:true,json:async()=>[{id:'region1',sellerName:'Merkez',marketName:'migros',location:{lat:36.8948,lon:30.7056}}]};
+  const date=nowPricing();return {ok:true,json:async()=>({content:[{id:'sole-market',title:'Temel makarna',productDepotInfoList:[{depotId:'region1',price:30,indexTime:date+' 08:17'}]}]})};
+ };
+ const all=await prices.query(new URLSearchParams({lat:'36.8948',lng:'30.7056',q:'makarna',view:'all'}));
+ assert.equal(all.view,'all');assert.equal(all.products.length,1);
+ assert.equal(all.products[0].id,'sole-market');
+ assert.deepEqual(all.alternatives,[]);
+} finally{globalThis.fetch=originalFetch;}
+console.log('All product view PASS: single-chain products remain visible.');
 console.log('Nationwide prices PASS: western/eastern coordinates, nearby-only depots/offers, location-specific cache, invalid coordinates and no fallback for empty coverage.');

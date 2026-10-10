@@ -19,6 +19,8 @@ const RadioView = lazy(() => import("./components/RadioView").then(m => ({ defau
 const GamesView = lazy(() => import("./components/GamesView").then(m => ({ default: m.GamesView })));
 const DEMO = new URLSearchParams(window.location.search).has("preview");
 const DEMO_ORIGIN = { lat: 36.8615, lng: 30.6377 };
+const ANTALYA_CENTER: Coordinates = {lat:36.8948,lng:30.7056};
+const inAntalya=(c:Coordinates)=>c.lat>=35.5&&c.lat<=38&&c.lng>=29&&c.lng<=33;
 const DEMO_PLACES: Place[] = [
   { id: "demo1", name: "Örnek Mahalle Marketi", category: "market", lat: 36.8622, lng: 30.6370, address: "Örnek adres · Konyaaltı, Antalya" },
   { id: "demo2", name: "Örnek Sahil Kafesi", category: "cafe", lat: 36.8603, lng: 30.6364, address: "Örnek adres · Konyaaltı, Antalya" },
@@ -45,7 +47,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   const searchMode=category==='transit'&&transitMode==='traffic'?'traffic':category==='market'&&productMode?'prices':category;
   const activeSearch=sectionSearch[searchMode]||'';
   const [mapOpen,setMapOpen] = useState(false);
-  const pilot = (category === "transit" || category === "events" || category === "market" && productMode) && !mapOpen;
+  const pilot = ((category === "transit" && section !== "map") || category === "events" || category === "market" && productMode) && !mapOpen;
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
   useBackLayer(mapOpen,()=>{setMapOpen(false);setPicking(false);onMapChange?.(false);});
@@ -92,15 +94,32 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
     return ()=>{cancelled=true;};
   },[setLocation]);
   useEffect(()=>{ clearTimeout(moveTimer.current);setViewportPending(false);setArea(location ? {center:location,bounds:boundsAround(location),owner:locationScope} : null); },[locationScope]);
-  const areaReady = !!location && !!area && area.owner === locationScope;
+  const areaReady = !!area && area.owner === locationScope && (!!location || category==="transit");
+  useEffect(()=>{if(category==="transit"&&section==="map"){const c=location&&inAntalya(location)?location:ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}},[category,section,locationScope]);
   useEffect(()=>{if(embedded){setMapOpen(section==='map');if(section!=='map')setPicking(false);}},[section,embedded]);
   useEffect(()=>{if(service){setProductMode(service==='prices');setTransitMode(service==='traffic'?'traffic':'stops');setMapOpen(false);}},[service]);
   useEffect(()=>{onGameActivity?.(playingGame);},[playingGame,onGameActivity]);
   const active = isVisible && (section === "nearby" || section === "map");
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
-  const areaQuery = useQuery({queryKey:["area-v8",locationScope,...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !pilot && areaReady && category!=="duty",staleTime:600000,retry:0});
+  const areaQuery = useQuery({queryKey:["area-v8",locationScope,...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !pilot && areaReady && category!=="duty" && category!=="transit",staleTime:600000,retry:0});
   const supplementQuery = useQuery({queryKey:["supplement-v7",locationScope,area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !pilot && areaReady && category!=="duty",staleTime:1800000,retry:0});
   const fuelQuery=useQuery({queryKey:['fuel-area',locationScope],queryFn:({signal})=>fetchArea({south:location!.lat-.04,north:location!.lat+.04,west:location!.lng-.05,east:location!.lng+.05},location!,signal),enabled:!DEMO&&active&&category==='fuel'&&!mapOpen&&!!location,staleTime:600000,retry:1});
+  const stopView=area?.bounds;
+  const transitMapQuery=useQuery({
+    queryKey:['main-map-transit',category,section,locationScope,stopView?.south,stopView?.west,stopView?.north,stopView?.east,category==='transit'?search.trim():''],
+    queryFn:async({signal})=>{
+      const params=new URLSearchParams();
+      if(category==='transit'&&search.trim())params.set('q',search.trim());
+      else params.set('bounds',[stopView!.south,stopView!.west,stopView!.north,stopView!.east].map(v=>v.toFixed(5)).join(','));
+      params.set('lat',String(area!.center.lat));params.set('lng',String(area!.center.lng));
+      const res=await fetch(`/api/transit?${params.toString()}`,{signal});
+      if(!res.ok)throw new Error('transit_data');
+      return res.json() as Promise<{stops:{id:string;name:string;lat:number;lng:number;routes:string[];distanceM:number}[];partial:boolean}>;
+    },
+    enabled:!DEMO&&active&&section==='map'&&mapOpen&&areaReady&&(category==='transit'||category==='all'),
+    staleTime:300000,retry:0,
+  });
+  const transitPlaces:Place[]=(transitMapQuery.data?.stops||[]).map(s=>({id:`transit:${s.id}`,name:s.name,category:'transit',lat:s.lat,lng:s.lng,address:`Durak ${s.id} · ${s.routes.join(', ')}`,distanceM:location&&inAntalya(location)?distance(location,s):undefined,source:'Antalyakart / Kentkart'}));
   const isDiscovery=discoveryCategories.some(c=>c.id===category);
   const discoveryQuery=useQuery({queryKey:['discovery',locationScope],queryFn:({signal})=>fetchDiscoveryPlaces(location!,signal),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!location,staleTime:600000,retry:0});
   const discoverySupplementQuery=useQuery({queryKey:['discovery-supplement',category,locationScope],queryFn:({signal})=>fetchOvertureSupplement(location!,signal,category),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!location,staleTime:21600000,retry:0});
@@ -121,16 +140,17 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   const dutyData = mapOpen ? retainedDuty : areaReady ? dutyQuery.data ?? [] : [];
   const matchingPlaces = useMemo(()=>{
     if (!areaReady) return [];
-    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(isDiscovery?[...(discoveryQuery.data||[]),...(discoverySupplementQuery.data||[])]:[]),...(municipalArea&&['all','parking','toilets'].includes(category)?municipalQuery.data?.places||[]:[]),...(category==='fuel'?fuelQuery.data||[]:[])]);
+    if(category==="transit")return transitPlaces.filter(p=>!search.trim()||`${p.name} ${p.address}`.toLocaleLowerCase("tr").includes(search.trim().toLocaleLowerCase("tr")));
+    const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(isDiscovery?[...(discoveryQuery.data||[]),...(discoverySupplementQuery.data||[])]:[]),...(municipalArea&&['all','parking','toilets'].includes(category)?municipalQuery.data?.places||[]:[]),...(category==='fuel'?fuelQuery.data||[]:[]),...transitPlaces]);
     const term=search.trim().toLocaleLowerCase("tr");
     return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
-  },[category,search,areaData,supplementData,dutyData,fuelQuery.data,municipalQuery.data,municipalArea,discoveryQuery.data,discoverySupplementQuery.data,isDiscovery,mapOpen,areaReady,location?.lat,location?.lng]);
+  },[category,search,areaData,supplementData,dutyData,fuelQuery.data,municipalQuery.data,municipalArea,discoveryQuery.data,discoverySupplementQuery.data,isDiscovery,mapOpen,areaReady,location?.lat,location?.lng,transitMapQuery.data]);
   const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || ((category==="fuel"||isDiscovery||category==="parking"&&municipalArea)&&!mapOpen) || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area,mapOpen,isDiscovery,municipalArea]);
   const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyData.length : isDiscovery||category==='parking'&&municipalArea ? !matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||discoveryQuery.isFetching||discoverySupplementQuery.isFetching||municipalQuery.isFetching) : category==='fuel'?!matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||fuelQuery.isFetching):!matchingPlaces.length && (areaQuery.isFetching||supplementQuery.isFetching||municipalEnabled&&municipalQuery.isFetching);
   const failed = DEMO ? previewState==="error" : category==="duty" ? dutyQuery.isError : areaQuery.isError && supplementQuery.isError && !matchingPlaces.length && (!isDiscovery||discoveryQuery.isError&&discoverySupplementQuery.isError) && (!municipalArea||!['all','parking','toilets'].includes(category)||municipalQuery.isError);
   const updating = !DEMO && (areaQuery.isFetching || supplementQuery.isFetching || municipalEnabled&&municipalQuery.isFetching || isDiscovery&&discoveryQuery.isFetching);
   // Map refreshes are visible even while retained pins keep the map usable.
-  const mapLoading = DEMO ? previewState === "loading" : !picking && areaReady && (viewportPending || (category === "duty" ? dutyQuery.isFetching : areaQuery.isFetching || supplementQuery.isFetching || municipalEnabled && municipalQuery.isFetching || isDiscovery && (discoveryQuery.isFetching || discoverySupplementQuery.isFetching)));
+  const mapLoading = DEMO ? previewState === "loading" : !picking && areaReady && (viewportPending || (category === "transit" ? transitMapQuery.isFetching : category === "duty" ? dutyQuery.isFetching : areaQuery.isFetching || supplementQuery.isFetching || transitMapQuery.isFetching || municipalEnabled && municipalQuery.isFetching || isDiscovery && (discoveryQuery.isFetching || discoverySupplementQuery.isFetching)));
   const visible = DEMO && ["loading","error","empty"].includes(previewState) ? [] : places;
   useEffect(()=>{if(!DEMO)useAppStore.getState().rememberSavedPlaces?.(matchingPlaces);},[matchingPlaces]);
   function requestLocation() {
@@ -198,12 +218,13 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
           {id:'fuel' as const,label:'Akaryakıt',Icon:Fuel},{id:'parking' as const,label:'Otopark',Icon:CircleParking},
           {id:'park' as const,label:'Park',Icon:Trees},{id:'atm' as const,label:'ATM',Icon:Banknote},
         ].map(({id,label,Icon})=><button key={id} onClick={()=>{setCategory(id);setSearch(sectionSearch[id]||'');setSelected(null);}}><span><Icon size={24}/></span><small>{label}</small></button>)}</div>}
+        {mapOpen&&category==='transit'&&<label className="search-box map-stop-search"><Search size={19}/><input aria-label="Antalya durak veya hat ara" placeholder="Durak veya hat ara" value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="Aramayı temizle" onClick={()=>setSearch('')}><X size={18}/></button>}</label>}
         <CategoryRail variant={mapOpen?"map":"list"} value={category} onChange={c=>{setCategory(c);setSearch(sectionSearch[c]||'');setSelected(null);setPicking(false);}}/>
         {category==='all'&&location&&!mapOpen&&!picking&&<Suspense fallback={null}><WeatherSummary location={location}/></Suspense>}
         {category==='market'&&!mapOpen&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
         {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tümü</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
         {((!location&&!pilot) || picking || locationError) && <section className="state-card"><strong>{locationError?(location?'Konum güncellenemedi':'Konum alınamadı'):picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}{location?" · Önceki konum kullanılmaya devam ediyor.":""}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} picking={picking} onPick={pick} onViewportChange={viewport} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense>{!picking&&<button className="map-list-button" onClick={()=>{setMapOpen(false);onMapChange?.(false);}}><List size={18}/>Liste · {visible.length}</button>}</div> : location && !picking ? <>
+        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map"><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} location={category==="transit"?(location&&inAntalya(location)?location:ANTALYA_CENTER):location} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense>{!picking&&<button className="map-list-button" onClick={()=>{setMapOpen(false);onMapChange?.(false);}}><List size={18}/>Liste · {visible.length}</button>}</div> : location && !picking ? <>
           <div className="results-toolbar"><span>{category==='duty'?`${new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',timeZone:'Europe/Istanbul'}).format(new Date())} · Nöbetçi`:LABELS[category]}</span><button onClick={()=>{setMapOpen(true);onMapChange?.(true);}}><MapPin size={18}/>{embedded?'Haritaya bak':'Harita'}</button></div>
           {category==="duty" && dutyData.some(p=>p.source==="legacy-fallback") && <small className="data-note" role="status">Resmî listeye erişilemedi; kayıtlar Eczane Adresi alternatif kaynağından. Gitmeden önce telefonla doğrulayın.</small>}
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
