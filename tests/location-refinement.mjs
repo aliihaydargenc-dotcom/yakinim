@@ -23,6 +23,8 @@ update(fix(36.7,2000));assert.equal(location.lat,36.88);
 update(fix(36.884,15));assert.equal(location.lat,36.884);assert.deepEqual(cleared,[]);
 update(fix(36.885,20));assert.equal(location.lat,36.885);
 update(fix(36.88501,20));assert.equal(location.lat,36.885);
+update(fix(36.886,80));assert.equal(location.lat,36.886);
+update(fix(36.887,150));assert.equal(location.lat,36.886);
 context.requestLocation();first(fix(36.8,900));assert.deepEqual(cleared,[42]);assert.equal(watch.current,42);
 context.locationRequest.current++;update(fix(36.7,5));assert.equal(location.lat,36.8);
 console.log('Location refinement PASS: fresh fix, continuous tracking, jitter and worse-fix rejection, cleanup and cancelled request.');

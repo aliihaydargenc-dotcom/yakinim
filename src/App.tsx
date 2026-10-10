@@ -177,7 +177,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
       const next={lat:latitude,lng:longitude};
       if(lastFix&&distance(lastFix,next)<20)return;
       lastFix=next;
-      bestAccuracy=precision;
+      bestAccuracy=Math.min(bestAccuracy,precision);
       clearTimeout(moveTimer.current);
       setLocation({lat:latitude,lng:longitude});setLocating(false);setPicking(false);
       setLocationPanel(false);
