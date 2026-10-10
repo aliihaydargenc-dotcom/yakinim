@@ -14,12 +14,13 @@ const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
 type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
   const previousLocation = useRef(location);
+  const lastAutoFit=useRef('');
   const placesRef = useRef<Place[]>(places);
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
@@ -283,6 +284,17 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     setSelectedPlace(current => current ? places.find(place => place.id === current.id) ?? null : null);
     return () => { map.off("load", sync); };
   }, [places]);
+
+  useEffect(() => {
+    if(!autoFitKey || !places.length || lastAutoFit.current===autoFitKey)return;
+    const map=mapRef.current;
+    if(!map)return;
+    const extent=new maplibregl.LngLatBounds();
+    places.forEach(p=>extent.extend([p.lng,p.lat]));
+    lastAutoFit.current=autoFitKey;
+    if(places.length===1)map.easeTo({center:[places[0].lng,places[0].lat],zoom:14,duration:250});
+    else map.fitBounds(extent,{padding:52,maxZoom:14,duration:250});
+  },[autoFitKey,places]);
 
   useEffect(() => {
     const map = mapRef.current;
