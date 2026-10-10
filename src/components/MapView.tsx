@@ -278,7 +278,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     filter:['==',['get','id'],''],paint:{'circle-radius':18,'circle-color':'#ffffff','circle-opacity':0.9,'circle-stroke-width':3,'circle-stroke-color':'#42687c'}} as any);
   map.addLayer({id:ICON_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:11.5,filter:['!',['has','point_count']],
     layout:{'icon-image':['get','icon'],'icon-size':['interpolate',['linear'],['zoom'],11.5,0.8,15.5,1.1],
-      'icon-allow-overlap':false,'icon-ignore-placement':false,'icon-padding':2}} as any);
+      'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-padding':1}} as any);
   map.addLayer({id:LABEL_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:15.5,filter:['!',['has','point_count']],
     layout:{'text-field':['get','name'],'text-size':11.5,'text-anchor':'top','text-offset':[0,1.2],
       'text-max-width':11,'text-allow-overlap':false,'text-optional':true},
