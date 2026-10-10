@@ -36,12 +36,14 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const onPickRef = useRef(onPick);
   const onViewportChangeRef = useRef(onViewportChange);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(()=>memoryKey?cameras.get(memoryKey)?.selected??null:null);
-  useBackLayer(!!selectedPlace,()=>setSelectedPlace(null));
   const previousScope=useRef(selectionScope);
   useEffect(()=>{if(previousScope.current===selectionScope)return;previousScope.current=selectionScope;setSelectedPlace(null);setSheetLevel("peek");},[selectionScope]);
   const selectedRef = useRef<Place | null>(null);
   const [visiblePlaces,setVisiblePlaces]=useState<Place[]>([]);
   const [sheetLevel,setSheetLevel]=useState<"peek"|"half"|"full">("peek");
+  // Dismissing details must return to the map, not leave the places list half open.
+  const closeSelectedPlace=()=>{setSelectedPlace(null);setSheetLevel("peek");};
+  useBackLayer(!!selectedPlace,closeSelectedPlace);
   const touchStart=useRef<number|null>(null);
   const suppressTap=useRef(false);
   const visibleRef=useRef<() => void>(()=>{});
@@ -127,7 +129,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const handleClick=async(event:maplibregl.MapMouseEvent)=>{
       if(pickingRef.current){setSelectedPlace(null);onPickRef.current({lat:event.lngLat.lat,lng:event.lngLat.lng});return;}
       const f=getHits(event.point)[0];
-      if(!f)return;
+      if(!f){closeSelectedPlace();return;}
       const props=f.properties||{};
       if(props.cluster){
         const source=map.getSource(PLACES_SOURCE) as maplibregl.GeoJSONSource|undefined;
@@ -340,10 +342,10 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
           {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Haritadaki yerler</strong><small>{loading?'Güncelleniyor…':`${visiblePlaces.length} kayıt · Listeyi aç`}</small></span>}
           {sheetLevel==='full'?<ChevronDown size={20}/>:<ChevronUp size={20}/>}
         </button>
-        {selectedPlace&&<button type="button" className="map-sheet-close" aria-label="Yer kartını kapat" onClick={()=>{setSelectedPlace(null);setSheetLevel('half');}}><X size={20}/></button>}
+        {selectedPlace&&<button type="button" className="map-sheet-close" aria-label="Yer kartını kapat" onClick={closeSelectedPlace}><X size={20}/></button>}
       </div>
       <div className="map-sheet-content" id="map-sheet-content">
-        {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>{setSelectedPlace(null);setSheetLevel('half');}} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/>:
+        {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={closeSelectedPlace} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/>:
           <div className="map-sheet-place-list" aria-label="Görünen yerler">
             {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':dataError||'Kayıt yok'}</p>:
               visiblePlaces.map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
@@ -354,7 +356,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         }
       </div>
     </section>}
-    {selectedPlace&&!enableList&&<div ref={sheetRef} className="map-sheet-holder" key={selectedPlace.id}><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>setSelectedPlace(null)} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/></div>}
+    {selectedPlace&&!enableList&&<div ref={sheetRef} className="map-sheet-holder" key={selectedPlace.id}><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={closeSelectedPlace} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/></div>}
   </div>;
 }
 

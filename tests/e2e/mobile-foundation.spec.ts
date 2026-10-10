@@ -69,6 +69,27 @@ test('transit map does not refetch on resize jitter and selects stop without dup
  const size=page.viewportSize()!;await page.setViewportSize({width:size.width,height:size.height-2});await page.setViewportSize(size);await page.waitForTimeout(1100);expect(calls).toBe(initial);
  await expect(page.locator('.map-unified-sheet')).toHaveCount(0);const marker=await page.locator('.user-marker').boundingBox();await page.mouse.click(marker!.x+marker!.width/2,marker!.y+marker!.height/2);await expect(page.getByRole('dialog',{name:'ANTALYA DURAK',exact:true})).toBeVisible();
 });
+test('closing a map place or tapping the empty map collapses the bottom sheet',async({page})=>{
+ await storeLocation(page);await page.goto('/');await openPlaces(page);await page.getByRole('button',{name:'Harita',exact:true}).click();
+ const sheet=page.locator('.map-unified-sheet');
+ await expect(sheet).toHaveAttribute('data-level','peek');
+ await sheet.locator('.map-sheet-toggle').click();
+ await expect(sheet).toHaveAttribute('data-level','half');
+ await sheet.locator('.map-place-chip').first().click();
+ await expect(sheet).toHaveAttribute('data-selected','true');
+ await sheet.getByRole('button',{name:'Yer kartını kapat'}).click();
+ await expect(sheet).toHaveAttribute('data-selected','false');
+ await expect(sheet).toHaveAttribute('data-level','peek');
+ await sheet.locator('.map-sheet-toggle').click();
+ await expect(sheet).toHaveAttribute('data-level','half');
+ await page.locator('.maplibregl-canvas').click({position:{x:25,y:155}});
+ await expect(sheet).toHaveAttribute('data-level','peek');
+ await sheet.locator('.map-sheet-toggle').click();
+ await sheet.locator('.map-place-chip').first().click();
+ await page.goBack();
+ await expect(sheet).toHaveAttribute('data-selected','false');
+ await expect(sheet).toHaveAttribute('data-level','peek');
+});
 test('map count in services never falls back to offscreen results',async({page})=>{
  await storeLocation(page);await page.goto('/');await openPlaces(page);await page.getByRole('button',{name:'Harita',exact:true}).click();await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count','12');await page.locator('.map-sheet-toggle').click();await expect(page.locator('.map-place-chip')).toHaveCount(12);
  await page.locator('.maplibregl-canvas').focus();for(let i=0;i<8;i++){await page.keyboard.press('ArrowRight');await page.waitForTimeout(350);}
