@@ -13,6 +13,14 @@ const blogItems=events.parseBubilet(blog,'https://www.bubilet.com.tr/blog/antaly
 assert.equal(blogItems.length,3);assert.equal(blogItems[0].startsAt,'2026-10-13T21:00:00+03:00');assert.equal(events.deduplicate([...blogItems,...blogItems]).length,3);assert.equal(blogItems[0].directionsUrl,undefined);const [located]=events.locateEvents([{venue:'Antalya Bahçe'}]);assert.equal(new URL(located.directionsUrl).searchParams.get('destination'),'36.88178065,30.66679438');
 const stops=await transit.query('stops',new URLSearchParams({lat:'36.9002946',lng:'30.7007151'}));
 assert.equal(stops.stops[0].id,'11265');assert.equal(stops.stops[0].distanceM,0);assert.equal(stops.stops.some(s=>s.id==='11254'),true);assert.equal(stops.stops.filter(s=>s.name.includes('TONGUÇ')).length,10);assert.ok(stops.catalogSize>4000);assert.ok(stops.coverage.length>100);assert.ok(stops.stops.every((s,i,all)=>i===0||all[i-1].distanceM<=s.distanceM));
+const wide=await transit.query('stops',new URLSearchParams({bounds:'36.68,31.54,36.74,31.59'}));
+assert.equal(wide.scope,'viewport');
+assert.ok(wide.stops.some(s=>s.id==='46237'),'Viewport map includes Manavgat stops far beyond current 2-km search');
+const globalStop=await transit.query('stops',new URLSearchParams({q:'46237'}));
+assert.equal(globalStop.scope,'search');
+assert.ok(globalStop.stops.some(s=>s.id==='46237'));
+await assert.rejects(transit.query('stops',new URLSearchParams({bounds:'36.8,30.7,36.7,30.8'})),/invalid_bounds/);
+console.log('Full-region transit PASS: map viewport, global stop search and bounds validation.');
 console.log('Antalya pilot PASS: fresh/stale arrivals, directions, valid stops, verified dates, expired events and source links.');
 
 const locatedVenues=events.locateEvents([{venue:'Rockbull Performance Hall'},{venue:'Aspendos Antik Tiyatro'},{venue:'Manavgat Atatürk Kültür Merkezi'},{venue:'Konyaaltı Belediyesi Nazım Hikmet Fuar ve Kongre Merkezi'},{venue:'Antalya AKM Aspendos Salonu'}]);assert.ok(locatedVenues.every(v=>v.directionsUrl&&v.locationSource));
