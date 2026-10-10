@@ -277,3 +277,28 @@
 .feature-sheet-header>button{flex:none}
 .map-place-heading>div{min-width:0;overflow-wrap:anywhere}
 .map-bus-item>span,.stop-row strong,.route-stops li{overflow-wrap:anywhere}
+
+/* Other hub and nine-game library: square cards share the Services layout language. */
+.shell-app .other-category-grid{margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.shell-app .other-category-grid>button{aspect-ratio:1;min-height:0;gap:10px}
+.shell-app .secondary-workspace:has(.game-library-grid){padding:0;max-width:980px}
+.shell-app .game-library-heading{padding-bottom:12px}
+.shell-app .game-library-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.shell-app .game-library-card{display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1;min-width:0;padding:12px 8px;border:1px solid var(--line);border-radius:15px;background:white;text-align:center;gap:7px;transition:transform .16s ease,background-color .16s ease,border-color .16s ease}
+.shell-app .game-library-card:active{transform:scale(.975)}
+.shell-app .game-library-card:hover{background:#f3f7fb;border-color:#bacbd8}
+.shell-app .game-library-icon{display:grid;place-items:center;width:50px;height:50px;border-radius:15px;background:#e9eff5;color:#365d7b}
+.shell-app .game-library-card strong{font-size:14px;line-height:1.2;font-weight:650}
+.shell-app .game-library-card small{font-size:11px;margin:0;color:#6b7e8b}
+.shell-app .game-library-grid,.shell-app .game-library-heading{animation:game-hub-enter .18s ease-out both}
+@keyframes game-hub-enter{from{opacity:.65;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.shell-app .game-play-layout{height:100%;min-height:0;display:flex;flex-direction:column;gap:5px;animation:game-hub-enter .18s ease-out both}
+.shell-app .game-play-layout .game-frame{flex:1;min-height:0;height:100%;border:0;background:#f7f8fb}
+.shell-app .game-play-layout .game-heading{display:flex;align-items:center;gap:12px}
+.shell-app .game-play-layout .game-heading button{width:44px;min-width:44px;height:44px;display:grid;place-items:center}
+@media(min-width:680px){.shell-app .game-library-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.shell-app .game-library-grid,.shell-app .game-library-heading,.shell-app .game-play-layout{animation:none}.shell-app .game-library-card{transition:none}}
+
+/* Full-screen gameplay owns the only visible toolbar. */
+.shell-playing .shell-header,.shell-playing .shell-backbar{display:none}
+.shell-playing .shell-body{padding-bottom:0}

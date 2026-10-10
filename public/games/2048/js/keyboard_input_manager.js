@@ -139,6 +139,6 @@ KeyboardInputManager.prototype.keepPlaying = function (event) {
 
 KeyboardInputManager.prototype.bindButtonPress = function (selector, fn) {
   var button = document.querySelector(selector);
+  // Touch generates a click: a second touchend listener double-submitted moves.
   button.addEventListener("click", fn.bind(this));
-  button.addEventListener(this.eventTouchend, fn.bind(this));
 };

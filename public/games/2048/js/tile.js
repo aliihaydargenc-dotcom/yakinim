@@ -2,10 +2,13 @@ function Tile(position, value) {
   this.x                = position.x;
   this.y                = position.y;
   this.value            = value || 2;
+  this.id               = ++Tile.nextId;
 
   this.previousPosition = null;
   this.mergedFrom       = null; // Tracks tiles that merged together
 }
+
+Tile.nextId = 0;
 
 Tile.prototype.savePosition = function () {
   this.previousPosition = { x: this.x, y: this.y };

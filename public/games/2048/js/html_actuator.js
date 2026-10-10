@@ -5,33 +5,45 @@ function HTMLActuator() {
   this.messageContainer = document.querySelector(".game-message");
 
   this.score = 0;
+  this.nodes = Object.create(null);
+  this.pendingFrame = 0;
 }
 
 HTMLActuator.prototype.actuate = function (grid, metadata) {
   var self = this;
-
-  window.requestAnimationFrame(function () {
-    self.clearContainer(self.tileContainer);
-
+  if (this.pendingFrame) window.cancelAnimationFrame(this.pendingFrame);
+  this.pendingFrame = window.requestAnimationFrame(function () {
+    self.pendingFrame = 0;
+    var previous = self.nodes;
+    var current = Object.create(null);
+    var merged = Object.create(null);
     grid.cells.forEach(function (column) {
-      column.forEach(function (cell) {
-        if (cell) {
-          self.addTile(cell);
+      column.forEach(function (tile) {
+        if (!tile) return;
+        if (tile.mergedFrom) {
+          tile.mergedFrom.forEach(function (source) { merged[source.id] = tile; });
         }
+        self.addTile(tile, previous, current);
       });
     });
-
+    Object.keys(previous).forEach(function (id) {
+      var node = previous[id];
+      if (current[id]) return;
+      if (merged[id]) {
+        var target = merged[id];
+        node.className = "tile tile-" + (Number(node.dataset.value) || target.value / 2) + " " + self.positionClass(target);
+        window.setTimeout(function () { node.remove(); }, 110);
+      } else {
+        node.remove();
+      }
+    });
+    self.nodes = current;
     self.updateScore(metadata.score);
     self.updateBestScore(metadata.bestScore);
-
     if (metadata.terminated) {
-      if (metadata.over) {
-        self.message(false); // You lose
-      } else if (metadata.won) {
-        self.message(true); // Kazandın!
-      }
+      if (metadata.over) self.message(false);
+      else if (metadata.won) self.message(true);
     }
-
   });
 };
 
@@ -46,48 +58,29 @@ HTMLActuator.prototype.clearContainer = function (container) {
   }
 };
 
-HTMLActuator.prototype.addTile = function (tile) {
-  var self = this;
-
-  var wrapper   = document.createElement("div");
-  var inner     = document.createElement("div");
-  var position  = tile.previousPosition || { x: tile.x, y: tile.y };
-  var positionClass = this.positionClass(position);
-
-  // We can't use classlist because it somehow glitches when replacing classes
-  var classes = ["tile", "tile-" + tile.value, positionClass];
-
-  if (tile.value > 2048) classes.push("tile-super");
-
-  this.applyClasses(wrapper, classes);
-
-  inner.classList.add("tile-inner");
-  inner.textContent = tile.value;
-
-  if (tile.previousPosition) {
-    // Make sure that the tile gets rendered in the previous position first
-    window.requestAnimationFrame(function () {
-      classes[2] = self.positionClass({ x: tile.x, y: tile.y });
-      self.applyClasses(wrapper, classes); // Update the position
-    });
-  } else if (tile.mergedFrom) {
-    classes.push("tile-merged");
-    this.applyClasses(wrapper, classes);
-
-    // Render the tiles that merged
-    tile.mergedFrom.forEach(function (merged) {
-      self.addTile(merged);
-    });
-  } else {
-    classes.push("tile-new");
-    this.applyClasses(wrapper, classes);
+HTMLActuator.prototype.addTile = function (tile, previous, current) {
+  var node = previous[tile.id];
+  var reused = !!node;
+  if (!node) {
+    node = document.createElement("div");
+    var inner = document.createElement("div");
+    inner.className = "tile-inner";
+    inner.textContent = tile.value;
+    node.appendChild(inner);
+    node.dataset.value = tile.value;
+    node.className = "tile tile-" + tile.value + " " + this.positionClass(tile.previousPosition || tile);
+    if (tile.mergedFrom) node.classList.add("tile-merged");
+    else if (!tile.previousPosition) node.classList.add("tile-new");
+    this.tileContainer.appendChild(node);
   }
-
-  // Add the inner part of the tile to the wrapper
-  wrapper.appendChild(inner);
-
-  // Put the tile on the board
-  this.tileContainer.appendChild(wrapper);
+  current[tile.id] = node;
+  var finalClass = "tile tile-" + tile.value + " " + this.positionClass(tile);
+  if (tile.value > 2048) finalClass += " tile-super";
+  if (reused) {
+    if (node.className !== finalClass) node.className = finalClass;
+  } else if (tile.previousPosition) {
+    window.requestAnimationFrame(function () { node.className = finalClass; });
+  }
 };
 
 HTMLActuator.prototype.applyClasses = function (element, classes) {

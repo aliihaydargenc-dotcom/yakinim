@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Blocks, Grid2X2, Brain, ChevronRight, Worm, Bomb } from 'lucide-react';
-const games=[{id:'blocks',title:'Düşen Bloklar',subtitle:'Bulmaca',Icon:Blocks},{id:'2048',title:'2048',subtitle:'Sayı oyunu',Icon:Grid2X2},{id:'memory',title:'Hafıza',subtitle:'Desen eşleştirme',Icon:Brain},{id:'snake',title:'Yılan',subtitle:'Kaydırarak oyna',Icon:Worm},{id:'mines',title:'Mayın Tarlası',subtitle:'Mantık oyunu',Icon:Bomb}];
+import {useEffect,useState} from 'react';
+import {ArrowLeft,Blocks,Grid2X2,Brain,Worm,Bomb,Grid3X3,BookOpen,BrickWall,PersonStanding} from 'lucide-react';
+
+const games=[
+ {id:'2048',title:'2048',kind:'Zekâ',Icon:Grid2X2,legacy:true},
+ {id:'blocks',title:'Düşen Bloklar',kind:'Arcade',Icon:Blocks,legacy:true},
+ {id:'memory',title:'Hafıza',kind:'Zekâ',Icon:Brain,legacy:true},
+ {id:'snake',title:'Yılan',kind:'Arcade',Icon:Worm,legacy:true},
+ {id:'mines',title:'Mayın Tarlası',kind:'Zekâ',Icon:Bomb,legacy:true},
+ {id:'breaker',title:'Tuğla Kırma',kind:'Arcade',Icon:BrickWall,legacy:false},
+ {id:'sudoku',title:'Sudoku',kind:'Zekâ',Icon:Grid3X3,legacy:false},
+ {id:'runner',title:'Engel Atlama',kind:'Arcade',Icon:PersonStanding,legacy:false},
+ {id:'words',title:'Kelime Oyunu',kind:'Zekâ',Icon:BookOpen,legacy:false}
+];
 export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>void}){
  const [selected,setSelected]=useState<string|null>(null);
  const game=games.find(g=>g.id===selected);
@@ -10,6 +21,7 @@ export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>voi
   return ()=>{window.removeEventListener('popstate',close);onActiveChange(false);};
  },[onActiveChange]);
  function open(id:string){
+  if(selected)return;
   window.history.pushState({...window.history.state,yakinimGame:id},'',window.location.href);
   setSelected(id);onActiveChange(true);
  }
@@ -17,5 +29,19 @@ export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>voi
   if(window.history.state?.yakinimGame)window.history.back();
   else{setSelected(null);onActiveChange(false);}
  }
- return <section className={`content-screen ${game?'game-screen':''}`}>{game?<><div className="game-heading"><button aria-label="Oyunlara dön" onClick={back}><ArrowLeft size={20}/></button><h2>{game.title}</h2><a className="game-license" href={`/games/${game.id}/LICENSE`} target="_blank" rel="noreferrer" aria-label="Kaynak ve lisans">Lisans</a></div><iframe className="game-frame" title={game.title} src={`/games/${game.id}/index.html`} sandbox="allow-scripts allow-same-origin"/></>:<><div className="screen-heading"><h2>Oyun</h2></div>{games.map(({id,title,subtitle,Icon})=><button key={id} className="game-tile" onClick={()=>open(id)}><span><Icon size={27}/></span><span><strong>{title}</strong><small>{subtitle}</small></span><ChevronRight size={19}/></button>)}</>}</section>;
+ return <section className={`content-screen ${game?'game-screen':''}`}>
+  {game?<div className="game-play-layout">
+    <div className="game-heading"><button aria-label="Oyunlara dön" onClick={back}><ArrowLeft size={20}/></button><h2>{game.title}</h2>
+    {game.legacy&&<a className="game-license" href={`/games/${game.id}/LICENSE`} target="_blank" rel="noreferrer" aria-label="Kaynak ve lisans">Lisans</a>}</div>
+    <iframe key={game.id} className="game-frame" title={game.title} src={`/games/${game.id}/index.html`} sandbox="allow-scripts allow-same-origin" loading="eager"/>
+   </div>:
+   <><div className="screen-heading game-library-heading"><h2>Oyunlar</h2></div>
+    <div className="game-library-grid" aria-label="Oyun kütüphanesi">
+      {games.map(({id,title,kind,Icon})=><button key={id} className="game-library-card" onClick={()=>open(id)} aria-label={`${title} oyununu aç`}>
+        <span className="game-library-icon"><Icon size={29} strokeWidth={1.8}/></span>
+        <strong>{title}</strong><small>{kind}</small>
+      </button>)}
+    </div>
+   </>}
+ </section>;
 }

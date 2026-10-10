@@ -1,0 +1,70 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Tuğla Kırma</title><link rel="stylesheet" href="../common.css"><style>
+.arcade{display:block;width:min(100%,410px);aspect-ratio:2/3;margin:0 auto;border-radius:15px;border:1px solid #b8c8d9;background:#eaf0f7;touch-action:none}
+.app{justify-content:flex-start}.help{text-align:center;font-size:12px;color:#64758b}
+</style></head><body><main class="app">
+<div class="head"><div><h1>Tuğla Kırma</h1><p class="sub">Paleti parmağınla hareket ettir.</p></div><div class="metrics"><div class="metric"><strong id="score">0</strong><span>Skor</span></div><div class="metric"><strong id="best">0</strong><span>Rekor</span></div></div></div>
+<canvas id="board" class="arcade" width="360" height="540" aria-label="Tuğla Kırma oyun alanı"></canvas>
+<div class="controls"><button class="primary" id="start">Başlat</button><button class="secondary" id="reset">Yeniden başla</button><span class="notice" id="status" role="status" aria-live="polite"></span></div>
+<p class="help">Parmağını kaydır veya yön tuşlarını kullan · 3 can</p></main>
+<script>
+'use strict';
+const canvas=document.getElementById('board'),ctx=canvas.getContext('2d'),W=360,H=540;
+const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best'),statusEl=document.getElementById('status');
+let score=0,best=0,lives=3,playing=false,over=false,ball,paddle,bricks=[],last=0,frame=0,keys={};
+try{best=Number(localStorage.getItem('yakinim:breaker:best')||0)||0;}catch{}
+function resize(){let r=canvas.getBoundingClientRect(),ratio=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.max(1,Math.round(r.width*ratio));canvas.height=Math.max(1,Math.round(r.height*ratio));ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0);}
+new ResizeObserver(resize).observe(canvas);resize();
+function createBricks(){bricks=[];for(let row=0;row<5;row++)for(let col=0;col<7;col++)bricks.push({x:12+col*48,y:74+row*26,w:43,h:19,alive:true,row});}
+function resetBall(){ball={x:180,y:467,vx:185*(Math.random()>.5?1:-1),vy:-270,r:7};paddle={x:140,y:495,w:80,h:12};playing=false;}
+function reset(){score=0;lives=3;over=false;createBricks();resetBall();refresh();draw();}
+function refresh(){scoreEl.textContent=score;bestEl.textContent=best;statusEl.textContent=over?'Oyun bitti':playing?'Can: '+lives:'Başlamak için dokun';document.getElementById('start').textContent=playing?'Duraklat':over?'Yeni oyun':'Oyna';}
+function start(){if(over)reset();playing=!playing;refresh();}
+function update(dt){
+ if(keys.ArrowLeft||keys.a) paddle.x-=dt*370;
+ if(keys.ArrowRight||keys.d)paddle.x+=dt*370;
+ paddle.x=Math.max(8,Math.min(W-paddle.w-8,paddle.x));
+ const steps=Math.max(1,Math.ceil(dt/(1/120)));
+ for(let i=0;i<steps;i++){
+  const d=dt/steps;ball.x+=ball.vx*d;ball.y+=ball.vy*d;
+  if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx);}
+  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx);}
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy=Math.abs(ball.vy);}
+  if(ball.vy>0&&ball.y+ball.r>=paddle.y&&ball.y-ball.r<paddle.y+paddle.h&&ball.x>=paddle.x-5&&ball.x<=paddle.x+paddle.w+5){
+   ball.y=paddle.y-ball.r;ball.vy=-Math.max(260,Math.abs(ball.vy));
+   ball.vx=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2)*240;
+  }
+  for(const b of bricks){if(!b.alive)continue;
+   const nx=Math.max(b.x,Math.min(ball.x,b.x+b.w)),ny=Math.max(b.y,Math.min(ball.y,b.y+b.h));
+   if((ball.x-nx)**2+(ball.y-ny)**2>ball.r**2)continue;
+   b.alive=false;ball.vy*=-1;score+=10;
+   if(score>best){best=score;try{localStorage.setItem('yakinim:breaker:best',String(best));}catch{}}
+   if(bricks.every(v=>!v.alive)){createBricks();ball.vy*=1.12;}break;
+  }
+  if(ball.y>H+ball.r){lives--;if(lives<=0){over=true;playing=false;}else resetBall();refresh();break;}
+ }
+ scoreEl.textContent=score;bestEl.textContent=best;
+}
+function roundRect(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function draw(){
+ ctx.fillStyle='#eef3f9';ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='#dde8f5';ctx.fillRect(0,0,W,47);
+ ctx.fillStyle='#4e6784';ctx.font='bold 14px system-ui';ctx.fillText('TUĞLA KIRMA',16,29);
+ const colors=['#597baf','#7b93c4','#83b1be','#9bb7a0','#c4ac85'];
+ for(const b of bricks)if(b.alive)roundRect(b.x,b.y,b.w,b.h,5,colors[b.row]);
+ roundRect(paddle.x,paddle.y,paddle.w,paddle.h,6,'#345b7a');
+ ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fillStyle='#d56d7f';ctx.fill();
+ if(!playing){roundRect(50,246,260,74,15,'#ffffffee');ctx.textAlign='center';ctx.font='bold 18px system-ui';ctx.fillStyle='#304c68';ctx.fillText(over?'Oyun bitti':score?'Devam et':'Başlamak için dokun',180,292);ctx.textAlign='left';}
+}
+function loop(t){let dt=Math.min((t-last)/1000||0,0.033);last=t;if(playing)update(dt);draw();frame=requestAnimationFrame(loop);}
+function point(e){let r=canvas.getBoundingClientRect();paddle.x=Math.max(8,Math.min(W-paddle.w-8,(e.clientX-r.left)/r.width*W-paddle.w/2));}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();point(e);if(!playing)start();canvas.setPointerCapture?.(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'||e.buttons)point(e);});
+document.getElementById('start').addEventListener('click',start);
+document.getElementById('reset').addEventListener('click',reset);
+window.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight',' ','a','d'].includes(e.key)){e.preventDefault();keys[e.key]=true;if(e.key===' '&&!playing)start();}});
+window.addEventListener('keyup',e=>{keys[e.key]=false;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){playing=false;refresh();}});
+window.addEventListener('pagehide',()=>cancelAnimationFrame(frame));
+reset();bestEl.textContent=best;frame=requestAnimationFrame(loop);
+</script></body></html>

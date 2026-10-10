@@ -16,3 +16,7 @@
 .tile.tile-position-3-4{transform:translate(calc(2 * (var(--cell) + var(--gap))),calc(3 * (var(--cell) + var(--gap))))!important}
 .tile.tile-position-4-4{transform:translate(calc(3 * (var(--cell) + var(--gap))),calc(3 * (var(--cell) + var(--gap))))!important}
 .grid-container{inset:var(--gap);width:auto!important;height:auto!important}
+
+/* Keep transform animations compositor-friendly without refreshing the full board. */
+.tile{will-change:transform;backface-visibility:hidden;transition:transform 105ms ease-out!important}
+@media(prefers-reduced-motion:reduce){.tile{transition:none!important;will-change:auto}}

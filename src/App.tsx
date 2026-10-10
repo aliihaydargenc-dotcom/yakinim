@@ -94,6 +94,22 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
     locationWatch.current=null;
   }
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);stopLocationWatch();};},[]);
+  // Games use the same embedded App shell; GPS polling should not compete with gameplay.
+  const pausedLocationForGame=useRef(false);
+  useEffect(()=>{
+    if(playingGame){
+      pausedLocationForGame.current=locationWatch.current!==null;
+      if(locationWatch.current!==null){stopLocationWatch();++locationRequest.current;setLocating(false);}
+    } else if(pausedLocationForGame.current){
+      pausedLocationForGame.current=false;
+      if(navigator.permissions){
+        void navigator.permissions.query({name:"geolocation"}).then(permission=>{
+          if(permission.state==="granted"&&useAppStore.getState().locationMode==="device")requestLocation();
+        }).catch(()=>{});
+      }
+    }
+  },[playingGame]);
+
   useEffect(()=>{
     if (DEMO || !navigator.geolocation || useAppStore.getState().locationMode==="manual") return;
     let cancelled=false;

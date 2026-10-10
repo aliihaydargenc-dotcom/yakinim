@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Sudoku</title><link rel="stylesheet" href="../common.css">
+<style>
+.levels{display:flex;gap:6px}
+.levels button{flex:1;min-width:0;padding:9px 4px;border-radius:10px;background:#eaf0f7;color:#354c65;font-size:12px}
+.levels button[aria-pressed=true]{background:#345b7a;color:#fff}
+.board{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));aspect-ratio:1;width:min(100%,440px);margin:auto;background:#314762;padding:2px;gap:1px;border:2px solid #314762;border-radius:8px;overflow:hidden}
+.cell{display:grid;place-items:center;min-height:0;padding:0;background:white;color:#24425d;font-size:clamp(14px,4.6vw,21px);font-weight:550;border-radius:0;font-variant-numeric:tabular-nums}
+.cell.fixed{background:#eaf0f6;font-weight:800}
+.cell.selected{background:#bfdcf2}
+.cell.same{background:#e4f2fc}
+.cell.bad{color:#b4324b;background:#fae4e7}
+.cell:nth-child(3n):not(:nth-child(9n)){border-right:2px solid #4a6180}
+.cell:nth-child(n+19):nth-child(-n+27),.cell:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid #4a6180}
+.digits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.digits button{min-height:42px;border-radius:11px;background:#eaf0f7;color:#345b7a;font-size:19px;font-weight:750}
+.digits button:nth-child(10){background:#f4ecf0;color:#8d415d;font-size:13px}
+.digits button:nth-child(11){grid-column:span 5;background:#345b7a;color:#fff;font-size:13px}
+</style></head>
+<body><main class="app"><div class="head"><div><h1>Sudoku</h1><p class="sub">Her satır, sütun ve 3×3 kutuda 1–9.</p></div><button class="secondary" id="reset">Yeni oyun</button></div>
+<div class="levels" id="levels"><button data-level="kolay">Kolay</button><button data-level="orta">Orta</button><button data-level="zor">Zor</button></div>
+<div class="board" id="board" role="grid" aria-label="Sudoku tablosu"></div>
+<div class="digits" id="digits"></div><div class="notice" id="status" role="status" aria-live="polite"></div>
+<footer>İlerleme bu cihazda saklanır.</footer></main>
+<script>
+'use strict';
+const PUZZLES={
+kolay:'530070000600195000098000060800060003400803001700020006060000280000419005000080079',
+orta:'000260701680070090190004500820100040004602900050003028009300074040050036703018000',
+zor:'000000907000420180000705026100904000050000040000507009920108000034059000507000000'
+};
+const KEY='yakinim:sudoku:v1',board=document.getElementById('board'),status=document.getElementById('status');
+let state=null;
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+function order(){const bands=shuffle([0,1,2]);return bands.flatMap(b=>shuffle([0,1,2]).map(i=>b*3+i));}
+function puzzleFor(level){
+ const rows=order(),cols=order(),digitMap=shuffle([1,2,3,4,5,6,7,8,9]);
+ const src=PUZZLES[level];return Array.from({length:81},(_,i)=>{let v=Number(src[rows[Math.floor(i/9)]*9+cols[i%9]]);return v?digitMap[v-1]:0;});
+}
+function candidates(values,i){const used=new Set(),r=Math.floor(i/9),c=i%9;
+ for(let k=0;k<9;k++){used.add(values[r*9+k]);used.add(values[k*9+c]);}
+ let br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;
+ for(let y=0;y<3;y++)for(let x=0;x<3;x++)used.add(values[(br+y)*9+bc+x]);
+ return [1,2,3,4,5,6,7,8,9].filter(v=>!used.has(v));
+}
+function solve(input){const a=input.slice();function visit(){
+ let best=-1,opts=null;
+ for(let i=0;i<81;i++)if(!a[i]){let o=candidates(a,i);if(!o.length)return false;if(!opts||o.length<opts.length){best=i;opts=o;if(o.length===1)break;}}
+ if(best<0)return true;
+ for(const n of opts){a[best]=n;if(visit())return true;}
+ a[best]=0;return false;
+ }return visit()?a:null;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch{}}
+function newGame(level=state?.level||'kolay'){
+ const fixed=puzzleFor(level),solution=solve(fixed);
+ if(!solution){status.textContent='Bulmaca oluşturulamadı.';return;}
+ state={level,fixed,solution,values:fixed.slice(),selected:fixed.findIndex(v=>!v)};
+ save();render();
+}
+function load(){try{let v=JSON.parse(localStorage.getItem(KEY)||'null');
+ if(v&&PUZZLES[v.level]&&Array.isArray(v.fixed)&&v.fixed.length===81&&Array.isArray(v.values)&&v.values.length===81&&Array.isArray(v.solution)&&v.solution.length===81){state=v;return;}
+ }catch{}newGame('kolay');}
+function valid(i,n){
+ if(!n)return true;let r=Math.floor(i/9),c=i%9;
+ for(let j=0;j<81;j++)if(j!==i&&state.values[j]===n){
+ let rr=Math.floor(j/9),cc=j%9;
+ if(rr===r||cc===c||(Math.floor(rr/3)===Math.floor(r/3)&&Math.floor(cc/3)===Math.floor(c/3)))return false;
+ }return true;
+}
+function insert(n){if(!state||state.selected<0)return;const i=state.selected;if(state.fixed[i])return;
+ state.values[i]=n;save();render();}
+function render(){
+ if(!state)return;
+ document.querySelectorAll('[data-level]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.level===state.level)));
+ let selectedValue=state.values[state.selected];
+ const frag=document.createDocumentFragment();
+ state.values.forEach((v,i)=>{let b=document.createElement('button');b.type='button';b.className='cell';
+ if(state.fixed[i])b.classList.add('fixed');
+ if(i===state.selected)b.classList.add('selected');
+ else if(v&&selectedValue===v)b.classList.add('same');
+ if(v&&!valid(i,v))b.classList.add('bad');
+ b.textContent=v||'';b.setAttribute('role','gridcell');b.setAttribute('aria-label',Math.floor(i/9)+1+'. satır '+(i%9+1)+'. sütun: '+(v||'boş'));
+ b.addEventListener('click',()=>{state.selected=i;save();render();});
+ frag.appendChild(b);});
+ board.replaceChildren(frag);
+ let filled=state.values.filter(Boolean).length;
+ status.textContent=filled===81&&state.values.every((v,i)=>v===state.solution[i])?'Tebrikler! Bulmacayı tamamladın.':'Dolu hücre: '+filled+'/81';
+}
+document.getElementById('digits').innerHTML=Array.from({length:9},(_,i)=>'<button data-n="'+(i+1)+'">'+(i+1)+'</button>').join('')+'<button data-n="0">Sil</button><button id="hint">İpucu · seçili hücre</button>';
+document.getElementById('digits').addEventListener('click',e=>{const el=e.target.closest('button');if(!el)return;
+ if(el.id==='hint'){if(state&&state.selected>=0&&!state.fixed[state.selected])insert(state.solution[state.selected]);}
+ else if(el.dataset.n!==undefined)insert(Number(el.dataset.n));});
+document.getElementById('levels').addEventListener('click',e=>{let b=e.target.closest('[data-level]');if(b&&b.dataset.level!==state.level)newGame(b.dataset.level);});
+document.getElementById('reset').addEventListener('click',()=>newGame());
+window.addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='9')insert(Number(e.key));else if(e.key==='Backspace'||e.key==='Delete')insert(0);});
+load();render();
+</script></body></html>
