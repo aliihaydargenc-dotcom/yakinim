@@ -6,7 +6,7 @@ async function setup(page:Page){
  await page.route('**/api/location?**',r=>r.fulfill({json:{label:'Antalya'}}));
  await page.route('**/api/nearby?**',r=>r.fulfill({json:{elements:[],places:[]}}));
  await page.route('**/api/fishing?**',r=>r.fulfill({json:{hourly:[],daily:[]}}));
- await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+ await page.route('https://tiles.openfreemap.org/styles/liberty',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
  await page.goto('/');
  await page.getByRole('button',{name:'Tüm kategorileri aç',exact:true}).click();
  await page.getByRole('dialog',{name:'Tüm kategoriler',exact:true}).getByRole('button',{name:'Veteriner',exact:true}).click();

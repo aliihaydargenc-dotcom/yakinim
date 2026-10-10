@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node tests/audit-fixes.mjs && node tests/audit-ui.cjs && node tests/location-refinement.mjs && node tests/hardening.cjs && node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && node tests/prices.mjs && node tests/fishing.mjs && node tests/location-label.mjs && node tests/discovery.mjs && node tests/discovery-extensions.mjs && node tests/pilot.mjs && node tests/city-services.mjs && npm run build",
+    "test": "node tests/audit-fixes.mjs && node tests/audit-ui.cjs && node tests/location-refinement.mjs && node tests/hardening.cjs && node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && node tests/prices.mjs && node tests/fishing.mjs && node tests/location-label.mjs && node tests/discovery.mjs && node tests/discovery-extensions.mjs && node tests/pilot.mjs && node tests/city-services.mjs && node tests/traffic.mjs && npm run build",
     "test:mobile": "playwright test",
     "test:hardening": "node tests/hardening.cjs",
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js",

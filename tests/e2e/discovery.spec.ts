@@ -6,7 +6,7 @@ async function base(page:Page,location={lat:36.88,lng:30.7}){
  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements:[]}}));
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
  await page.route('**/api/fishing?**',r=>r.fulfill({json:{hourly:[{time:hour,airTemperature:22,feelsLike:23,rain:0,wind:2,visibility:10000}],daily:[{time:hour,uv:4}],fetchedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+900000).toISOString()}}));
- await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
+ await page.route('https://tiles.openfreemap.org/styles/liberty',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
 }
 async function category(page:Page,name:string){await page.getByRole('button',{name:'Tüm kategorileri aç',exact:true}).click();await page.getByRole('dialog',{name:'Tüm kategoriler',exact:true}).getByRole('button',{name,exact:true}).click();}
 test('new categories show unnamed public infrastructure, facts and map details within 5 km',async({page})=>{

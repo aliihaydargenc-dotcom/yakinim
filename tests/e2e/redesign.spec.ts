@@ -11,7 +11,7 @@ test('Model 1 opens with a list and nests duty under pharmacy',async({page})=>{
  await page.locator('.place-row').click();
  await expect(page.getByRole('dialog')).toBeVisible();
  await page.getByRole('button',{name:'Kapat',exact:true}).click();
- await page.getByRole('button',{name:'Oyun',exact:true}).click();
+ await page.locator('.shell-nav--mobile').getByRole('button',{name:'Diğer',exact:true}).click();await page.getByRole('button',{name:/^Oyunlar/}).click();
  await page.getByRole('button',{name:'2048 Sayı oyunu'}).click();
  await expect(page.frameLocator('iframe').locator('.tile').first()).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

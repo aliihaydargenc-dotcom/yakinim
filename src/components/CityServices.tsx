@@ -3,18 +3,21 @@ import {useQuery} from '@tanstack/react-query';
 import {RefreshCw} from 'lucide-react';
 import type {Coordinates} from '../types';
 const OutageMap=lazy(()=>import('./OutageMap'));
+const DiscoveryMap=lazy(()=>import('./MapView').then(m=>({default:m.MapView})));
 export type Outage={id:string;district?:string;neighborhood?:string;startsAt:string;endsAt:string|null;message?:string;notification?:string;locations?:{district:string;neighborhood:string}[];geometry?:{type:'MultiPolygon';coordinates:number[][][][]};source:string;sourceUrl:string};
 const date=(value:string)=>new Date(value).toLocaleString('tr-TR',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Istanbul'});
 const fold=(value:string)=>value.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i');
+type TrafficIndex={available:boolean;index:number|null;observedAt:string|null;fresh:boolean;source:string;sourceUrl:string;licenseUrl:string};
 export function TrafficView({location,search}:{location:Coordinates|null;search:string}){
- const center=location||{lat:36.8969,lng:30.7133};const [version,setVersion]=useState(0),[loaded,setLoaded]=useState(false);
- useEffect(()=>setLoaded(false),[version,center.lat,center.lng]);
- const [term,setTerm]=useState('');
- useEffect(()=>{const timer=setTimeout(()=>setTerm(search.trim()),600);return()=>clearTimeout(timer);},[search]);
- const params=new URLSearchParams({ll:`${center.lng},${center.lat}`,z:'14',l:'map,trf',lang:'tr_TR'});if(term.length>=2){params.set('mode','search');params.set('text',term);}
- const url=`https://yandex.com.tr/map-widget/v1/?${params}`;
- return <section className="pilot-panel traffic-panel"><div className="pilot-title"><h2>Trafik yoğunluğu</h2><button aria-label="Trafik haritasını yenile" onClick={()=>setVersion(v=>v+1)}><RefreshCw size={18}/></button></div><div className="traffic-map">{!loaded&&<p role="status" className="traffic-loading">Trafik haritası yükleniyor…</p>}<iframe key={version} title="Canlı trafik haritası" src={url} onLoad={()=>setLoaded(true)} allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/></div><small className="traffic-privacy-note">Yandex trafik haritası, seçilen konum ve arama terimini kendi sunucularından işler.</small><div className="traffic-legend" aria-label="Trafik renkleri"><span><i className="traffic-free"/>Akıcı</span><span><i className="traffic-slow"/>Yavaş</span><span><i className="traffic-busy"/>Yoğun</span></div></section>;
+ const center=location||{lat:36.8969,lng:30.7133};
+ const traffic=useQuery({queryKey:['traffic-index',location?.lat,location?.lng],queryFn:async({signal})=>{const response=await fetch(`/api/traffic?lat=${location!.lat}&lng=${location!.lng}`,{signal});if(!response.ok)throw Error('traffic_unavailable');return response.json() as Promise<TrafficIndex>;},enabled:!!location,staleTime:60000,refetchInterval:60000,retry:0});
+ return <section className="pilot-panel traffic-panel"><div className="pilot-title"><h2>Yol ve trafik</h2>{location&&<button aria-label="Trafik verisini yenile" disabled={traffic.isFetching} onClick={()=>void traffic.refetch()}><RefreshCw size={18}/></button>}</div><p>Keşif, ulaşım ve yol görünümünde aynı harita kullanılır.</p>
+ {traffic.data?.available&&!traffic.isError&&<section className="traffic-index-card"><strong>İstanbul geneli trafik endeksi</strong>{traffic.data.fresh&&traffic.data.index!==null?<div className="traffic-index-value">{traffic.data.index}<small>/ 100</small></div>:<p role="status">Kaynak güncel değil; canlı endeks gösterilmiyor.</p>}<small>Şehir geneli ölçümdür; tek bir yolun yoğunluğunu göstermez.</small>{traffic.data.observedAt&&<small>Kaynak zamanı: {new Date(traffic.data.observedAt).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})}</small>}<a href={traffic.data.sourceUrl} target="_blank" rel="noreferrer">{traffic.data.source}</a><a href={traffic.data.licenseUrl} target="_blank" rel="noreferrer">Açık veri lisansı</a></section>}
+ {traffic.isError&&<p role="alert">Trafik kaynağına ulaşılamadı. Yol haritası kullanılabilir.</p>}
+ <div className="traffic-map"><Suspense fallback={<p>Harita hazırlanıyor…</p>}><DiscoveryMap location={center} places={[]} picking={false} onPick={()=>{}} onViewportChange={()=>{}} memoryKey={`traffic:${center.lat}:${center.lng}`}/></Suspense></div>
+ <div className="traffic-source-actions"><small role="status">Bu görünüm yol haritasıdır. Yol üzerindeki canlı yoğunluk renkleri gösterilmez.</small>{!location?<small>Bölgenin veri durumunu görmek için bir konum seç.</small>:traffic.isPending?<small>Bu bölgenin trafik veri kapsamı kontrol ediliyor…</small>:traffic.data&&!traffic.data.available?<small>İBB açık trafik endeksi yalnızca İstanbul için kullanılabilir. Seçili bölge için doğrulanmış canlı trafik kaynağı henüz bağlı değil.</small>:null}{search.trim()&&<small>Cadde araması henüz desteklenmiyor; haritayı kaydırıp yakınlaştırabilirsin.</small>}</div></section>;
 }
+
 export function OutagesView({location,search}:{location:Coordinates|null;search:string}){
  const [kind,setKind]=useState<'water'|'electric'>('water'),[selected,setSelected]=useState<string|null>(null);
  const query=useQuery({queryKey:['outages',kind],queryFn:async({signal})=>{const r=await fetch(`/api/outages?kind=${kind}`,{signal});if(!r.ok)throw Error('source_unavailable');return r.json() as Promise<{items:Outage[];fetchedAt:string;partial:boolean;source?:string}>;},staleTime:60000,refetchInterval:300000,retry:1});

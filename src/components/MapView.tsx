@@ -106,7 +106,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const saved=memoryKey?cameras.get(memoryKey):undefined;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: "https://tiles.openfreemap.org/styles/positron",
+      style: "https://tiles.openfreemap.org/styles/liberty",
       center: saved?.center ?? (location ? [location.lng, location.lat] : [35, 39]),
       zoom: saved?.zoom ?? (location ? 14.6 : 5.2),
       attributionControl: { compact: true },

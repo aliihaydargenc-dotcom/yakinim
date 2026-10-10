@@ -68,6 +68,9 @@
     },
     "api/location.js": {
       "maxDuration": 15
+    },
+    "api/traffic.js": {
+      "maxDuration": 15
     }
   }
 }
