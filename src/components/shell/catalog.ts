@@ -10,7 +10,7 @@ import discoveryCategories from '../../../lib/discovery-categories.json';
 import type {CategoryId} from '../../types';
 
 export type Tab = 'explore'|'services'|'saved'|'more';
-export type Service = 'prices'|'transit'|'traffic'|'events';
+export type Service = 'places'|'prices'|'transit'|'events';
 export type Media = 'news'|'radio'|'games';
 export type NavOption = {id:Tab;label:string;Icon:LucideIcon};
 export const tabs:NavOption[] = [
@@ -20,14 +20,13 @@ export const tabs:NavOption[] = [
   {id:'more',label:'Diğer',Icon:Ellipsis},
 ];
 export const services:{id:Service;label:string;description:string;Icon:LucideIcon}[] = [
-  {id:'prices',label:'Market fiyatları',description:'Kaynakta bildirilen ürün fiyatları',Icon:TrendingDown},
+  {id:'prices',label:'Market',description:'Kaynakta bildirilen ürün fiyatları',Icon:TrendingDown},
   {id:'transit',label:'Toplu ulaşım',description:'Antalya durakları ve geliş tahminleri',Icon:BusFront},
-  {id:'traffic',label:'Trafik',description:'Kaynak kapsamı ve yol haritası',Icon:Navigation},
   {id:'events',label:'Etkinlikler',description:'Duyurular ve program',Icon:CalendarDays},
 ];
 export const categories:{id:CategoryId;label:string;Icon:LucideIcon}[] = [
   {id:'all',label:'Tümü',Icon:Compass},
-  {id:'market',label:'Market',Icon:ShoppingBasket},
+  {id:'market',label:'Marketler',Icon:ShoppingBasket},
   {id:'food',label:'Yemek',Icon:UtensilsCrossed},
   {id:'cafe',label:'Kafe',Icon:Coffee},
   {id:'duty',label:'Nöbetçi eczane',Icon:Cross},

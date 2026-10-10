@@ -10,10 +10,9 @@ import { RadioPlayer } from "./components/RadioPlayer";
 import { combinePlaceSources, fetchDiscoveryPlaces, fetchMunicipalPlaces, fetchArea, fetchDuty, fetchOvertureSupplement, fetchRadio, type ViewportBounds } from "./services/api";
 import { useAppStore } from "./store";
 import {useBackLayer} from "./hooks/useBackLayer";
+import {sparsePlaces} from './services/map-viewport';
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
-const WeatherSummary = lazy(()=>import("./components/WeatherSummary"));
-const MapWeatherChip = lazy(()=>import("./components/MapWeatherChip").then(m=>({default:m.MapWeatherChip})));
 const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
 const MapView = lazy(() => import("./components/MapView").then(m => ({ default: m.MapView })));
 const NewsView = lazy(() => import("./components/NewsView").then(m => ({ default: m.NewsView })));
@@ -32,28 +31,29 @@ const DEMO_PLACES: Place[] = [
   { id: "demo5", name: "Örnek Yemek Yeri", category: "food", lat: 36.8587, lng: 30.6415, address: "Örnek adres · Konyaaltı, Antalya" },
   { id: "demo6", name: "Örnek ATM", category: "atm", lat: 36.8606, lng: 30.6347, address: "Örnek adres · Konyaaltı, Antalya" },
 ];
-const LABELS: Record<string,string> = { ...Object.fromEntries(discoveryCategories.map(c=>[c.id,c.label])), transit:"Ulaşım",events:"Etkinlik",all:"Tüm yerler", market:"Marketler", food:"Yemek", cafe:"Kafeler", duty:"Nöbetçi eczaneler", pharmacy:"Eczaneler", bakery:"Fırınlar", atm:"ATM", park:"Parklar", hospital:"Sağlık", fuel:"Akaryakıt", parking:"Otopark", greengrocer:"Manavlar", shopping:"Alışveriş" };
+const LABELS: Record<string,string> = { ...Object.fromEntries(discoveryCategories.map(c=>[c.id,c.label])), transit:"Ulaşım",events:"Etkinlik",all:"Yerler", market:"Marketler", food:"Yemek", cafe:"Kafeler", duty:"Nöbetçi eczaneler", pharmacy:"Eczaneler", bakery:"Fırınlar", atm:"ATM", park:"Parklar", hospital:"Sağlık", fuel:"Akaryakıt", parking:"Otopark", greengrocer:"Manavlar", shopping:"Alışveriş" };
 function boundsAround(c: Coordinates): ViewportBounds { return { south:c.lat-.012, north:c.lat+.012, west:c.lng-.018, east:c.lng+.018 }; }
 function distance(a: Coordinates,b: Coordinates) { const r=Math.PI/180; const h=Math.sin((b.lat-a.lat)*r/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin((b.lng-a.lng)*r/2)**2; return Math.round(12742000*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))); }
 function distanceLabel(m?: number) { return m === undefined || !Number.isFinite(m) ? "" : m<1000 ? `${m} m` : `${(m/1000).toFixed(1).replace('.',',')} km`; }
 
-export default function App({embedded=false, splitMap=false, service, isVisible=true, onGameActivity,onMapChange}:{embedded?:boolean;splitMap?:boolean;service?:string|null;isVisible?:boolean;onGameActivity?:(playing:boolean)=>void;onMapChange?:(map:boolean)=>void}={}) {
-  const {section,setSection,category,setCategory,search,setSearch,location:storedLocation,setLocation,clearLocation,restoredLocation,locationError,setLocationError,savedIds,toggleSaved} = useAppStore();
+export default function App({embedded=false, homeMap=false, onBack, service, isVisible=true, onGameActivity,onMapChange}:{embedded?:boolean;homeMap?:boolean;onBack?:()=>void;service?:string|null;isVisible?:boolean;onGameActivity?:(playing:boolean)=>void;onMapChange?:(map:boolean)=>void}={}) {
+  const {section,setSection,category,setCategory,search,setSearch,location:storedLocation,setLocation,clearLocation,locationError,setLocationError,savedIds,toggleSaved} = useAppStore();
   const [previewState,setPreviewState] = useState("ready");
   const location = DEMO ? (previewState === "location" ? null : DEMO_ORIGIN) : storedLocation;
-  const locationScope = location ? `${location.lat.toFixed(5)}:${location.lng.toFixed(5)}` : "none";
+  const locationScope = location ? `${location.lat.toFixed(useAppStore.getState().locationMode==='manual'?5:3)}:${location.lng.toFixed(useAppStore.getState().locationMode==='manual'?5:3)}` : "none";
   const [area,setArea] = useState<{center:Coordinates;bounds:ViewportBounds;owner:string}|null>(()=>{const c=location||ANTALYA_CENTER;return {center:c,bounds:boundsAround(c),owner:locationScope};});
   const [sectionSearch,setSectionSearch]=useState<Record<string,string>>({});
   const [productMode,setProductMode] = useState(false);
-  const [transitMode,setTransitMode]=useState<"stops"|"traffic">("stops");
-  const searchMode=category==='transit'&&transitMode==='traffic'?'traffic':category==='market'&&productMode?'prices':category;
+  const searchMode=category==='market'&&productMode?'prices':category;
   const activeSearch=sectionSearch[searchMode]||'';
-  const [mapOpen,setMapOpen] = useState(false);
+  const [mapOpen,setMapOpen] = useState(homeMap);
+  const [locationPanel,setLocationPanel]=useState(false);
+  const [recenter,setRecenter]=useState(0);
   const pilot = ((category === "transit" && section !== "map") || category === "events" || category === "market" && productMode) && !mapOpen;
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
   useEffect(()=>setSelected(null),[locationScope]);
-  useBackLayer(mapOpen,()=>{setMapOpen(false);setPicking(false);onMapChange?.(false);});
+  useBackLayer(picking||mapOpen&&!homeMap,()=>{setMapOpen(homeMap);setPicking(false);onMapChange?.(false);});
 
   useEffect(()=>{if(!isVisible)setSelected(null);},[isVisible]);
   useEffect(()=>{window.scrollTo(0,0);},[category,mapOpen,service]);
@@ -67,19 +67,16 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   const mounted = useRef(true);
   const locationRequest = useRef(0);
   const locationWatch = useRef<number|null>(null);
-  const locationWatchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const [pickedCoast,setPickedCoast]=useState<Coordinates|null>(null);
-  const coastPick=useRef(false);
   const workspace=useRef<HTMLElement>(null);
   useEffect(()=>{
     const node=workspace.current;
     if(!node?.animate||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    const animation=node.animate([{opacity:.55},{opacity:1}],{duration:160,easing:'ease-out'});
+    const animation=node.animate([{opacity:.6,transform:"translateY(6px)"},{opacity:1,transform:"translateY(0)"}],{duration:260,easing:'ease-out'});
     return ()=>animation.cancel();
   },[section,category,productMode,mapOpen]);
   function stopLocationWatch() {
     if(locationWatch.current!==null) navigator.geolocation.clearWatch(locationWatch.current);
-    locationWatch.current=null;clearTimeout(locationWatchTimer.current);
+    locationWatch.current=null;
   }
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;clearTimeout(moveTimer.current);stopLocationWatch();};},[]);
   useEffect(()=>{
@@ -101,8 +98,8 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   useEffect(()=>{clearTimeout(moveTimer.current);setViewportPending(false);const c=location||ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});},[locationScope]);
   const areaReady = !!location && !!area && area.owner === locationScope;
   useEffect(()=>{if(category==="transit"&&section==="map"&&area&&!inAntalya(area.center)){const c=location&&inAntalya(location)?location:ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}},[category,section,locationScope]);
-  useEffect(()=>{if(embedded){setMapOpen(section==='map');if(section!=='map')setPicking(false);}},[section,embedded]);
-  useEffect(()=>{setProductMode(service==='prices');setTransitMode(service==='traffic'?'traffic':'stops');if(service){setSectionSearch(v=>({...v,[service==='traffic'?'traffic':service==='prices'?'prices':service]:''}));setMapOpen(false);}},[service]);
+  useEffect(()=>{if(embedded){setMapOpen(homeMap||section==='map');if(section!=='map')setPicking(false);}},[section,embedded,homeMap]);
+  useEffect(()=>{setProductMode(service==='prices');if(service&&service!=='places'){setSectionSearch(v=>({...v,[service==='prices'?'prices':service]:''}));setMapOpen(false);}},[service]);
   useEffect(()=>{onGameActivity?.(playingGame);},[playingGame,onGameActivity]);
   const active = isVisible && (section === "nearby" || section === "map");
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
@@ -111,7 +108,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   const fuelQuery=useQuery({queryKey:['fuel-area',locationScope],queryFn:({signal})=>fetchArea({south:location!.lat-.04,north:location!.lat+.04,west:location!.lng-.05,east:location!.lng+.05},location!,signal),enabled:!DEMO&&active&&category==='fuel'&&!mapOpen&&!!location,staleTime:600000,retry:1});
   const stopView=area?.bounds;
   const transitMapQuery=useQuery({
-    queryKey:['main-map-transit',category,section,locationScope,stopView?.south,stopView?.west,stopView?.north,stopView?.east,category==='transit'?search.trim():''],
+    queryKey:['main-map-transit',category,section,locationScope,stopView?.south.toFixed(3),stopView?.west.toFixed(3),stopView?.north.toFixed(3),stopView?.east.toFixed(3),category==='transit'?search.trim():''],
     queryFn:async({signal})=>{
       const params=new URLSearchParams();
       if(category==='transit'&&search.trim())params.set('q',search.trim());
@@ -121,7 +118,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
       if(!res.ok)throw new Error('transit_data');
       return res.json() as Promise<{stops:{id:string;name:string;lat:number;lng:number;routes:string[];distanceM:number}[];partial:boolean}>;
     },
-    enabled:!DEMO&&active&&section==='map'&&mapOpen&&areaReady&&(category==='transit'||category==='all'),
+    enabled:!DEMO&&active&&section==='map'&&mapOpen&&areaReady&&category==='transit',
 
     staleTime:300000,retry:0,
   });
@@ -152,6 +149,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
     return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
   },[category,search,areaData,supplementData,dutyData,fuelQuery.data,municipalQuery.data,municipalArea,discoveryQuery.data,discoverySupplementQuery.data,isDiscovery,mapOpen,areaReady,location?.lat,location?.lng,transitMapQuery.data]);
   const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || ((category==="fuel"||isDiscovery||category==="parking"&&municipalArea)&&!mapOpen) || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area,mapOpen,isDiscovery,municipalArea]);
+  const homePlaces=useMemo(()=>sparsePlaces(places,area?.center||location||ANTALYA_CENTER),[places,area?.center.lat,area?.center.lng]);
   const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyData.length : isDiscovery||category==='parking'&&municipalArea ? !matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||discoveryQuery.isFetching||discoverySupplementQuery.isFetching||municipalQuery.isFetching) : category==='fuel'?!matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||fuelQuery.isFetching):!matchingPlaces.length && (areaQuery.isFetching||supplementQuery.isFetching||municipalEnabled&&municipalQuery.isFetching);
   const failed = DEMO ? previewState==="error" : category==="duty" ? dutyQuery.isError : areaQuery.isError && supplementQuery.isError && !matchingPlaces.length && (!isDiscovery||discoveryQuery.isError&&discoverySupplementQuery.isError) && (!municipalArea||!['all','parking','toilets'].includes(category)||municipalQuery.isError);
   const updating = !DEMO && (areaQuery.isFetching || supplementQuery.isFetching || municipalEnabled&&municipalQuery.isFetching || isDiscovery&&discoveryQuery.isFetching);
@@ -162,37 +160,41 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   useEffect(()=>{if(!DEMO)useAppStore.getState().rememberSavedPlaces?.(matchingPlaces);},[matchingPlaces]);
   function requestLocation() {
     if(DEMO) {setPreviewState("ready");setPicking(false);return;}
-    if(!window.isSecureContext || !navigator.geolocation) {setLocationError("Cihaz konumu bu tarayıcıda kullanılamıyor. Siteyi HTTPS bağlantısıyla aç veya haritadan seç.");return;}
+    if(!window.isSecureContext || !navigator.geolocation) {setLocationError("Konum kullanılamıyor");return;}
     stopLocationWatch();
     const request=++locationRequest.current;
     setLocating(true);setLocationError("");
     const current=()=>mounted.current && request===locationRequest.current;
     let bestAccuracy=Infinity;
     let refining=false;
+    let lastFix:Coordinates|null=null;
     const accept=(p:GeolocationPosition)=>{
       if(!current())return;
       const {latitude,longitude,accuracy}=p.coords;
       if(!Number.isFinite(latitude)||!Number.isFinite(longitude))return;
       const precision=Number.isFinite(accuracy)?accuracy:Infinity;
-      if(precision>bestAccuracy)return;
-      bestAccuracy=precision;
-      clearTimeout(moveTimer.current);
+      if(precision>Math.max(100,bestAccuracy*2))return;
+      const next={lat:latitude,lng:longitude};
+      if(lastFix&&distance(lastFix,next)<20)return;
+      lastFix=next;
+      bestAccuracy=Math.min(bestAccuracy,precision);
       setLocation({lat:latitude,lng:longitude});setLocating(false);setPicking(false);
-      if(precision<=30)stopLocationWatch();
+      setLocationPanel(false);
     };
     const success=(p:GeolocationPosition)=>{
       accept(p);
       // The first device fix can be coarse. Keep receiving better fixes after one tap.
-      if(!current()||bestAccuracy<=30||refining||!navigator.geolocation.watchPosition)return;
+      if(!current()||refining||!navigator.geolocation.watchPosition)return;
+      setRecenter(v=>v+1);
       refining=true;
       locationWatch.current=navigator.geolocation.watchPosition(accept,()=>{}, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
-      locationWatchTimer.current=setTimeout(stopLocationWatch,20000);
+
     };
     const failure=(e:GeolocationPositionError)=>{
       if(!current())return;
       setLocationError(e.code===1
-        ? "Konum izni verilmedi. Cihazın Konum Servislerini ve tarayıcıdaki site iznini kontrol edip tekrar dene. Konum izni vermeden haritadan da seçebilirsin."
-        : "Cihaz konumu alınamadı. Konum Servislerini ve bağlantını kontrol edip tekrar dene veya haritadan seç.");
+        ? "Konum izni verilmedi"
+        : "Konum alınamadı");
       setLocating(false);
     };
     // Keep the native request inside the button gesture, without a Permissions API gate.
@@ -202,48 +204,46 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
       navigator.geolocation.getCurrentPosition(success,failure,{enableHighAccuracy:false,timeout:15000,maximumAge:0});
     },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   }
-  function chooseOnMap() {onMapChange?.(true);coastPick.current=false;stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
-  function chooseCoast(){chooseOnMap();coastPick.current=true;}
+  function chooseOnMap() {setLocationPanel(false);onMapChange?.(true);stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
     clearTimeout(moveTimer.current);
     setViewportPending(true);
-    moveTimer.current=setTimeout(()=>{setArea({center,bounds,owner:locationScope});setViewportPending(false);},450);
+    moveTimer.current=setTimeout(()=>{setArea(old=>old?.owner===locationScope&&Object.keys(bounds).every(k=>old.bounds[k as keyof ViewportBounds].toFixed(3)===bounds[k as keyof ViewportBounds].toFixed(3))?old:{center,bounds,owner:locationScope});setViewportPending(false);},450);
   }
-  function pick(c:Coordinates) {if(coastPick.current){setPickedCoast(c);coastPick.current=false;}stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c),owner:`${c.lat.toFixed(5)}:${c.lng.toFixed(5)}`});setPicking(false);setMapOpen(false);onMapChange?.(false);if(DEMO)setPreviewState("ready");}
+  function pick(c:Coordinates) {stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c),owner:`${c.lat.toFixed(5)}:${c.lng.toFixed(5)}`});setPicking(false);setMapOpen(homeMap);setRecenter(v=>v+1);onMapChange?.(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();if(municipalArea)void municipalQuery.refetch();if(category==='fuel')void fuelQuery.refetch();if(isDiscovery){void discoveryQuery.refetch();void discoverySupplementQuery.refetch();}}}
   return <div data-view={mapOpen?'map':'list'} className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {section==="nearby"||section==="map" ? <>
-      <header className={mapOpen?'model-header map-main-header':'model-header'}>
-        <>{mapOpen?<button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);onMapChange?.(false);}}><ArrowLeft size={20}/>Listeye dön</button>:<strong className="brand-lockup"><span className="brand-mark"><MapPin size={20}/></span><span>yakınım<span className="brand-period">.</span></span></strong>}</>
-        <button className="map-current-location" onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={20}/>{!mapOpen&&<span>{locating?'Bulunuyor…':'Konum'}</span>}</button>
+      <header className="model-header compact-location-header">
+        {onBack&&!picking&&<button className="service-back" aria-label={mapOpen?"Listeye dön":"Hizmetlere dön"} onClick={()=>{if(mapOpen){setMapOpen(false);onMapChange?.(false);}else onBack();}}><ArrowLeft size={21}/></button>}
+        {picking?<button className="location-name" onClick={()=>{setPicking(false);setMapOpen(homeMap);onMapChange?.(false);}}><X size={18}/>Vazgeç</button>:<button className="location-name" onClick={()=>setLocationPanel(true)}><LocationStatus location={location} demo={DEMO}/></button>}
+        <button className="location-control" onClick={()=>setLocationPanel(true)} disabled={locating} aria-label="Konum"><LocateFixed size={22} className={locating?'locating-spin':''}/></button>
       </header>
-      {!mapOpen&&<LocationStatus location={location} manual={useAppStore.getState().locationMode==="manual"} restored={restoredLocation} demo={DEMO} onChooseMap={chooseOnMap} onClear={()=>{stopLocationWatch();++locationRequest.current;setLocating(false);clearLocation();}}/>}
-      <div className={splitMap&&!mapOpen&&!pilot?"discovery-layout":"single-workspace"}><main ref={workspace} className={mapOpen?'map-workspace':splitMap&&!pilot?'list-workspace split-list-workspace':'list-workspace'}>
-        {!mapOpen && <section className="discovery-intro"><h1>{service?({'prices':'Market fiyatları','transit':'Toplu ulaşım','traffic':'Trafik','events':'Etkinlikler'} as Record<string,string>)[service]:category==='all'?'Yakınındaki yerler':LABELS[category]}</h1></section>}
-        {!mapOpen && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='traffic'?'Trafikte yer ara':searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':'Yer ara'} placeholder={searchMode==='traffic'?'Cadde veya yer ara':searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
-        {mapOpen&&<label className="search-box map-stop-search unified-search"><Search size={19}/><input aria-label={category==='transit'?'Durak veya hat ara':'Yer ara'} placeholder={category==='transit'?'Durak veya hat ara':'Bu alandaki yerleri ara'} value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="Aramayı temizle" onClick={()=>setSearch('')}><X size={18}/></button>}</label>}
-        {!service&&<CategoryRail variant={mapOpen?"map":"list"} value={category} onChange={c=>{setCategory(c);setSearch(mapOpen?'':sectionSearch[c]||'');setSelected(null);setPicking(false);}}/>}
-        {category==='all'&&location&&!mapOpen&&!picking&&<Suspense fallback={null}><WeatherSummary location={location}/></Suspense>}
-        {category==='market'&&!mapOpen&&!service&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
-        {(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tüm eczaneler</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
-        {((!location&&!pilot&&!mapOpen) || (picking&&!mapOpen) || (locationError&&!mapOpen)) && <section className="state-card location-gate"><strong>{locationError?(location?'Konum güncellenemedi':'Konum alınamadı'):picking?'Haritada bir nokta seç':'Konum seç'}</strong>{!locationError&&<p>Yakındaki yerleri görmek için cihaz konumunu kullan veya haritada bir nokta seç.</p>}{locationError && <p role="alert">{locationError}{location?" · Önceki konum kullanılmaya devam ediyor.":""}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch} transitMode={transitMode} onTransitModeChange={setTransitMode}/></Suspense>:mapOpen ? <div className="model-map">
-        {!location&&!picking&&<button type="button" className="map-origin-prompt" onClick={requestLocation}><LocateFixed size={16}/>Konumumu kullan</button>}
-        {location&&!picking&&<Suspense fallback={null}><MapWeatherChip location={location}/></Suspense>}
-        {locationError&&<div className="map-location-error" role="alert">{locationError}</div>}{category==='transit'&&<small className="map-data-scope">Antalya durakları{location&&!inAntalya(location)?' · Seçtiğin konum bu kapsamın dışında':''}</small>}
-        <Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={DEMO&&["loading","error","empty"].includes(previewState)?[]:matchingPlaces} location={category==="transit"?(location&&inAntalya(location)?location:null):location} initialCenter={location?area?.center:undefined} focusTarget={category==="transit"?{key:"transit",position:location&&inAntalya(location)?location:ANTALYA_CENTER}:undefined} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} enableList={!picking} selectionScope={`${category}:${locationScope}`} onSavePlace={p=>toggleSaved(p.id,p,!DEMO)} savedPlaceIds={savedIds} dataError={failed||sourceIncomplete?"Yer verisi tam alınamadı; bu alanda yer olmadığı sonucu çıkarılamaz.":undefined} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense></div> : location && !picking ? <>
+      <FeatureSheet open={locationPanel} title="Konum" onClose={()=>setLocationPanel(false)}><div className="location-options">{locationError&&<p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}><LocateFixed size={19}/>{locating?'Bulunuyor…':'Konumumu kullan'}</button><button className="outline-button" onClick={chooseOnMap}><MapPin size={19}/>Haritadan seç</button>{location&&!DEMO&&<button className="plain-button" onClick={()=>{stopLocationWatch();++locationRequest.current;setLocating(false);clearLocation();setLocationPanel(false);}}>Konumu sil</button>}</div></FeatureSheet>
+      <div className="single-workspace"><main ref={workspace} className={mapOpen?'map-workspace':'list-workspace'}>
+        {!mapOpen && <section className="discovery-intro"><h1>{service?({'prices':'Ürünler','transit':'Toplu ulaşım','places':LABELS[category],'events':'Etkinlikler'} as Record<string,string>)[service]:LABELS[category]}</h1></section>}
+        {!mapOpen && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':'Yer ara'} placeholder={searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='all'?'Yer ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
+        {mapOpen&&!homeMap&&!picking&&<label className="search-box map-stop-search unified-search"><Search size={19}/><input aria-label={category==='transit'?'Durak veya hat ara':'Yer ara'} placeholder={category==='transit'?'Durak veya hat ara':'Bu alandaki yerleri ara'} value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="Aramayı temizle" onClick={()=>setSearch('')}><X size={18}/></button>}</label>}
+        {!homeMap&&service==='places'&&!picking&&<CategoryRail variant={mapOpen?"map":"list"} value={category} onChange={c=>{setCategory(c);setSearch(mapOpen?'':sectionSearch[c]||'');setSelected(null);setPicking(false);}}/>}
+        {category==='market'&&!mapOpen&&service==='places'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}
+        {!homeMap&&!picking&&(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tüm eczaneler</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
+        {((!location&&!pilot&&!mapOpen) || (picking&&!mapOpen) || (locationError&&!mapOpen)) && <section className="state-card location-gate"><strong>{locationError?(location?'Konum güncellenemedi':'Konum alınamadı'):picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
+        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch}/></Suspense>:mapOpen ? <div className="model-map">
+
+        {!picking&&sourceIncomplete&&!mapLoading&&<div className="map-source-state" role="alert"><span>Veri alınamadı</span><button onClick={retry}>Yenile</button></div>}{locationError&&<div className="map-location-error" role="alert">{locationError}</div>}{category==='transit'&&<small className="map-data-scope">Antalya durakları{location&&!inAntalya(location)?' · Seçtiğin konum bu kapsamın dışında':''}</small>}
+        <Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={picking?[]:DEMO&&["loading","error","empty"].includes(previewState)?[]:homeMap?homePlaces:matchingPlaces} recenterKey={recenter} minimalPOI={homeMap} location={category==="transit"?(location&&inAntalya(location)?location:null):location} initialCenter={location?area?.center:undefined} focusTarget={category==="transit"?{key:"transit",position:location&&inAntalya(location)?location:ANTALYA_CENTER}:undefined} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} enableList={!picking&&!homeMap} selectionScope={`${category}:${locationScope}`} onSavePlace={p=>toggleSaved(p.id,p,!DEMO)} savedPlaceIds={savedIds} dataError={failed||sourceIncomplete?"Veri alınamadı":undefined} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{failed?'Veri alınamadı':loading?'Yerler yükleniyor…':`${visible.length} kayıt${visible.length>100?' · İlk 100 gösteriliyor':''}`}</span><button onClick={()=>{setMapOpen(true);onMapChange?.(true);}}><MapPin size={18}/>Harita</button></div>
-          {category==="duty" && dutyData.some(p=>p.source==="legacy-fallback") && <small className="data-note" role="status">Resmî listeye erişilemedi; kayıtlar Eczane Adresi alternatif kaynağından. Gitmeden önce telefonla doğrulayın.</small>}
+          {category==="duty" && dutyData.some(p=>p.source==="legacy-fallback") && <small className="data-note" role="status">Eczane Adresi</small>}
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}
-          {!loading&&!failed&&!visible.length && <div className="state-card"><strong>{sourceIncomplete?'Kaynaklar eksik; sonuç doğrulanamadı':category==='duty'?'Bu çevre için nöbetçi kaydı alınamadı':'Eşleşme bulunamadı'}</strong><p>Bu sonuç, çevrede yer olmadığı anlamına gelmez. Aramayı değiştir veya haritadan başka bir alan seç.</p>{sourceIncomplete&&<button className="plain-button" onClick={retry}>Tekrar dene</button>}<button className="plain-button" onClick={()=>{setMapOpen(true);onMapChange?.(true);}}>Haritada ara</button></div>}
-          <small className="data-note">Mesafeler kuş uçuşudur. Kayıtlar anlık açık olma veya stok bilgisi göstermez.</small><div className="places-list">{visible.slice(0,100).map(p=><button className="place-row" key={p.id} onClick={()=>setSelected(p)}><span className="place-symbol">{p.category==='duty'||p.category==='pharmacy'?<Cross size={25}/>:<MapPin size={23}/>}</span><span><strong>{p.name}</strong><small>{LABELS[p.category]} · {distanceLabel(p.distanceM)}</small><small>{p.address==='Adres bilgisi yok'?'':p.address}</small><PlaceFacts place={p} compact/></span><ChevronRight size={19}/></button>)}</div>
+          {!loading&&!failed&&!visible.length && <div className="state-card"><strong>{sourceIncomplete?'Veri eksik':category==='duty'?'Bu çevre için nöbetçi kaydı alınamadı':'Eşleşme bulunamadı'}</strong>{sourceIncomplete&&<button className="plain-button" onClick={retry}>Tekrar dene</button>}<button className="plain-button" onClick={()=>{setMapOpen(true);onMapChange?.(true);}}>Haritada ara</button></div>}
+          <div className="places-list">{visible.slice(0,100).map(p=><button className="place-row" key={p.id} onClick={()=>setSelected(p)}><span className="place-symbol">{p.category==='duty'||p.category==='pharmacy'?<Cross size={25}/>:<MapPin size={23}/>}</span><span><strong>{p.name}</strong><small>{LABELS[p.category]} · {distanceLabel(p.distanceM)}</small><small>{p.address==='Adres bilgisi yok'?'':p.address}</small><PlaceFacts place={p} compact/></span><ChevronRight size={19}/></button>)}</div>
           {updating && visible.length>0 && <small className="data-note" role="status">Güncelleniyor…</small>}
-          {sourceIncomplete&&!failed&&visible.length>0&&<small className="data-note">Bazı kaynaklar alınamadı; önceki kayıtlar gösteriliyor olabilir.</small>}
+          {sourceIncomplete&&!failed&&visible.length>0&&<small className="data-note">Veri eksik</small>}
         </> : null}
-      </main>{splitMap&&!mapOpen&&!pilot&&<aside className="discovery-map-panel" aria-label="Yakındaki yerlerin haritası"><div className="discovery-map-title"><strong>Çevreni keşfet</strong><small>{matchingPlaces.length} yer</small></div><Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView location={location} places={matchingPlaces} picking={false} onPick={pick} onViewportChange={viewport} loading={mapLoading} onPlaceOpen={setSelected}/></Suspense></aside>}</div>
-      <FeatureSheet closeLabel="Kapat" open={!!selected} title={selected?.name||'Yer ayrıntısı'} onClose={()=>setSelected(null)}>{selected&&<section className="place-detail"><p>{selected.address||'Adres bilgisi doğrulanmadı'}</p><PlaceFacts place={selected}/><small>{distanceLabel(selected.distanceM)}{selected.distanceM!==undefined?' · yaklaşık, kuş uçuşu':''}</small>{selected.source&&<small className="data-note">Kaynak: {selected.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":selected.source}{selected.queryDate&&` · ${selected.queryDate}`}</small>}<p className="data-note">Gitmeden önce adresi ve açık olma durumunu kaynaktan veya telefonla doğrula.</p><div className="detail-buttons">{selected.phone&&!DEMO&&<a className="outline-button" href={`tel:${selected.phone}`}><Phone size={18}/>Ara</a>}{!DEMO&&Number.isFinite(selected.lat)&&Number.isFinite(selected.lng)&&<a className="solid-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={18}/>Yol tarifi</a>}<button aria-label="Yeri kaydet" aria-pressed={savedIds.includes(selected.id)} onClick={()=>toggleSaved(selected.id,selected,!DEMO)}><Heart size={20} fill={savedIds.includes(selected.id)?'currentColor':'none'}/>{savedIds.includes(selected.id)?'Kaydedildi':'Kaydet'}</button></div></section>}</FeatureSheet>
+      </main></div>
+      <FeatureSheet closeLabel="Kapat" open={!!selected} title={selected?.name||'Yer ayrıntısı'} onClose={()=>setSelected(null)}>{selected&&<section className="place-detail"><p>{selected.address||''}</p><PlaceFacts place={selected}/><small>{distanceLabel(selected.distanceM)}</small>{selected.source&&<small className="data-note">Kaynak: {selected.source==="legacy-fallback"?"Eczane Adresi":selected.source}{selected.queryDate&&` · ${selected.queryDate}`}</small>}<div className="detail-buttons">{selected.phone&&!DEMO&&<a className="outline-button" href={`tel:${selected.phone}`}><Phone size={18}/>Ara</a>}{!DEMO&&Number.isFinite(selected.lat)&&Number.isFinite(selected.lng)&&<a className="solid-button" href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer"><Navigation size={18}/>Yol tarifi</a>}<button aria-label="Yeri kaydet" aria-pressed={savedIds.includes(selected.id)} onClick={()=>toggleSaved(selected.id,selected,!DEMO)}><Heart size={20} fill={savedIds.includes(selected.id)?'currentColor':'none'}/>{savedIds.includes(selected.id)?'Kaydedildi':'Kaydet'}</button></div></section>}</FeatureSheet>
 
     </> : <main ref={workspace} className="secondary-workspace"><Suspense fallback={<div className="state-card">Yükleniyor…</div>}>{section==='news'?<NewsView/>:section==='games'?<GamesView onActiveChange={setGameActive}/>:<RadioView current={currentRadio} onSelect={setCurrentRadio}/>}</Suspense></main>}
     <RadioPlayer station={currentRadio} stations={radioQuery.data||[]} onSelect={setCurrentRadio} onClose={()=>setCurrentRadio(null)}/>

@@ -11,7 +11,7 @@ const useAppStore=()=>({...store,category});useAppStore.getState=()=>store;
 function load(path){
  const module={exports:{}};
  const requireMock=name=>{
-  if(name==='react')return {...React,useState:initial=>{const i=stateIndex++;return React.useState(path.endsWith('App.tsx')&&picking&&(i===5||i===7)?true:initial)},lazy:loader=>props=>React.createElement('div',{'data-lazy':loader.toString().includes('MapView')?'map':'pilot','data-picking':String(props.picking)})};
+  if(name==='react')return {...React,useState:initial=>{const i=stateIndex++;return React.useState(path.endsWith('App.tsx')&&picking&&(i===4||i===8)?true:initial)},lazy:loader=>props=>React.createElement('div',{'data-lazy':loader.toString().includes('MapView')?'map':'pilot','data-picking':String(props.picking)})};
   if(name==='@tanstack/react-query')return {useQuery:()=>query};
   if(name==='lucide-react')return new Proxy({},{get:()=>()=>null});
   if(name.includes('/store'))return {useAppStore};
@@ -22,6 +22,8 @@ function load(path){
   if(name.includes('PlaceFacts'))return {PlaceFacts:()=>null};
   if(name.includes('discovery-categories'))return {default:require('../lib/discovery-categories.json')};
   if(name.includes('event-cities'))return {default:require('../lib/event-cities.json')};
+  if(name.includes('map-viewport'))return {coveredBy:()=>true,requestBounds:x=>x,sparsePlaces:x=>x};
+  if(name.includes('TransitArrivals'))return {TransitArrivals:()=>null};
   if(name.includes('LocationStatus'))return {LocationStatus:()=>null};
   if(name.includes('CategoryRail'))return {CategoryRail:()=>null};
   if(name.includes('RadioPlayer'))return {RadioPlayer:()=>null};
