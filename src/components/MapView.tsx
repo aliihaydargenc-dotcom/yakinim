@@ -77,15 +77,19 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       entry.button.setAttribute("aria-label",place.name);
       entry.button.setAttribute("aria-pressed",String(place.id === selectedRef.current?.id));
       if (entry.label.textContent !== place.name) entry.label.textContent = place.name;
-      entry.marker.getElement().hidden = map.getZoom() < 13;
-      // Reserve name space only after a gesture settles. Dots and their touch
-      // targets remain available even when two names cannot fit side by side.
-      const labelWidth = entry.label.offsetWidth || 100;
-      const labelHeight = entry.label.offsetHeight || 32;
-      const rect = {left:point.x-labelWidth/2-4,right:point.x+labelWidth/2+4,top:point.y+14,bottom:point.y+14+labelHeight+4};
+      const zoom = map.getZoom();
+      const selected = place.id === selectedRef.current?.id;
+      entry.marker.getElement().hidden = zoom < 13;
+      entry.marker.getElement().style.zIndex = selected ? "12" : "2";
+      // Reserve label space only for visible labels. The pin remains tappable
+      // when nearby names cannot all fit in the viewport.
+      const labelWidth = entry.label.offsetWidth || 128;
+      const labelHeight = entry.label.offsetHeight || 30;
+      const rect = {left:point.x-labelWidth/2-7,right:point.x+labelWidth/2+7,top:point.y+19,bottom:point.y+19+labelHeight+5};
       const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
-      entry.label.style.visibility = (place.id !== selectedRef.current?.id && (overlap || place.category==='transit'&&map.getZoom()<15.8)) ? "hidden" : "visible";
-      if (!overlap) occupied.push(rect);
+      const showName = selected || (zoom >= 13.7 && !overlap && !(place.category==='transit'&&zoom<15.8));
+      entry.label.style.visibility = showName ? "visible" : "hidden";
+      if (showName) occupied.push(rect);
     }
   };
 
