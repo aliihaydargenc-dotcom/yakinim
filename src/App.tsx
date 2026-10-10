@@ -183,7 +183,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
       const precision=Number.isFinite(accuracy)?accuracy:Infinity;
       if(precision>Math.max(100,bestAccuracy*2))return;
       const next={lat:latitude,lng:longitude};
-      if(lastFix&&distance(lastFix,next)<20)return;
+      if(lastFix&&distance(lastFix,next)<4)return;
       lastFix=next;
       bestAccuracy=Math.min(bestAccuracy,precision);
       setLocation({lat:latitude,lng:longitude});setLocating(false);setPicking(false);
