@@ -25,6 +25,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
   const previousLocation = useRef<Coordinates|null>(null);
+  const markerAnimation = useRef<number|null>(null);
   const following=useRef(true);
   const previousRecenter=useRef(recenterKey);
   const openPlaceRef=useRef(onPlaceOpen);openPlaceRef.current=onPlaceOpen;
@@ -177,6 +178,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       sourceSignatureRef.current = "";
       map.remove();
       mapRef.current = null;
+      if(markerAnimation.current!==null)cancelAnimationFrame(markerAnimation.current);
+      markerAnimation.current=null;
       locationMarkerRef.current = null;
       previousLocation.current = null;
     };
@@ -206,19 +209,44 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (!location) {locationMarkerRef.current?.remove();locationMarkerRef.current=null;previousLocation.current=null;return;}
-
-    if (!locationMarkerRef.current) {
-      const el = document.createElement("div");
-      el.className = "user-marker";
-      el.setAttribute("role", "img");
-      el.setAttribute("aria-label", "Konumun");
-      locationMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([location.lng, location.lat]).addTo(map);
-    } else {
-      locationMarkerRef.current.setLngLat([location.lng, location.lat]);
+    if(markerAnimation.current!==null)cancelAnimationFrame(markerAnimation.current);
+    markerAnimation.current=null;
+    if (!location) {
+      locationMarkerRef.current?.remove();
+      locationMarkerRef.current=null;
+      previousLocation.current=null;
+      return;
     }
 
-    const previous = previousLocation.current;
+    const target:[number,number]=[location.lng,location.lat];
+    if (!locationMarkerRef.current) {
+      const el=document.createElement("div");
+      el.className="user-marker";
+      el.setAttribute("role","img");
+      el.setAttribute("aria-label","Konumun");
+      locationMarkerRef.current=new maplibregl.Marker({element:el}).setLngLat(target).addTo(map);
+    } else {
+      const marker=locationMarkerRef.current;
+      const origin=marker.getLngLat();
+      const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const delta=Math.hypot(target[0]-origin.lng,target[1]-origin.lat);
+      if(reduced||delta>0.02){
+        marker.setLngLat(target);
+      } else if(delta>0) {
+        const startTime=performance.now();
+        const duration=900;
+        const animate=(now:number)=>{
+          const t=Math.min(1,(now-startTime)/duration);
+          const eased=t*t*(3-2*t);
+          marker.setLngLat([origin.lng+(target[0]-origin.lng)*eased,origin.lat+(target[1]-origin.lat)*eased]);
+          if(t<1)markerAnimation.current=requestAnimationFrame(animate);
+          else markerAnimation.current=null;
+        };
+        markerAnimation.current=requestAnimationFrame(animate);
+      }
+    }
+
+    const previous=previousLocation.current;
     const recentered=previousRecenter.current!==recenterKey;
     previousRecenter.current=recenterKey;
     if(!previous)following.current=!(memoryKey&&cameras.has(memoryKey));
@@ -226,11 +254,11 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const moved=!previous||previous.lat!==location.lat||previous.lng!==location.lng;
     previousLocation.current=location;
     if(following.current&&(moved||recentered)&&!picking){
-      const move=()=>{if(following.current)map.flyTo({center:[location.lng,location.lat],zoom:Math.max(map.getZoom(),15.1),duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:850,curve:1.35});};
-      if(map.isStyleLoaded())move();else map.once('load',move);
-      return ()=>{map.off('load',move);};
+      const move=()=>{if(following.current)map.easeTo({center:target,zoom:Math.max(map.getZoom(),15.1),duration:window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:850});};
+      if(map.isStyleLoaded())move();else map.once("load",move);
+      return ()=>{map.off("load",move);};
     }
-  }, [location?.lat, location?.lng,recenterKey,picking]);
+  }, [location?.lat,location?.lng,recenterKey,picking]);
 
   useEffect(() => {
     const map = mapRef.current;
