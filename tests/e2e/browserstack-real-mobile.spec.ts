@@ -116,12 +116,11 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await activateMobile(page.getByRole("button", {name:"Nöbetçi",exact:true}));
   await expect(page.locator(".place-row")).toContainText("Merkez Nöbetçi Eczane");
   await activateMobile(page.getByRole("button", {name:"Harita",exact:true}));
-  await expect(page.getByRole("button", {name:/Liste ·/})).toBeVisible();
+  await expect(page.locator('.map-place-chip').first()).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layered-discovery");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   await expect(page.locator(".user-marker")).toBeVisible();
-  await activateMobile(page.getByRole('button',{name:/Haritadaki yerler/}));
-  const row=page.locator('.map-visible-row').filter({hasText:'Merkez Nöbetçi Eczane'});
+  const row=page.locator('.map-place-chip').filter({hasText:'Merkez Nöbetçi Eczane'});
   await expect(row).toBeVisible();
   const hit=await row.boundingBox();expect(hit).not.toBeNull();expect(hit!.height).toBeGreaterThanOrEqual(44);
   await activateMobile(row);
