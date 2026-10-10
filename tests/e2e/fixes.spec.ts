@@ -276,17 +276,19 @@ test('snake earns a chapter, unlocks the next and pauses without resetting the b
  // Clock simulation and canvas snapshots need headroom on shared CI runners.
  test.setTimeout(90000);
  await page.addInitScript(()=>{Math.random=()=>0;});await page.clock.install();await page.goto('/games/snake/index.html');await page.clock.pauseAt(new Date(Date.now()+1000));
- // Keep input activation independent of animation-frame stability checks
- // while the game's clock is paused; the same button click handlers run.
- await page.getByRole('button',{name:'Başla',exact:true}).press('Enter');
- const turn=async(name:string,ticks:number)=>{await page.getByRole('button',{name,exact:true}).press('Enter');await page.clock.runFor(220*ticks+17);};
+ // Exercise the button handlers directly while time is paused. Native input
+ // can wait for animation frames that the fake clock intentionally stops;
+ // physical button interaction is covered by the mobile games smoke test.
+ const activate=async(name:string)=>{const button=page.getByRole('button',{name,exact:true});await expect(button).toBeVisible();await expect(button).toBeEnabled();await button.dispatchEvent('click');};
+ await activate('Başla');
+ const turn=async(name:string,ticks:number)=>{await activate(name);await page.clock.runFor(220*ticks+17);};
  await turn('Yukarı',9);await turn('Sola',8);await expect(page.locator('#score')).toContainText('1 / 5');
  await turn('Aşağı',1);await turn('Sağa',4);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('2 / 5');
  await turn('Sola',4);await expect(page.locator('#score')).toContainText('3 / 5');
  await turn('Aşağı',1);await turn('Sağa',5);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('4 / 5');
- await turn('Sola',5);await expect(page.locator('#title')).toHaveText('Bölüm 1 tamam!');await page.getByRole('button',{name:'Sonraki bölüm',exact:true}).click();await expect(page.locator('#level')).toHaveText('Bölüm 2');
- await page.getByRole('button',{name:'Oyunu duraklat',exact:true}).click();const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
- await page.getByRole('button',{name:'Devam et',exact:true}).click();await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
+ await turn('Sola',5);await expect(page.locator('#title')).toHaveText('Bölüm 1 tamam!');await activate('Sonraki bölüm');await expect(page.locator('#level')).toHaveText('Bölüm 2');
+ await activate('Oyunu duraklat');const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
+ await activate('Devam et');await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
 });
 
 for(const permissionMode of ['prompt','unsupported'] as const){
