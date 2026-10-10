@@ -10,6 +10,7 @@ import { combinePlaceSources, fetchDiscoveryPlaces, fetchMunicipalPlaces, fetchA
 import { useAppStore } from "./store";
 import {useBackLayer} from "./hooks/useBackLayer";
 import {sparsePlaces} from './services/map-viewport';
+import {shouldRefreshNearby} from "./services/nearby-refresh";
 import { useRetainedPlaces } from "./hooks/useRetainedPlaces";
 import type { Coordinates, Place, RadioStation } from "./types";
 const PilotViews = lazy(()=>import("./components/PilotViews").then(m=>({default:m.PilotView})));
@@ -39,8 +40,21 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   const {section,setSection,category,setCategory,search,setSearch,location:storedLocation,setLocation,clearLocation,locationError,setLocationError,savedIds,toggleSaved} = useAppStore();
   const [previewState,setPreviewState] = useState("ready");
   const location = DEMO ? (previewState === "location" ? null : DEMO_ORIGIN) : storedLocation;
-  const locationScope = location ? `${location.lat.toFixed(useAppStore.getState().locationMode==='manual'?5:3)}:${location.lng.toFixed(useAppStore.getState().locationMode==='manual'?5:3)}` : "none";
-  const [area,setArea] = useState<{center:Coordinates;bounds:ViewportBounds;owner:string}|null>(()=>{const c=location||ANTALYA_CENTER;return {center:c,bounds:boundsAround(c),owner:locationScope};});
+  // GPS position drives the marker; the independently throttled query location drives data requests.
+  const locationMode=useAppStore(state=>state.locationMode);
+  const [queryLocation,setQueryLocation]=useState<Coordinates|null>(location);
+  const lastQueryRefreshAt=useRef(0);
+  useEffect(()=>{
+    const now=Date.now();
+    setQueryLocation(previous=>{
+      if(!location)return null;
+      if(!shouldRefreshNearby(previous,location,locationMode,lastQueryRefreshAt.current,now))return previous;
+      lastQueryRefreshAt.current=now;
+      return location;
+    });
+  },[location?.lat,location?.lng,locationMode]);
+  const locationScope = queryLocation ? `${queryLocation.lat.toFixed(locationMode==='manual'?5:3)}:${queryLocation.lng.toFixed(locationMode==='manual'?5:3)}` : "none";
+  const [area,setArea] = useState<{center:Coordinates;bounds:ViewportBounds;owner:string}|null>(()=>{const c=queryLocation||ANTALYA_CENTER;return {center:c,bounds:boundsAround(c),owner:locationScope};});
   const [sectionSearch,setSectionSearch]=useState<Record<string,string>>({});
   const [productMode,setProductMode] = useState(false);
   const searchMode=category==='market'&&productMode?'prices':category;
@@ -52,7 +66,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   const pilot = ((category === "transit" && section !== "map") || category === "events" || category === "market" && productMode) && !mapOpen;
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
-  useEffect(()=>setSelected(null),[locationScope]);
+  useEffect(()=>setSelected(null),[category,locationMode==='manual'?locationScope:'device']);
   useBackLayer(picking||mapOpen&&!homeMap,()=>{setMapOpen(homeMap);setPicking(false);onMapChange?.(false);});
 
   useEffect(()=>{if(!isVisible)setSelected(null);},[isVisible]);
@@ -67,6 +81,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   const mounted = useRef(true);
   const locationRequest = useRef(0);
   const locationWatch = useRef<number|null>(null);
+  const manualViewport=useRef(false);
   const workspace=useRef<HTMLElement>(null);
   useEffect(()=>{
     const node=workspace.current;
@@ -95,9 +110,16 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
     }
     return ()=>{cancelled=true;};
   },[setLocation]);
-  useEffect(()=>{clearTimeout(moveTimer.current);setViewportPending(false);const c=location||ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});},[locationScope]);
-  const areaReady = !!location && !!area && area.owner === locationScope;
-  useEffect(()=>{if(category==="transit"&&section==="map"&&area&&!inAntalya(area.center)){const c=location&&inAntalya(location)?location:ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}},[category,section,locationScope]);
+  useEffect(()=>{
+    clearTimeout(moveTimer.current);setViewportPending(false);
+    setArea(old=>{
+      if(locationMode!=="manual"&&manualViewport.current&&old)return {...old,owner:locationScope};
+      const c=queryLocation||ANTALYA_CENTER;
+      return {center:c,bounds:boundsAround(c),owner:locationScope};
+    });
+  },[locationScope]);
+  const areaReady = !!queryLocation && !!area && area.owner === locationScope;
+  useEffect(()=>{if(category==="transit"&&section==="map"&&area&&!inAntalya(area.center)){const c=queryLocation&&inAntalya(queryLocation)?queryLocation:ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}},[category,section,locationScope]);
   useEffect(()=>{if(embedded){setMapOpen(homeMap||section==='map');if(section!=='map')setPicking(false);}},[section,embedded,homeMap]);
   useEffect(()=>{
     if(!mapOpen||!isVisible){clearTimeout(moveTimer.current);setViewportPending(false);}
@@ -105,7 +127,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   useEffect(()=>{
     setProductMode(service==='prices');
     if(service){clearTimeout(moveTimer.current);setViewportPending(false);}
-    if(service==='places'){const c=location||ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}
+    if(service==='places'){manualViewport.current=false;const c=queryLocation||ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}
     else if(service){setSectionSearch(v=>({...v,[service==='prices'?'prices':service]:''}));setMapOpen(false);}
   },[service]);
   useEffect(()=>{onGameActivity?.(playingGame);},[playingGame,onGameActivity]);
@@ -113,7 +135,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
   const areaQuery = useQuery({queryKey:["area-v8",locationScope,...key],queryFn:({signal})=>fetchArea(area!.bounds,area!.center,signal),enabled:!DEMO && active && !pilot && areaReady && category!=="duty" && category!=="transit",staleTime:600000,retry:0});
   const supplementQuery = useQuery({queryKey:["supplement-v7",locationScope,area?.center.lat.toFixed(2),area?.center.lng.toFixed(2)],queryFn:({signal})=>fetchOvertureSupplement(area!.center,signal),enabled:!DEMO && active && !pilot && areaReady && category!=="duty" && category!=="transit",staleTime:1800000,retry:0});
-  const fuelQuery=useQuery({queryKey:['fuel-area',locationScope],queryFn:({signal})=>fetchArea({south:location!.lat-.04,north:location!.lat+.04,west:location!.lng-.05,east:location!.lng+.05},location!,signal),enabled:!DEMO&&active&&category==='fuel'&&!mapOpen&&!!location,staleTime:600000,retry:1});
+  const fuelQuery=useQuery({queryKey:['fuel-area',locationScope],queryFn:({signal})=>fetchArea({south:queryLocation!.lat-.04,north:queryLocation!.lat+.04,west:queryLocation!.lng-.05,east:queryLocation!.lng+.05},queryLocation!,signal),enabled:!DEMO&&active&&category==='fuel'&&!mapOpen&&!!queryLocation,staleTime:600000,retry:1});
   const stopView=area?.bounds;
   const transitMapQuery=useQuery({
     queryKey:['main-map-transit',category,section,locationScope,stopView?.south.toFixed(3),stopView?.west.toFixed(3),stopView?.north.toFixed(3),stopView?.east.toFixed(3),category==='transit'?search.trim():''],
@@ -130,10 +152,10 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
 
     staleTime:300000,retry:0,
   });
-  const transitPlaces:Place[]=(transitMapQuery.data?.stops||[]).map(s=>({id:`transit:${s.id}`,name:s.name,category:'transit',lat:s.lat,lng:s.lng,address:`Durak ${s.id} · ${s.routes.join(', ')}`,distanceM:location&&inAntalya(location)?distance(location,s):undefined,source:'Antalyakart / Kentkart'}));
+  const transitPlaces:Place[]=(transitMapQuery.data?.stops||[]).map(s=>({id:`transit:${s.id}`,name:s.name,category:'transit',lat:s.lat,lng:s.lng,address:`Durak ${s.id} · ${s.routes.join(', ')}`,distanceM:queryLocation&&inAntalya(queryLocation)?distance(queryLocation,s):undefined,source:'Antalyakart / Kentkart'}));
   const isDiscovery=discoveryCategories.some(c=>c.id===category);
-  const discoveryQuery=useQuery({queryKey:['discovery',locationScope],queryFn:({signal})=>fetchDiscoveryPlaces(location!,signal),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!location,staleTime:600000,retry:0});
-  const discoverySupplementQuery=useQuery({queryKey:['discovery-supplement',category,locationScope],queryFn:({signal})=>fetchOvertureSupplement(location!,signal,category),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!location,staleTime:21600000,retry:0});
+  const discoveryQuery=useQuery({queryKey:['discovery',locationScope],queryFn:({signal})=>fetchDiscoveryPlaces(queryLocation!,signal),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!queryLocation,staleTime:600000,retry:0});
+  const discoverySupplementQuery=useQuery({queryKey:['discovery-supplement',category,locationScope],queryFn:({signal})=>fetchOvertureSupplement(queryLocation!,signal,category),enabled:!DEMO&&active&&isDiscovery&&!mapOpen&&!!queryLocation,staleTime:21600000,retry:0});
   const municipalArea=!!area&&area.center.lat>=40.5&&area.center.lat<=41.8&&area.center.lng>=27.5&&area.center.lng<=30.5;
   const municipalKind=category==='parking'?'parking':category==='toilets'?'toilets':'all';
   const municipalEnabled=!DEMO&&active&&!pilot&&areaReady&&municipalArea&&['all','parking','toilets'].includes(category);
@@ -154,13 +176,12 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
     if(category==="transit")return transitPlaces.filter(p=>!search.trim()||`${p.name} ${p.address}`.toLocaleLowerCase("tr").includes(search.trim().toLocaleLowerCase("tr")));
     const source = DEMO ? DEMO_PLACES : category==="duty" ? dutyData : combinePlaceSources([...areaData,...supplementData,...(isDiscovery?[...(discoveryQuery.data||[]),...(discoverySupplementQuery.data||[])]:[]),...(municipalArea&&['all','parking','toilets'].includes(category)?municipalQuery.data?.places||[]:[]),...(category==='fuel'?fuelQuery.data||[]:[]),...transitPlaces]);
     const term=search.trim().toLocaleLowerCase("tr");
-    return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:location&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(location,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
-  },[category,search,areaData,supplementData,dutyData,fuelQuery.data,municipalQuery.data,municipalArea,discoveryQuery.data,discoverySupplementQuery.data,isDiscovery,mapOpen,areaReady,location?.lat,location?.lng,transitMapQuery.data]);
+    return source.filter(p=>(category==="all" || p.category===category) && (!term || `${p.name} ${p.address} ${LABELS[p.category]}`.toLocaleLowerCase("tr").includes(term))).map(p=>({...p,distanceM:queryLocation&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?distance(queryLocation,p):p.distanceM})).sort((a,b)=>(a.distanceM??Infinity)-(b.distanceM??Infinity));
+  },[category,search,areaData,supplementData,dutyData,fuelQuery.data,municipalQuery.data,municipalArea,discoveryQuery.data,discoverySupplementQuery.data,isDiscovery,mapOpen,areaReady,queryLocation?.lat,queryLocation?.lng,transitMapQuery.data]);
   const places = useMemo(()=>matchingPlaces.filter(p=>category==="duty" || ((category==="fuel"||isDiscovery||category==="parking"&&municipalArea)&&!mapOpen) || !area || (p.lat>=area.bounds.south && p.lat<=area.bounds.north && p.lng>=area.bounds.west && p.lng<=area.bounds.east)),[matchingPlaces,category,area,mapOpen,isDiscovery,municipalArea]);
-  const homePlaces=useMemo(()=>sparsePlaces(places,area?.center||location||ANTALYA_CENTER),[places,area?.center.lat,area?.center.lng]);
+  const homePlaces=useMemo(()=>sparsePlaces(places,area?.center||queryLocation||ANTALYA_CENTER),[places,area?.center.lat,area?.center.lng]);
   const loading = DEMO ? previewState==="loading" : category==="duty" ? dutyQuery.isFetching && !dutyData.length : isDiscovery||category==='parking'&&municipalArea ? !matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||discoveryQuery.isFetching||discoverySupplementQuery.isFetching||municipalQuery.isFetching) : category==='fuel'?!matchingPlaces.length&&(areaQuery.isFetching||supplementQuery.isFetching||fuelQuery.isFetching):!matchingPlaces.length && (areaQuery.isFetching||supplementQuery.isFetching||municipalEnabled&&municipalQuery.isFetching);
   const failed = DEMO ? previewState==="error" : category==="duty" ? dutyQuery.isError : areaQuery.isError && supplementQuery.isError && !matchingPlaces.length && (!isDiscovery||discoveryQuery.isError&&discoverySupplementQuery.isError) && (!municipalArea||!['all','parking','toilets'].includes(category)||municipalQuery.isError);
-  const updating = !DEMO && (areaQuery.isFetching || supplementQuery.isFetching || municipalEnabled&&municipalQuery.isFetching || isDiscovery&&discoveryQuery.isFetching);
   // Map refreshes are visible even while retained pins keep the map usable.
   const mapLoading = DEMO ? previewState === "loading" : !picking && areaReady && (viewportPending || (category === "transit" ? transitMapQuery.isFetching : category === "duty" ? dutyQuery.isFetching : areaQuery.isFetching || supplementQuery.isFetching || transitMapQuery.isFetching || municipalEnabled && municipalQuery.isFetching || isDiscovery && (discoveryQuery.isFetching || discoverySupplementQuery.isFetching)));
   const visible = DEMO && ["loading","error","empty"].includes(previewState) ? [] : places;
@@ -170,6 +191,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
     if(DEMO) {setPreviewState("ready");setPicking(false);return;}
     if(!window.isSecureContext || !navigator.geolocation) {setLocationError("Konum kullanılamıyor");return;}
     stopLocationWatch();
+    manualViewport.current=false;
     const request=++locationRequest.current;
     setLocating(true);setLocationError("");
     const current=()=>mounted.current && request===locationRequest.current;
@@ -215,18 +237,19 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   function chooseOnMap() {setLocationPanel(false);onMapChange?.(true);stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
     if(!mapOpen||!isVisible)return;
+    manualViewport.current=true;
     clearTimeout(moveTimer.current);
     setViewportPending(true);
     moveTimer.current=setTimeout(()=>{setArea(old=>old?.owner===locationScope&&Object.keys(bounds).every(k=>old.bounds[k as keyof ViewportBounds].toFixed(3)===bounds[k as keyof ViewportBounds].toFixed(3))?old:{center,bounds,owner:locationScope});setViewportPending(false);},450);
   }
-  function pick(c:Coordinates) {stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c),owner:`${c.lat.toFixed(5)}:${c.lng.toFixed(5)}`});setPicking(false);setMapOpen(homeMap);setRecenter(v=>v+1);onMapChange?.(false);if(DEMO)setPreviewState("ready");}
+  function pick(c:Coordinates) {manualViewport.current=false;stopLocationWatch();++locationRequest.current;setLocating(false);setLocation(c,"Haritadan seçilen konum","manual");setArea({center:c,bounds:boundsAround(c),owner:`${c.lat.toFixed(5)}:${c.lng.toFixed(5)}`});setPicking(false);setMapOpen(homeMap);setRecenter(v=>v+1);onMapChange?.(false);if(DEMO)setPreviewState("ready");}
   function retry() {if(DEMO){setPreviewState("ready");return;}if(category==="duty")void dutyQuery.refetch();else{void areaQuery.refetch();void supplementQuery.refetch();if(municipalArea)void municipalQuery.refetch();if(category==='fuel')void fuelQuery.refetch();if(isDiscovery){void discoveryQuery.refetch();void discoverySupplementQuery.refetch();}}}
   return <div data-view={mapOpen?'map':'list'} className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {section==="nearby"||section==="map" ? <>
       <header className="model-header compact-location-header">
         {onBack&&!picking&&<button className="service-back" aria-label={mapOpen?"Listeye dön":"Hizmetlere dön"} onClick={()=>{if(mapOpen){setMapOpen(false);onMapChange?.(false);}else onBack();}}><ArrowLeft size={21}/></button>}
-        {picking?<button className="location-name" onClick={()=>{setPicking(false);setMapOpen(homeMap);onMapChange?.(false);}}><X size={18}/>Vazgeç</button>:<button className="location-name" onClick={()=>setLocationPanel(true)}><LocationStatus location={location} demo={DEMO}/></button>}
+        {picking?<button className="location-name" onClick={()=>{setPicking(false);setMapOpen(homeMap);onMapChange?.(false);}}><X size={18}/>Vazgeç</button>:<button className="location-name" onClick={()=>setLocationPanel(true)}><LocationStatus location={queryLocation} demo={DEMO}/></button>}
         <button className="location-control" onClick={()=>setLocationPanel(true)} disabled={locating} aria-label="Konum"><LocateFixed size={22} className={locating?'locating-spin':''}/></button>
       </header>
       <FeatureSheet open={locationPanel} title="Konum" onClose={()=>setLocationPanel(false)}><div className="location-options">{locationError&&<p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}><LocateFixed size={19}/>{locating?'Bulunuyor…':'Konumumu kullan'}</button><button className="outline-button" onClick={chooseOnMap}><MapPin size={19}/>Haritadan seç</button>{location&&!DEMO&&<button className="plain-button" onClick={()=>{stopLocationWatch();++locationRequest.current;setLocating(false);clearLocation();setLocationPanel(false);}}>Konumu sil</button>}</div></FeatureSheet>
@@ -236,17 +259,16 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
         {mapOpen&&!homeMap&&!picking&&<label className="search-box map-stop-search unified-search"><Search size={19}/><input aria-label={category==='transit'?'Durak veya hat ara':'Yer ara'} placeholder={category==='transit'?'Durak veya hat ara':'Bu alandaki yerleri ara'} value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="Aramayı temizle" onClick={()=>setSearch('')}><X size={18}/></button>}</label>}
         {!homeMap&&!mapOpen&&!picking&&(category==='pharmacy'||category==='duty') && <div className="pharmacy-filter" aria-label="Eczane filtresi"><button aria-pressed={category==='pharmacy'} onClick={()=>setCategory('pharmacy')}>Tüm eczaneler</button><button aria-pressed={category==='duty'} onClick={()=>setCategory('duty')}>Nöbetçi</button></div>}
         {((!location&&!pilot&&!mapOpen) || (picking&&!mapOpen) || (locationError&&!mapOpen)) && <section className="state-card location-gate"><strong>{locationError?(location?'Konum güncellenemedi':'Konum alınamadı'):picking?'Haritada bir nokta seç':'Konum seç'}</strong>{locationError && <p role="alert">{locationError}</p>}<button className="solid-button" onClick={requestLocation} disabled={locating}>Konumumu kullan</button><button className="plain-button" onClick={chooseOnMap}>Haritadan seç</button></section>}
-        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={location} search={activeSearch}/></Suspense>:mapOpen ? <div className="model-map">
+        {pilot&&!picking?<Suspense fallback={<div className="state-card">Hazırlanıyor…</div>}><PilotViews mode={category==='transit'?'transit':category==='events'?'events':'prices'} location={queryLocation} search={activeSearch}/></Suspense>:mapOpen ? <div className="model-map">
 
-        {!picking&&sourceIncomplete&&!mapLoading&&<div className="map-source-state" role="alert"><span>Veri alınamadı</span><button onClick={retry}>Yenile</button></div>}{locationError&&<div className="map-location-error" role="alert">{locationError}</div>}{category==='transit'&&<small className="map-data-scope">Antalya durakları{location&&!inAntalya(location)?' · Seçtiğin konum bu kapsamın dışında':''}</small>}
-        <Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={picking?[]:DEMO&&["loading","error","empty"].includes(previewState)?[]:homeMap?homePlaces:matchingPlaces} recenterKey={recenter} minimalPOI={homeMap} location={category==="transit"?(location&&inAntalya(location)?location:null):location} initialCenter={location?area?.center:undefined} focusTarget={category==="transit"?{key:"transit",position:location&&inAntalya(location)?location:ANTALYA_CENTER}:undefined} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} enableList={!picking&&!homeMap} selectionScope={`${category}:${locationScope}`} onSavePlace={p=>toggleSaved(p.id,p,!DEMO)} savedPlaceIds={savedIds} dataError={failed||sourceIncomplete?"Veri alınamadı":undefined} loading={mapLoading} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense></div> : location && !picking ? <>
+        {!picking&&sourceIncomplete&&!mapLoading&&!matchingPlaces.length&&<div className="map-source-state" role="alert"><span>Veri alınamadı</span><button onClick={retry}>Yenile</button></div>}{locationError&&<div className="map-location-error" role="alert">{locationError}</div>}{category==='transit'&&<small className="map-data-scope">Antalya durakları{location&&!inAntalya(location)?' · Seçtiğin konum bu kapsamın dışında':''}</small>}
+        <Suspense fallback={<div className="state-card">Harita hazırlanıyor…</div>}><MapView places={picking?[]:DEMO&&["loading","error","empty"].includes(previewState)?[]:homeMap?homePlaces:matchingPlaces} recenterKey={recenter} minimalPOI={homeMap} location={category==="transit"?(location&&inAntalya(location)?location:null):location} initialCenter={location?area?.center:undefined} focusTarget={category==="transit"?{key:"transit",position:location&&inAntalya(location)?location:ANTALYA_CENTER}:undefined} picking={picking} onPick={pick} onViewportChange={viewport} autoFitKey={category==="transit"?search.trim():undefined} enableList={!picking&&!homeMap} selectionScope={`${category}:${locationMode==="manual"?locationScope:"device"}`} onSavePlace={p=>toggleSaved(p.id,p,!DEMO)} savedPlaceIds={savedIds} dataError={!matchingPlaces.length&&(failed||sourceIncomplete)?"Veri alınamadı":undefined} loading={mapLoading&&!matchingPlaces.length} loadingText={matchingPlaces.length?"Güncelleniyor…":"Yükleniyor…"}/></Suspense></div> : location && !picking ? <>
           <div className="results-toolbar"><span>{failed?'Veri alınamadı':loading?'Yerler yükleniyor…':`${visible.length} kayıt${visible.length>100?' · İlk 100 gösteriliyor':''}`}</span><button onClick={()=>{setMapOpen(true);onMapChange?.(true);}}><MapPin size={18}/>Harita</button></div>
           {category==="duty" && dutyData.some(p=>p.source==="legacy-fallback") && <small className="data-note" role="status">Eczane Adresi</small>}
           {loading && <div className="skeleton-list" role="status" aria-label="Yerler yükleniyor">{[1,2,3].map(i=><div className="skeleton-card" key={i}/>)}</div>}
           {failed && <div className="state-card" role="alert"><strong>Yerler alınamadı</strong><button className="plain-button" onClick={retry}>Tekrar dene</button></div>}
           {!loading&&!failed&&!visible.length && <div className="state-card"><strong>{sourceIncomplete?'Veri eksik':category==='duty'?'Bu çevre için nöbetçi kaydı alınamadı':'Eşleşme bulunamadı'}</strong>{sourceIncomplete&&<button className="plain-button" onClick={retry}>Tekrar dene</button>}<button className="plain-button" onClick={()=>{setMapOpen(true);onMapChange?.(true);}}>Haritada ara</button></div>}
           <div className="places-list">{visible.slice(0,100).map(p=><button className="place-row" key={p.id} onClick={()=>setSelected(p)}><span className="place-symbol">{p.category==='duty'||p.category==='pharmacy'?<Cross size={25}/>:<MapPin size={23}/>}</span><span><strong>{p.name}</strong><small>{LABELS[p.category]} · {distanceLabel(p.distanceM)}</small><small>{p.address==='Adres bilgisi yok'?'':p.address}</small><PlaceFacts place={p} compact/></span><ChevronRight size={19}/></button>)}</div>
-          {updating && visible.length>0 && <small className="data-note" role="status">Güncelleniyor…</small>}
           {sourceIncomplete&&!failed&&visible.length>0&&<small className="data-note">Veri eksik</small>}
         </> : null}
       </main></div>

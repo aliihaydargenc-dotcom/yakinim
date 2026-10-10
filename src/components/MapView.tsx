@@ -89,6 +89,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     };
     const attributionToggle=(event:MouseEvent)=>{
       if(event.target instanceof Element&&event.target.closest('.maplibregl-ctrl-attrib-button'))attributionTouched=true;
+      if(event.target instanceof Element&&event.target.closest('.maplibregl-ctrl-zoom-in,.maplibregl-ctrl-zoom-out'))following.current=false;
     };
     map.on('styledata',collapseInitialAttribution);
     map.on('sourcedata',collapseInitialAttribution);
@@ -152,10 +153,16 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       const center = map.getCenter();
       if(memoryKey)cameras.set(memoryKey,{center:[center.lng,center.lat],zoom:map.getZoom(),selected:selectedRef.current});
       const bounds = map.getBounds();
-      onViewportChangeRef.current({ lat: center.lat, lng: center.lng }, { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
+      // Tracking updates the camera, not the discovery-query viewport.
+      if(!following.current)onViewportChangeRef.current({ lat: center.lat, lng: center.lng }, { south: bounds.getSouth(), west: bounds.getWest(), north: bounds.getNorth(), east: bounds.getEast() });
     };
 
-    map.on("dragstart",()=>{following.current=false;});
+    const pauseOnDrag=()=>{following.current=false;};
+    const pauseOnZoom=(event:maplibregl.MapLibreEvent<MouseEvent|TouchEvent|WheelEvent>)=>{
+      if(event.originalEvent)following.current=false;
+    };
+    map.on("dragstart",pauseOnDrag);
+    map.on("zoomstart",pauseOnZoom);
     map.on("load", setup);
     map.on("click", handleClick);
     map.on("mousemove", handlePointer);
@@ -174,6 +181,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       map.off("load", setup);
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);
+      map.off("dragstart",pauseOnDrag);
+      map.off("zoomstart",pauseOnZoom);
       map.off("moveend", handleMoveEnd);
       sourceSignatureRef.current = "";
       map.remove();
