@@ -69,5 +69,11 @@
     "api/location.js": {
       "maxDuration": 15
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/traffic",
+      "destination": "/api/transit?service=traffic"
+    }
+  ]
 }

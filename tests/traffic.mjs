@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),{query,parseTrafficHistory}=require('../lib/traffic.cjs');
+const now=Date.parse('2026-10-10T09:00:00Z');
+const row=(index,date)=>`<ResponseTrafficIndexHistory><TrafficIndex>${index}</TrafficIndex><TrafficIndexDate>${date}</TrafficIndexDate></ResponseTrafficIndexHistory>`;
+const zero=parseTrafficHistory(row(0,'2026-10-10T12:00:00'),now);
+assert.equal(zero.index,0);assert.equal(zero.observedAt,'2026-10-10T09:00:00.000Z');
+assert.equal(parseTrafficHistory(row(45,'2026-10-10T11:00:00'),now).index,null);
+assert.equal(parseTrafficHistory(row(20,'2026-10-10T11:55:00')+row(40,'2026-10-10T12:00:00'),now).index,40);
+assert.throws(()=>parseTrafficHistory(row(101,'2026-10-10T12:00:00'),now));
+assert.throws(()=>parseTrafficHistory(row(50,'2026-10-11T12:00:00'),now));
+assert.throws(()=>parseTrafficHistory('<html>service error</html>',now));
+let calls=0;const original=globalThis.fetch;
+try{globalThis.fetch=async()=>{calls++;return {ok:true,text:async()=>row(35,new Date().toISOString())}};
+ const antalya=await query(36.884,30.704);assert.equal(antalya.available,false);assert.equal(calls,0);
+ const istanbul=await query(41.01,28.98);assert.equal(istanbul.available,true);assert.equal(istanbul.scope,'citywide');assert.equal(istanbul.index,35);assert.equal(calls,1);
+ await query(41.02,28.99);assert.equal(calls,1);
+ await assert.rejects(()=>query(91,30));
+}finally{globalThis.fetch=original;}
+console.log('Traffic PASS: Istanbul coverage, zero, timezone, freshness, malformed/future data, citywide scope and cache.');

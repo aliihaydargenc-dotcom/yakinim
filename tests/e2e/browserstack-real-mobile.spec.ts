@@ -71,7 +71,7 @@ test.beforeEach(async ({ page }) => {
         headers: { "Content-Type": "application/json" },
       });
 
-      if (url.includes("tiles.openfreemap.org/styles/positron")) return json({version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":"#f7f5f1"}}]});
+      if (url.includes("tiles.openfreemap.org/styles/liberty")) return json({version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":"#f7f5f1"}}]});
       if (url.includes("/api/location?")) return json({label:"Antalya"});
       if (url.includes("/api/nearby?")) return json({elements:[],places:[]});
       if (url.includes("/api/fishing?")) return json({hourly:[],daily:[]});
@@ -106,7 +106,7 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   expect(device.height).toBeGreaterThanOrEqual(600);
   expect(device.userAgent).toMatch(/Android|iPhone|iPad|Mobile/i);
 
-  await expect(page.locator(".model-header")).toContainText("Yakınım");
+  await expect(page.locator(".model-header")).toContainText("yakınım");
   await expect(page.getByRole("button", {name:"Konumumu bul",exact:true})).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await expect(page.locator(".place-row").filter({hasText:"Yakın Market"})).toBeVisible();
@@ -130,10 +130,12 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   await assertMapChromeDoesNotOverlap(page);
   await page.screenshot({path:testInfo.outputPath('browserstack-map.png')});
   await activateMobile(page.getByRole('button',{name:'Yer kartını kapat',exact:true}));
-  const nav = page.locator(".model-nav");
-  await activateMobile(nav.getByRole("button", {name:"Haber",exact:true}));
+  const nav = page.locator(".shell-nav--mobile");
+  await activateMobile(nav.getByRole("button", {name:"Diğer",exact:true}));
+  await activateMobile(page.getByRole("button", {name:/^Haberler/}));
   await expect(page.getByText("Gerçek cihaz test haberi",{exact:true})).toBeVisible();
-  await activateMobile(nav.getByRole("button", {name:"Radyo",exact:true}));
+  await activateMobile(nav.getByRole("button", {name:"Diğer",exact:true}));
+  await activateMobile(page.getByRole("button", {name:/^Radyo/}));
   await expect(page.locator('.station-card')).toContainText("Gerçek Cihaz Test Radyosu");
   await activateMobile(page.locator(".station-card").filter({hasText:"Gerçek Cihaz Test Radyosu"}));
   await expect(page.locator(".global-radio-player")).toBeVisible();
@@ -158,7 +160,7 @@ async function assertNoHorizontalOverflow(page: import("@playwright/test").Page)
 }
 
 async function assertBottomNavInsideViewport(page: import("@playwright/test").Page) {
-  const navBox = await page.locator(".model-nav").boundingBox();
+  const navBox = await page.locator(".shell-nav--mobile").boundingBox();
   expect(navBox).not.toBeNull();
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   if (!navBox) return;
@@ -171,7 +173,7 @@ async function assertMapChromeDoesNotOverlap(page: import("@playwright/test").Pa
   const header = await page.locator(".model-header").boundingBox();
   const dock = await page.locator(".map-workspace .category-rail").boundingBox();
   const canvas = await page.locator(".maplibregl-canvas").boundingBox();
-  const nav = await page.locator('.model-nav').boundingBox();
+  const nav = await page.locator('.shell-nav--mobile').boundingBox();
   expect(header && dock && canvas && nav).toBeTruthy();
   if (!header || !dock || !canvas || !nav) return;
   expect(dock.y).toBeGreaterThanOrEqual(header.y + header.height - 2);
