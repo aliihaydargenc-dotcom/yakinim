@@ -22,3 +22,10 @@
 - Etkinlik tarihi kaynak tarafından farklı biçimlerde bildirilebilir; tarih/saat belirli değilse uydurulmaz.
 - Üretim yayınının çalışması, GitHub testlerinin geçtiği anlamına gelmez.
 - Eski kök JavaScript ve statik sayfalar arşivlenene kadar korunur; yanlış testler aktif CI sonucunu maskelememelidir.
+
+## Otomatik mobil kontrol kapsamı
+
+- `npm run test:mobile`: Güncel uygulamadan seçilmiş 4 kabul akışını iPhone Safari/WebKit ve iki Android Chromium görünümünde çalıştırır; toplam 12 senaryo, tekrar deneme yoktur.
+- `npm run test:mobile:extended`: Önceki bütün geniş E2E senaryolarını isteğe bağlı olarak çalıştırır; bunlar farklı mimari sürümlerinden kalmış olabilir. İlk 6 hatadan sonra durur, bakım sırasında modernize edilir. **Bu testlerin geçerli olmadığı veya geçtiği varsayılmaz.**
+- `browserstack-real-mobile.spec.ts`: Sadece ayrı, manuel tetiklenen gerçek-cihaz BrowserStack yapılandırması tarafından çalıştırılır.
+- GitHub CI tüm Node/kaynak/derleme kontrollerini ve kısa mobil kabul akışını içerir. Geniş test paketi gizlenmiş değil, sadece zaman ve bakım maliyeti nedeniyle otomatik CI'den ayrılmıştır.

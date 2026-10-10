@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -34,7 +38,7 @@ jobs:
       - name: Install mobile browser engines
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Mobile device emulation tests
+      - name: Current mobile acceptance smoke (12 browser scenarios)
         run: npm run test:mobile
 
       - name: Upload mobile test artifacts

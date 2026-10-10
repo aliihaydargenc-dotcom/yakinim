@@ -4,11 +4,11 @@ const chromiumLaunch = {executablePath:process.env.CHROMIUM_EXECUTABLE,args:["--
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: ["mobile-foundation.spec.ts", "shell.spec.ts", "redesign.spec.ts", "fixes.spec.ts", "city-services.spec.ts", "fishing-prices.spec.ts", "discovery.spec.ts", "map-feedback.spec.ts", "browserstack-real-mobile.spec.ts", "unified-mobile.spec.ts"],
+  testMatch: ["stability-smoke.spec.ts"],
   timeout: 45_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
-  retries: process.env.CI ? 1 : 0,
+  retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:4173",

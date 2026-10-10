@@ -12,7 +12,8 @@
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js",
     "test:model1": "node tests/model1-browser.cjs",
     "refresh:transit": "python scripts/refresh-transit.py",
-    "test:legacy-ui": "node tests/audit-ui.cjs"
+    "test:legacy-ui": "node tests/audit-ui.cjs",
+    "test:mobile:extended": "playwright test --config=playwright.extended.config.ts"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
