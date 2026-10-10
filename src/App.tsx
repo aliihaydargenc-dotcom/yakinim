@@ -99,7 +99,15 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   const areaReady = !!location && !!area && area.owner === locationScope;
   useEffect(()=>{if(category==="transit"&&section==="map"&&area&&!inAntalya(area.center)){const c=location&&inAntalya(location)?location:ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}},[category,section,locationScope]);
   useEffect(()=>{if(embedded){setMapOpen(homeMap||section==='map');if(section!=='map')setPicking(false);}},[section,embedded,homeMap]);
-  useEffect(()=>{setProductMode(service==='prices');if(service&&service!=='places'){setSectionSearch(v=>({...v,[service==='prices'?'prices':service]:''}));setMapOpen(false);}},[service]);
+  useEffect(()=>{
+    if(!mapOpen||!isVisible){clearTimeout(moveTimer.current);setViewportPending(false);}
+  },[mapOpen,isVisible]);
+  useEffect(()=>{
+    setProductMode(service==='prices');
+    if(service){clearTimeout(moveTimer.current);setViewportPending(false);}
+    if(service==='places'){const c=location||ANTALYA_CENTER;setArea({center:c,bounds:boundsAround(c),owner:locationScope});}
+    else if(service){setSectionSearch(v=>({...v,[service==='prices'?'prices':service]:''}));setMapOpen(false);}
+  },[service]);
   useEffect(()=>{onGameActivity?.(playingGame);},[playingGame,onGameActivity]);
   const active = isVisible && (section === "nearby" || section === "map");
   const key = area ? Object.values(area.bounds).map(v=>v.toFixed(3)) : [];
@@ -206,6 +214,7 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
   }
   function chooseOnMap() {setLocationPanel(false);onMapChange?.(true);stopLocationWatch();++locationRequest.current;setLocating(false);setLocationError("");setMapOpen(true);setPicking(true);}
   function viewport(center:Coordinates,bounds:ViewportBounds) {
+    if(!mapOpen||!isVisible)return;
     clearTimeout(moveTimer.current);
     setViewportPending(true);
     moveTimer.current=setTimeout(()=>{setArea(old=>old?.owner===locationScope&&Object.keys(bounds).every(k=>old.bounds[k as keyof ViewportBounds].toFixed(3)===bounds[k as keyof ViewportBounds].toFixed(3))?old:{center,bounds,owner:locationScope});setViewportPending(false);},450);
