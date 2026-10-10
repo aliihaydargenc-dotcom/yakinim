@@ -1,70 +1,70 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Turkce Wordle is actually a kind of wordle game. Also it supports multi-language. Please click settings for multi-language support! Play this word guessing game for fun and education!">
-    <meta name="robots" content="index, follow">
-    <title>Türkçe Kelime Tahmini</title>
-    <link rel="stylesheet" href="./css/index.css">
-    <style>
-        .loader {
-            width: 60px;
-            height: 40px;
-            position: relative;
-            display: inline-block;
-            --base-color: black; /*use your base color*/
-        }
-        #loading-screen a{
-            color:white;
-        }
-        .loader::before {
-            content: '';
-            left: 0;
-            top: 0;
-            position: absolute;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background-color: #FFF;
-            background-image: radial-gradient(circle 8px at 18px 18px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 18px 0px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 0px 18px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 36px 18px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 18px 36px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 30px 5px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 30px 5px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 30px 30px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 5px 30px, var(--base-color) 100%, transparent 0), radial-gradient(circle 4px at 5px 5px, var(--base-color) 100%, transparent 0);
-            background-repeat: no-repeat;
-            box-sizing: border-box;
-            animation: rotationBack 3s linear infinite;
-        }
-        .loader::after {
-            content: '';
-            left: 35px;
-            top: 15px;
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background-color: #FFF;
-            background-image: radial-gradient(circle 5px at 12px 12px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 12px 0px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 0px 12px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 24px 12px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 12px 24px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 20px 3px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 20px 3px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 20px 20px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 3px 20px, var(--base-color) 100%, transparent 0), radial-gradient(circle 2.5px at 3px 3px, var(--base-color) 100%, transparent 0);
-            background-repeat: no-repeat;
-            box-sizing: border-box;
-            animation: rotationBack 4s linear infinite reverse;
-        }
-        @keyframes rotationBack {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(-360deg);
-            }
-        }
-    </style>
-</head>
-<body>
-<div id="loading-screen" style="background-color:black; color:white;  width:100vw; height: 100vh; margin:0; padding-top: 300px; padding-left:20vw; padding-right: 20vw;" >
-    <span class="loader"></span> Yükleniyor...
-    <p>Turkce Wordle Game by <a href="https://github.com/caglarorhan" target="_blank">caglaror</a></p>
-</div>
-
-
-<script type="module" src="./js/index.js"></script>
-
-</body>
-</html>
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Kelime Tahmini</title><link rel="stylesheet" href="../common.css"><style>
+.word{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;min-height:86px;align-items:center;padding:12px 2px}
+.letter{display:grid;place-items:center;width:clamp(29px,9vw,43px);height:clamp(42px,13vw,54px);border-bottom:3px solid #486d8e;border-radius:7px;background:#edf2f8;font-size:clamp(18px,5.8vw,25px);font-weight:800}
+.letter.missing{color:#ad3452}
+.keyboard{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px}
+.keyboard button{min-height:44px;padding:0;border:1px solid #d7e1eb;border-radius:9px;background:white;color:#345571;font-size:17px;font-weight:700}
+.keyboard button:disabled{opacity:.35;background:#e9edf1;transform:none}
+.progress{display:flex;gap:5px;justify-content:center}.progress i{height:9px;flex:1;border-radius:99px;max-width:50px;background:#b9d3e9}.progress i.used{background:#c77b8a}
+.tip{font-size:15px;text-align:center;line-height:1.5}.outcome{min-height:24px;text-align:center;font-weight:650;color:#3c5c79}
+</style></head><body><main class="app"><div class="head"><div><h1>Kelime Tahmini</h1><p class="sub">İpucuna göre harfleri tamamla.</p></div><div class="metric"><strong id="score">0</strong><span>Puan</span></div></div>
+<div class="panel"><p class="tip" id="clue"></p><div class="word" id="word"></div><div class="progress" id="progress" aria-label="Yanlış tahmin göstergesi"></div><p class="outcome" id="outcome" role="status" aria-live="polite"></p></div>
+<div class="keyboard" id="keyboard"></div><div class="controls"><button class="primary" id="next">Yeni kelime</button><div class="metric"><strong id="best">0</strong><span>En iyi</span></div></div><footer>Türkçe kelimeler · internetsiz oynanabilir</footer></main>
+<script>
+'use strict';
+const entries=[
+ ['KİTAP','Sayfalardan oluşan okuma aracı'],['KALEM','Yazı yazmak için kullanılır'],['ÇİÇEK','Bahçede açan renkli bitki'],
+ ['DENİZ','Tuzlu suyun geniş alanı'],['GÜNEŞ','Dünyayı aydınlatan yıldız'],['BULUT','Gökyüzündeki su damlacıkları'],
+ ['YÜREK','Kalbin diğer adı'],['PERDE','Pencereyi örten kumaş'],['ŞEKER','Tatlı kristal yiyecek'],
+ ['KÖPRÜ','İki yakayı birleştirir'],['SAHİL','Deniz kıyısı'],['NEHİR','Akan büyük su yolu'],
+ ['KUMSAL','Kumla kaplı kıyı'],['YILDIZ','Gece göğünde parlayan gök cismi'],['PENCERE','Dışarıyı görmeyi sağlar'],
+ ['SANDALYE','Üzerine oturulan eşya'],['MUTFAK','Yemek pişirilen yer'],['KAHVE','Çekirdeğinden sıcak içecek yapılan bitki'],
+ ['ÇANTA','Eşyaları taşımaya yarar'],['İNCİR','Tatlı bir meyve'],['ARMUT','Bir meyve türü'],['ÜZÜM','Salkım halinde yetişir'],
+ ['KİRAZ','Yaz meyvesi'],['MÜZİK','Seslerin düzenli sanatı'],['ÇINAR','Geniş gölgeli ağaç']
+];
+const alphabet='ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ'.split('');
+const KEY='yakinim:words:v1';
+let state;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch{}}
+function start(){
+ const previous=state?.index??-1;let index=Math.floor(Math.random()*entries.length);
+ if(entries.length>1&&index===previous)index=(index+1)%entries.length;
+ state={index,guesses:[],score:state?.score||0,best:state?.best||0};save();render();
+}
+function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'null');
+ if(v&&Number.isInteger(v.index)&&entries[v.index]&&Array.isArray(v.guesses)){state=v;return;}
+ }catch{}start();}
+function guess(char){
+ if(!state||state.guesses.includes(char))return;
+ const [word]=entries[state.index];
+ const misses=state.guesses.filter(x=>!word.includes(x)).length;
+ if(misses>=7||[...word].every(c=>state.guesses.includes(c)))return;
+ state.guesses.push(char);
+ if([...word].every(c=>state.guesses.includes(c))){
+   state.score=(state.score||0)+Math.max(10,70-misses*10);
+   state.best=Math.max(state.best||0,state.score);
+ }
+ save();render();
+}
+function render(){
+ if(!state)return;
+ const [word,hint]=entries[state.index];document.getElementById('clue').textContent=hint;
+ const found=[...word].every(c=>state.guesses.includes(c));
+ const misses=state.guesses.filter(c=>!word.includes(c)).length;
+ const finished=found||misses>=7;
+ const shown=[...word].map(c=>state.guesses.includes(c)||finished?c:'');
+ document.getElementById('word').innerHTML='';
+ shown.forEach((c,i)=>{const cell=document.createElement('span');cell.className='letter'+(!c?' missing':'');cell.textContent=c;
+ cell.setAttribute('aria-label',c||'Gizli harf');document.getElementById('word').appendChild(cell);});
+ document.getElementById('progress').innerHTML=Array.from({length:7},(_,i)=>'<i class="'+(i<misses?'used':'')+'"></i>').join('');
+ document.getElementById('outcome').textContent=found?'Bildin! Yeni kelimeye geçebilirsin.':misses>=7?'Kelime: '+word:'Kalan deneme: '+(7-misses);
+ document.getElementById('score').textContent=state.score||0;
+ document.getElementById('best').textContent=state.best||0;
+ document.getElementById('keyboard').innerHTML='';
+ alphabet.forEach(c=>{let b=document.createElement('button');b.textContent=c;b.disabled=finished||state.guesses.includes(c);
+ b.setAttribute('aria-label',c+' harfini dene');b.addEventListener('click',()=>guess(c));document.getElementById('keyboard').appendChild(b);});
+}
+document.getElementById('next').addEventListener('click',start);
+window.addEventListener('keydown',e=>{const c=e.key.toLocaleUpperCase('tr-TR');if(alphabet.includes(c))guess(c)});
+load();render();
+</script></body></html>

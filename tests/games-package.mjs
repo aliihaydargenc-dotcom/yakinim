@@ -2,48 +2,35 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+
 const base='public/games';
-const games=['2048','blocks','memory','snake','mines','words','breaker','runner'];
-const imported=['words','breaker','runner'];
+const games=['2048','blocks','memory','snake','mines','words'];
+const removed=['sudoku','puzzle','breaker','runner'];
 const catalog=fs.readFileSync('src/components/GamesView.tsx','utf8');
 const shell=fs.readFileSync('src/AppShell.tsx','utf8');
-for(const id of ['sudoku','puzzle']){assert.ok(!catalog.includes("id:'"+id+"'"),'Removed game still shown: '+id);assert.ok(!fs.existsSync(path.join(base,id)),'Removed game folder still exists: '+id);}
-assert.equal(games.length,8);
+assert.equal(games.length,6);
+for(const id of removed){
+ assert.ok(!catalog.includes("id:'"+id+"'"),'Removed game still shown: '+id);
+ assert.ok(!fs.existsSync(path.join(base,id)),'Removed game folder still exists: '+id);
+}
 assert.ok(shell.includes('other-category-grid'),'Other hub should remain square');
-assert.match(fs.readFileSync('src/shell.css','utf8'),/\.game-library-card[\s\S]*?aspect-ratio:1/);
-function syntax(source,name){new vm.Script(source,{filename:name});}
+assert.ok(fs.readFileSync('src/shell.css','utf8').includes('aspect-ratio:1'),'Game cards should stay square');
 for(const id of games){
  assert.ok(catalog.includes("id:'"+id+"'"),'Missing game in library: '+id);
- const gameDir=path.join(base,id),index=path.join(gameDir,'index.html');
- assert.ok(fs.existsSync(index),'Missing game: '+id);
- const html=fs.readFileSync(index,'utf8');
- assert.match(html,/<meta\s+name=["']viewport["']/i,'Game should scale on mobile: '+id);
- const references=[...html.matchAll(/(?:src|href)=["']([^"'#]+)["']/gi)].map(m=>m[1]);
- if(imported.includes(id))for(const ref of references){
-   if(ref.startsWith('data:')||ref.startsWith('/')||ref.startsWith('https:')||ref.startsWith('http:'))continue;
-   assert.ok(fs.existsSync(path.resolve(gameDir,ref)),'Missing local asset '+id+': '+ref);
- }
- if(imported.includes(id)){
-   const license=path.join(gameDir,'LICENSE');
-   assert.ok(fs.existsSync(license),'Missing imported-game license: '+id);
-   assert.match(fs.readFileSync(license,'utf8'),/Permission is hereby granted/);
- }
- if(['breaker'].includes(id)){
-  const inline=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
-  assert.ok(inline.length,'Inline game script missing '+id);
-  for(const item of inline)syntax(item[1],id+'/inline.js');
- }
+ const html=fs.readFileSync(path.join(base,id,'index.html'),'utf8');
+ assert.ok(html.includes('name="viewport"'),'Game should scale on mobile: '+id);
 }
-for(const file of ['runner/game.js','words/js/index.js'])syntax(fs.readFileSync(path.join(base,file),'utf8'),file);
 const wordHtml=fs.readFileSync(path.join(base,'words/index.html'),'utf8');
-const wordJs=fs.readFileSync(path.join(base,'words/js/index.js'),'utf8');
-assert.ok(!/googletagmanager|paypal\.me|buymeacoffee|serviceWorker\.register/i.test(wordHtml+wordJs),'No trackers, donation redirects or PWA registration');
-assert.ok(wordJs.includes('let selectedLanguage = "tr_TR"'),'Turkish dictionary should be required');
-for(const f of ['words/i18n/tr_TR.js','words/dictionaries/tr_TR.js','words/language_list.js'])assert.ok(fs.existsSync(path.join(base,f)));
-const horse=fs.readFileSync(path.join(base,'runner/game.js'),'utf8');
-assert.ok(horse.includes("canvas.addEventListener('pointerdown'"),'Runner needs mobile touch');
-assert.ok(horse.includes('Fixed 60Hz'),'Runner needs time-step normalization');
-assert.ok(fs.readFileSync('src/App.tsx','utf8').includes('pausedLocationForGame'));
+assert.ok(wordHtml.includes('İpucuna göre harfleri tamamla.'),'Restore hint-based word game');
+assert.ok(wordHtml.includes('const entries='),'Original Turkish word list required');
+assert.ok(wordHtml.includes('const alphabet='),'Original Turkish alphabet required');
+assert.ok(wordHtml.includes('Türkçe kelimeler'),'Offline Turkish word game');
+assert.ok(!wordHtml.includes('turkcewordle'),'Third-party word game must be removed');
+const inline=wordHtml.split('<script>')[1]?.split('</script>')[0];
+assert.ok(inline,'Original word game needs inline JavaScript');
+new vm.Script(inline,{filename:'words/index.html'});
+assert.ok(catalog.includes('game.legacy&&<a'),'Custom word game should not show an imported-game license');
 const credits=fs.readFileSync(path.join(base,'THIRD_PARTY.md'),'utf8');
-for(const id of imported)assert.ok(credits.includes('github.com'),'Source attribution present');
-console.log('Games package PASS: 8 games, 3 imported MIT licenses, offline asset references, Turkish Wordle without trackers, mobile runner, syntax and gameplay integration.');
+for(const name of ['Tuğla Kırma','Engel Atlama','Türkçe Kelime Tahmini'])assert.ok(!credits.includes(name),'Obsolete attribution: '+name);
+assert.ok(fs.readFileSync('src/App.tsx','utf8').includes('pausedLocationForGame'),'Pause GPS during gameplay');
+console.log('Games package PASS: 6 games, restored Turkish word game, no removed assets, square navigation and GPS pause.');
