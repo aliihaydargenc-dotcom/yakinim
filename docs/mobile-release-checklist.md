@@ -4,7 +4,7 @@
 
 1. Değişiklikler ayrı dalda hazırlanır; üretim `main` değişmeden kalır.
 2. Taslak PR açılır, GitHub CI ve mobil emülasyon kontrolleri sonuçlanır. Başarısız kontrol atlanmaz; neden incelenir.
-3. Kullanıcı telefonda **gerçek cihaz** akışlarını kontrol eder; otomatik emülasyon fiziksel telefonun yerini tutmaz.
+3. Kullanıcı telefonda **gerçek cihaz** akışlarını kontrol eder; otomatik emülasyon fiziksel telefonun yerini tutmaz. BrowserStack'teki Automate kullanım hakkı dolduğu için ücretli gerçek-cihaz GitHub işi yalnızca manuel tetiklenir; kullanıcı telefon testi ücretsizdir.
 4. Kullanıcı onay verdiğinde PR, mümkünse tek **squash** commit ile `main` dalına alınır. Üretim Vercel yayını ayrıca kontrol edilir.
 5. Kaynak kesintileri ve geçici veri eksiklikleri kullanıcının olumsuz test bulgusu olarak değil, ayrı veri problemi olarak değerlendirilir.
 
