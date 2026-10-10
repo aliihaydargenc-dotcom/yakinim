@@ -65,3 +65,15 @@
 @media(min-width:1100px){.transit-map-open .shell-body .model-app{height:100dvh}}
  .event-city-filter{display:flex;align-items:center;gap:12px;margin:12px 0;font-size:14px}
  .event-city-filter select{max-width:100%;min-width:0;flex:1;padding:10px;border:1px solid var(--border,#d5e5dc);border-radius:10px;background:var(--surface,#fff);color:inherit;font:inherit}
+
+/* Light navigation transitions: avoid full remounts of the map and its layers. */
+.shell-app[data-tab="services"] .shell-content,
+.shell-app[data-tab="saved"] .shell-content,
+.shell-app[data-tab="more"] .shell-content,
+.shell-app[data-tab="explore"] .list-workspace,
+.shell-app[data-tab="map"] .map-workspace{animation:shell-section-in .2s ease-out both}
+.shell-nav button{transition:color .17s ease,background-color .17s ease}
+.shell-service-grid button{transition:transform .17s ease,background-color .17s ease}
+.shell-service-grid button:active{transform:scale(.985)}
+@keyframes shell-section-in{from{opacity:.7;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.shell-app[data-tab] .shell-content,.shell-app[data-tab] .list-workspace,.shell-app[data-tab] .map-workspace{animation:none}.shell-nav button,.shell-service-grid button{transition:none}}
