@@ -286,14 +286,17 @@ test('snake earns a chapter, unlocks the next and pauses without resetting the b
 });
 
 for(const permissionMode of ['prompt','unsupported'] as const){
- test(`Safari ${permissionMode} permission state does not block saved GPS refresh`,async({page})=>{
+ test(`Safari ${permissionMode} permission state preserves cached location until explicit GPS refresh`,async({page})=>{
   await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
   await page.addInitScript(mode=>{
    localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.8,lng:30.7,mode:'device',savedAt:Date.now()}));
    Object.defineProperty(navigator,'permissions',{value:mode==='unsupported'?undefined:{query:async()=>({state:'prompt'})},configurable:true});
    Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:36.884,longitude:30.704}} as GeolocationPosition)},configurable:true});
   },permissionMode);
-  await page.goto('/');await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
+  await page.goto('/');await expect(page.getByRole('button',{name:'Konumumu bul',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.8);
+  await page.getByRole('button',{name:'Konumumu bul',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
  });
 }
 test('denied location stays visible with cached coordinates and does not retry permission',async({page})=>{

@@ -50,7 +50,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       if (!ids.has(id)) { entry.marker.remove(); markersRef.current.delete(id); }
     }
     const occupied: Array<{left:number;top:number;right:number;bottom:number}> = [];
-    for (const {place,point} of candidates) {
+    for (const [index,{place,point}] of candidates.entries()) {
       let entry = markersRef.current.get(place.id);
       if (!entry) {
         const element = document.createElement("div");
@@ -80,7 +80,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       const zoom = map.getZoom();
       const selected = place.id === selectedRef.current?.id;
       entry.marker.getElement().hidden = zoom < 13;
-      entry.marker.getElement().style.zIndex = selected ? "12" : "2";
+      entry.marker.getElement().style.zIndex = String(selected ? candidates.length + 1 : candidates.length - index);
       // Reserve label space only for visible labels. The pin remains tappable
       // when nearby names cannot all fit in the viewport.
       const labelWidth = entry.label.offsetWidth || 128;
@@ -276,7 +276,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const observer=new ResizeObserver(focus);observer.observe(sheetRef.current);focus();return ()=>observer.disconnect();
   }, [selectedPlace?.id]);
 
-  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length}>
+  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length} aria-busy={loading}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}

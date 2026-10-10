@@ -78,3 +78,10 @@
 .prices-panel{gap:8px;padding-top:12px}.prices-panel>.feature-categories{margin:0;padding-top:0}.prices-panel>.price-coverage{margin:0}.fishing-panel{gap:10px}.fishing-panel>.shore-toolbar{margin:4px 0}.fishing-panel>.forecast-days{margin:4px 0}.forecast-table-wrap{margin:4px 0}
 
 .traffic-privacy-note{display:block;margin:6px 0;color:var(--muted);font-size:12px;line-height:1.4}
+
+.map-loading-indicator{display:inline-flex;align-items:center;gap:8px;max-width:calc(100% - 72px);min-height:38px;padding:8px 12px;border:1px solid var(--line);border-radius:20px;background:#fff;color:#342532;font-weight:600;box-shadow:0 2px 12px #29262b24;pointer-events:none;z-index:14}
+.map-loader-ring{flex:none;width:16px;height:16px;border:2px solid #79576d35;border-top-color:var(--accent);border-radius:50%;animation:map-refresh-spin .8s linear infinite}
+@keyframes map-refresh-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.map-loader-ring{animation:none}}
+
+.map-stage{position:relative}.map-canvas{position:relative;z-index:0}
