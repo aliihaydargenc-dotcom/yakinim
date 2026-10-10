@@ -214,7 +214,17 @@
 .shell-app .shell-service-grid strong{font-size:15px}
 .service-search{height:48px;position:static!important;background:white}
 .service-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}
-.service-category-grid button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:80px;padding:10px 6px;border:1px solid var(--line);border-radius:14px;background:white;color:var(--accent-deep);font-size:12px}
+.service-category-grid button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;aspect-ratio:1;min-width:0;padding:10px 6px;border:1px solid var(--line);border-radius:14px;background:white;color:var(--accent-deep);font-size:13px;line-height:1.35;transition:background-color .17s ease,transform .17s ease}
+.service-category-grid button:hover{background:var(--accent-soft)}
+.service-category-grid button:active{transform:scale(.97)}
+.service-category-grid button svg{flex:none}
+.service-category-grid button span{max-width:100%;overflow-wrap:anywhere}
+.product-category-select{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:white;color:var(--accent-deep);font-size:14px;text-align:left}
+.shell-app .pharmacy-filter{margin:0 0 8px;gap:16px}
+.shell-app .results-toolbar{margin-top:8px}
+@media(min-width:700px){.service-category-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1100px){.shell-app .services-menu{max-width:1060px;margin:auto}.service-category-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.service-category-grid button{transition:none}}
 .service-region{font-size:14px;color:var(--accent-deep);font-weight:600}
 .shell-app .stop-row{padding:12px 0;gap:10px;min-height:64px}
 .shell-app .stop-row strong{font-size:14px;line-height:1.4}
