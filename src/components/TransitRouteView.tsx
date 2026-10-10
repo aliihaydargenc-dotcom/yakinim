@@ -1,8 +1,9 @@
 import {useEffect,useRef,useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
-import {BusFront,RefreshCw} from 'lucide-react';
+import {BusFront,MapPin,RefreshCw} from 'lucide-react';
 import maplibregl,{type Map as MapLibreMap,type Marker,type Popup} from 'maplibre-gl';
 import {useBackLayer} from '../hooks/useBackLayer';
+import {distanceAlongRouteMeters,straightLineDistanceMeters,formatTransitDistance} from '../services/transit-route-distance';
 
 type Point={lat:number;lng:number};
 type Stop=Point&{id:string;name:string};
@@ -26,6 +27,7 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack}:{
  const containerRef=useRef<HTMLDivElement|null>(null);
  const mapRef=useRef<MapLibreMap|null>(null);
  const markerRef=useRef<Marker|null>(null);
+ const selectedStopMarkerRef=useRef<Marker|null>(null);
  const animationRef=useRef<number|null>(null);
  const popupRef=useRef<Popup|null>(null);
  const [lastSeen,setLastSeen]=useState<LastSeen|null>(null);
@@ -43,10 +45,43 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack}:{
   const map=new maplibregl.Map({container:containerRef.current,style:'https://tiles.openfreemap.org/styles/liberty',center:[stop.lng,stop.lat],zoom:12.6,attributionControl:{compact:true}});
   mapRef.current=map;
   map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+  // Keep required source credits available via the compact (i) control.
+  let creditsOpened=false;
+  const compactCredits=()=>{
+   if(creditsOpened)return;
+   const credits=map.getContainer().querySelector('details.maplibregl-ctrl-attrib');
+   credits?.removeAttribute('open');
+   credits?.classList.remove('maplibregl-compact-show');
+  };
+  const onCreditsClick=(event:MouseEvent)=>{
+   if(event.target instanceof Element&&event.target.closest('.maplibregl-ctrl-attrib-button'))creditsOpened=true;
+  };
+  map.on('styledata',compactCredits);
+  map.on('sourcedata',compactCredits);
+  map.on('load',compactCredits);
+  map.getContainer().addEventListener('click',onCreditsClick,true);
+  const stopElement=document.createElement('div');
+  stopElement.className='transit-selected-stop-marker';
+  stopElement.setAttribute('role','img');
+  stopElement.setAttribute('aria-label','Seçtiğin durak: '+stop.name);
+  const flag=document.createElement('span');
+  flag.className='transit-selected-stop-flag';
+  flag.textContent='Bu durak';
+  const dot=document.createElement('span');
+  dot.className='transit-selected-stop-dot';
+  dot.setAttribute('aria-hidden','true');
+  stopElement.append(flag,dot);
+  selectedStopMarkerRef.current=new maplibregl.Marker({element:stopElement,anchor:'bottom'}).setLngLat([stop.lng,stop.lat]).addTo(map);
   const observer=new ResizeObserver(()=>map.resize());
   observer.observe(containerRef.current);
   return()=>{
    observer.disconnect();
+   map.off('styledata',compactCredits);
+   map.off('sourcedata',compactCredits);
+   map.off('load',compactCredits);
+   map.getContainer().removeEventListener('click',onCreditsClick,true);
+   selectedStopMarkerRef.current?.remove();
+   selectedStopMarkerRef.current=null;
    if(animationRef.current!==null)cancelAnimationFrame(animationRef.current);
    popupRef.current?.remove();
    markerRef.current?.remove();
@@ -139,6 +174,9 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack}:{
   animationRef.current=requestAnimationFrame(animate);
  },[shown?.lat,shown?.lng,active]);
 
+ const alongDistance=shown&&path.data?.points?distanceAlongRouteMeters(path.data.points,shown,stop):null;
+ const straightDistance=shown?straightLineDistanceMeters(shown,stop):null;
+ const distanceText=shown&&straightDistance!==null?(alongDistance!==null?'≈ '+formatTransitDistance(alongDistance)+' kaldı':'≈ '+formatTransitDistance(straightDistance)+' kuş uçuşu'):null;
  const status=!vehicleId?'Hat güzergâhı':arrivals.isPending?'Araç konumu alınıyor…':arrivals.isError?'Konum güncellenemedi':!arrivals.data?.fresh?'Kaynak verisi güncel değil':active?'Araç konumu bildirildi':lastSeen?'Araç artık bu durakta görünmüyor':'Araç konumu bulunamadı';
  const sourceAt=active?arrivals.data?.sourceAt||null:lastSeen?.sourceAt||null;
  return <div className="transit-route-view">
@@ -147,6 +185,11 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack}:{
   </div>
   <div className="transit-route-map-frame">
    <div ref={containerRef} className="transit-route-map" role="region" aria-label={code+' güzergâh haritası'}/>
+   <div className="transit-selected-stop-card">
+    <MapPin size={19}/>
+    <div><small>Seçtiğin durak</small><strong>{stop.name}</strong></div>
+    {distanceText&&<b aria-label={'Otobüs ile durak arası '+distanceText}>{distanceText}{!active?' · son konum':''}</b>}
+   </div>
    {path.isPending&&<p className="transit-route-map-note" role="status">Güzergâh yükleniyor…</p>}
    {path.isError&&<div className="transit-route-map-note" role="alert">Güzergâh alınamadı. <button type="button" onClick={()=>void path.refetch()}>Tekrar dene</button></div>}
    {!path.isPending&&!path.isError&&(!path.data?.points||path.data.points.length<2)&&<p className="transit-route-map-note">Bu hat için çizim koordinatları bulunamadı.</p>}

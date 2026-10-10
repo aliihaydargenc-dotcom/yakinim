@@ -233,3 +233,19 @@ body{background:var(--canvas);color:var(--ink)}
 .transit-route-refresh:disabled{opacity:.55}
 @media(min-width:700px){.feature-dialog:has(.transit-route-view){left:50%;translate:-50% 0;width:min(100%,820px);max-width:820px}.transit-route-top{flex-direction:row;align-items:center;justify-content:space-between}}
 @media(prefers-reduced-motion:reduce){.transit-vehicle-marker{transition:none}}
+
+
+/* Selected transit stop: amber against the blue route / vehicle marker. */
+.transit-selected-stop-marker{display:flex;flex-direction:column;align-items:center;gap:0;filter:drop-shadow(0 2px 4px #182b3970);pointer-events:none}
+.transit-selected-stop-flag{padding:5px 9px;border-radius:9px 9px 2px 2px;background:#f4ac22;border:2px solid #ffffff;color:#222b32;font-size:12px;font-weight:800;white-space:nowrap;line-height:1.2}
+.transit-selected-stop-dot{width:21px;height:21px;border-radius:50%;background:#ffac16;border:5px solid white;box-shadow:0 0 0 3px #ad5d0c;transform:translateY(2px)}
+.transit-selected-stop-card{position:absolute;z-index:3;top:12px;left:12px;display:grid;grid-template-columns:20px minmax(0,1fr);align-items:start;gap:5px 8px;max-width:min(285px,calc(100% - 86px));padding:10px 12px;background:#fffefaeb;border:1px solid #ddae51;border-left:4px solid #eb9d12;border-radius:12px;box-shadow:0 2px 12px #122b3d20;pointer-events:none;color:#273849}
+.transit-selected-stop-card>svg{color:#bd6d0d;margin-top:3px}
+.transit-selected-stop-card>div{min-width:0;display:grid;gap:2px}
+.transit-selected-stop-card small{font-size:10px;font-weight:650;color:#826026}
+.transit-selected-stop-card strong{font-size:12px;line-height:1.25;overflow-wrap:anywhere}
+.transit-selected-stop-card>b{grid-column:2;font-size:13px;color:#9c4e09;line-height:1.35}
+.transit-route-map-frame .transit-route-map-note{top:102px}
+/* Attribution stays licensed and accessible through the map's compact information toggle. */
+.transit-route-map .maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show){max-width:32px}
+@media(max-width:370px){.transit-selected-stop-card{max-width:calc(100% - 80px);padding:8px}}

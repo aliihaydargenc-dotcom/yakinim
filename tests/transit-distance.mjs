@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {distanceAlongRouteMeters,straightLineDistanceMeters,formatTransitDistance} from '../src/services/transit-route-distance.ts';
+const route=[{lat:36.89,lng:30.7},{lat:36.89,lng:30.701},{lat:36.89,lng:30.702}];
+const stop={lat:36.89,lng:30.70175};
+const bus={lat:36.89,lng:30.70025};
+const remaining=distanceAlongRouteMeters(route,bus,stop);
+assert.ok(remaining!==null&&remaining>125&&remaining<140,'Route-aligned distance is calculated from the selected bus toward the chosen stop');
+assert.equal(distanceAlongRouteMeters(route,stop,bus),null,'Bus that passed the stop does not show remaining route distance');
+assert.equal(distanceAlongRouteMeters(route,{lat:36.9,lng:30.7},stop),null,'Off-route bus does not claim valid road distance');
+assert.ok(straightLineDistanceMeters(bus,stop)>120,'Fallback straight-line distance is available');
+assert.equal(formatTransitDistance(850),'850 m');
+assert.equal(formatTransitDistance(1200),'1,2 km');
+console.log('Transit selected-stop distance PASS: route projection, passed stop, off-route fallback and formatting.');
