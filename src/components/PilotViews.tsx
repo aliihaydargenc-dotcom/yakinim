@@ -1,4 +1,4 @@
-import {lazy,Suspense,useEffect,useMemo,useState} from 'react';
+import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {ArrowLeft,ArrowUpRight,MapPin,Navigation,RefreshCw} from 'lucide-react';
 import type {Coordinates,Place} from '../types';
