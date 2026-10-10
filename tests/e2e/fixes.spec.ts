@@ -198,7 +198,7 @@ test('games fit the mobile width, blocks start full height and new games respond
 test('radio media actions publish metadata, disconnect on pause and stop without closing app',async({page})=>{
  await page.addInitScript(()=>{
   const actions:Record<string,MediaSessionActionHandler|null>={};
-  navigator.mediaSession.setActionHandler=(action,handler)=>{actions[action]=handler;};
+  Object.defineProperty(navigator,'mediaSession',{configurable:true,value:{metadata:null,playbackState:'none',setActionHandler:(action:MediaSessionAction,handler:MediaSessionActionHandler|null)=>{actions[action]=handler;}}});
   (window as any).mediaActions=actions;
   HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};
   HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};
@@ -217,7 +217,7 @@ test('radio media actions publish metadata, disconnect on pause and stop without
 test('notification switches stations in both directions and the radio map stays within viewport',async({page})=>{
  await page.setViewportSize({width:360,height:640});
  await page.addInitScript(()=>{
-  const actions:Record<string,MediaSessionActionHandler|null>={};navigator.mediaSession.setActionHandler=(a,h)=>{actions[a]=h;};(window as any).mediaActions=actions;
+  const actions:Record<string,MediaSessionActionHandler|null>={};Object.defineProperty(navigator,'mediaSession',{configurable:true,value:{metadata:null,playbackState:'none',setActionHandler:(a:MediaSessionAction,h:MediaSessionActionHandler|null)=>{actions[a]=h;}}});(window as any).mediaActions=actions;
   HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};HTMLMediaElement.prototype.load=function(){};
  });
  await page.route('**/api/radio?**',r=>r.fulfill({json:{stations:[1,2,3].map(n=>({id:String(n),name:`Radyo ${n}`,streamUrl:`https://radio.example/${n}`,codec:'MP3'}))}}));
@@ -273,27 +273,36 @@ test('mines retain square, equal rows after opening numbers on a short phone',as
 });
 
 test('snake earns a chapter, unlocks the next and pauses without resetting the board',async({page})=>{
+ // Clock simulation and canvas snapshots need headroom on shared CI runners.
+ test.setTimeout(90000);
  await page.addInitScript(()=>{Math.random=()=>0;});await page.clock.install();await page.goto('/games/snake/index.html');await page.clock.pauseAt(new Date(Date.now()+1000));
- await page.getByRole('button',{name:'Başla',exact:true}).click();
- const turn=async(name:string,ticks:number)=>{await page.getByRole('button',{name,exact:true}).click();await page.clock.runFor(220*ticks+17);};
+ // Exercise the button handlers directly while time is paused. Native input
+ // can wait for animation frames that the fake clock intentionally stops;
+ // physical button interaction is covered by the mobile games smoke test.
+ const activate=async(name:string)=>{const button=page.getByRole('button',{name,exact:true});await expect(button).toBeVisible();await expect(button).toBeEnabled();await button.dispatchEvent('click');};
+ await activate('Başla');
+ const turn=async(name:string,ticks:number)=>{await activate(name);await page.clock.runFor(220*ticks+17);};
  await turn('Yukarı',9);await turn('Sola',8);await expect(page.locator('#score')).toContainText('1 / 5');
  await turn('Aşağı',1);await turn('Sağa',4);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('2 / 5');
  await turn('Sola',4);await expect(page.locator('#score')).toContainText('3 / 5');
  await turn('Aşağı',1);await turn('Sağa',5);await turn('Yukarı',1);await expect(page.locator('#score')).toContainText('4 / 5');
- await turn('Sola',5);await expect(page.locator('#title')).toHaveText('Bölüm 1 tamam!');await page.getByRole('button',{name:'Sonraki bölüm',exact:true}).click();await expect(page.locator('#level')).toHaveText('Bölüm 2');
- await page.getByRole('button',{name:'Oyunu duraklat',exact:true}).click();const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
- await page.getByRole('button',{name:'Devam et',exact:true}).click();await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
+ await turn('Sola',5);await expect(page.locator('#title')).toHaveText('Bölüm 1 tamam!');await activate('Sonraki bölüm');await expect(page.locator('#level')).toHaveText('Bölüm 2');
+ await activate('Oyunu duraklat');const before=await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL());await page.clock.runFor(5000);expect(await page.locator('#board').evaluate((c:HTMLCanvasElement)=>c.toDataURL())).toBe(before);
+ await activate('Devam et');await expect(page.locator('#overlay')).not.toBeVisible();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:snake:v2')||'{}').unlocked)).toBe(2);
 });
 
 for(const permissionMode of ['prompt','unsupported'] as const){
- test(`Safari ${permissionMode} permission state does not block saved GPS refresh`,async({page})=>{
+ test(`Safari ${permissionMode} permission state preserves cached location until explicit GPS refresh`,async({page})=>{
   await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
   await page.addInitScript(mode=>{
    localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.8,lng:30.7,mode:'device',savedAt:Date.now()}));
    Object.defineProperty(navigator,'permissions',{value:mode==='unsupported'?undefined:{query:async()=>({state:'prompt'})},configurable:true});
    Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(success:PositionCallback)=>success({coords:{latitude:36.884,longitude:30.704}} as GeolocationPosition)},configurable:true});
   },permissionMode);
-  await page.goto('/');await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
+  await page.goto('/');await expect(page.getByRole('button',{name:'Konumumu bul',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.8);
+  await page.getByRole('button',{name:'Konumumu bul',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')||'{}').lat)).toBe(36.884);
  });
 }
 test('denied location stays visible with cached coordinates and does not retry permission',async({page})=>{

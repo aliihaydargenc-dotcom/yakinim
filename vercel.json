@@ -23,7 +23,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(self \"https://yandex.com.tr\")"
+          "value": "geolocation=(self)"
         },
         {
           "key": "X-Frame-Options",
@@ -33,6 +33,9 @@
     }
   ],
   "functions": {
+    "api/overture.js": {
+      "maxDuration": 60
+    },
     "api/nearby.js": {
       "maxDuration": 60
     },

@@ -1,84 +1,64 @@
-# Yakınımda
+# Yakınım — React/Vite uygulaması
 
-**Sürüm:** 2.0.2
+**Geliştirilmiş karşılaştırma paketi · 10 Ekim 2026**
 
-Mobil öncelikli, kurulabilir (PWA) yakın çevre keşif uygulaması. Hesap veya ücretli API anahtarı gerektirmez. OSM sorguları aynı alan adındaki Vercel Function üzerinden yürütülür.
+Yakınım; konuma göre yer keşfi, harita, nöbetçi eczane, market fiyatları, Antalya toplu ulaşımı, etkinlikler, kesintiler, balıkçılık, haber, radyo ve oyun modülleri içeren mobil öncelikli web uygulamasıdır. Bu paket mevcut mimari ve veri kaynakları korunarak iyileştirilmiştir; yeni ücretli servis veya API anahtarı gerektiren bağımlılık eklenmemiştir.
 
-## Özellikler
+**Önemli:** Bu inceleme ortamında npm paketleri indirilemediği için tam `npm run build` ve gerçek cihaz testi **doğrulanamadı**. Kaynak yapısı Vercel/Vite dağıtımına uygun hazırlanmıştır; yayın öncesi aşağıdaki kontroller zorunludur. Teknik ayrıntılar `ANALIZ.md`, `DEGISIKLIKLER.md` ve `TEST-SONUCLARI.md` dosyalarında yer alır.
 
-- Açık temalı keşif ekranı, Tümü varsayılanı, yer adı/kategori araması
-- Ayrı liste ve harita görünümleri; mobilde tam boy sonuç kartları
-- Kafe, yemek, alışveriş, park ve günlük ihtiyaç kategorileri
-- Kullanıcının isteğiyle GPS veya haritadan konum seçimi
-- Nöbetçi eczane: Eczane Adresi public API
-- Market / bakkal: OpenStreetMap `shop=supermarket|convenience`
-- Manav: OpenStreetMap `shop=greengrocer`
-- Fırın: OpenStreetMap `shop=bakery`
-- Normal eczane: OpenStreetMap `amenity=pharmacy`
-- ATM: OpenStreetMap `amenity=atm`
-- 1 / 3 / 5 km arama yarıçapı
-- Harita ve liste birlikte çalışır
-- Favoriler ve tercihler cihazda saklanır
-- Eczane sonuçları 15 dakika, OSM sonuçları 6 saat cihazda cache'lenir
-- Veri kaynağı geçici olarak erişilemezse son cihaz önbelleği fallback olarak gösterilir
-- PWA kabuğu çevrimdışı açılabilir
-- Harita tile'ları offline/prefetch edilmez
+## Aktif mimari
 
-## Veri kaynakları
+| Konum | İşlev |
+|---|---|
+| `index.html`, `src/main.tsx`, `src/App.tsx` | **Aktif** React 18 / TypeScript uygulaması |
+| `src/components/` | Liste/harita, fiyat, ulaşım, balıkçılık, haber, radyo, oyun arayüzleri |
+| `src/services/` ve `src/store.ts` | İstemci API sorguları, konum ve tercihler |
+| `api/` | Vercel Functions; sunucu tarafı kaynak doğrulama/erişim |
+| `lib/` | Veri kaynakları için normalleştiriciler, statik durak kataloğu |
+| `public/` | Vite'nin statik çıktıya kopyaladığı PWA, ikonlar ve lisanslı oyunlar |
+| `tests/`, `playwright.config.ts` | Node regresyon ve tarayıcı senaryoları |
+| `vercel.json` | Vite build, `dist` çıktısı, API fonksiyonları, güvenlik başlıkları |
 
-### Eczane Adresi
+Kök dizindeki `app.js`, `styles.css`, `sprint*.js`, `mobile-flow.*`, **kök `sw.js`** ve kök `manifest.webmanifest` önceki statik sürümün kalıntılarıdır; mevcut `index.html` tarafından yüklenmezler. Mevcut projeyle karşılaştırma ve geriye dönüş için bu turda silinmemişlerdir. **Yayınlanan servis çalışanı `public/sw.js` dosyasıdır.** Eski statik testlerin bir kısmı artık aktif uygulamayı test etmez.
 
-Dokümantasyon: https://eczaneadresi.com/api-docs
+## Kurulum ve çalıştırma
 
-Public API anahtar istemez. API çıktısını kullanan yüzeylerde görünür "Veri: Eczane Adresi" atfı uygulanır.
-
-### OpenStreetMap / Overpass
-
-POI sorguları kullanıcı etkileşimiyle çalışır ve cihaz içi cache kullanır.
-
-Overpass: https://wiki.openstreetmap.org/wiki/Overpass_API
-
-OSM tile politikası: https://operations.osmfoundation.org/policies/tiles/
-
-## Gizlilik
-
-GPS koordinatı hesap oluşturulmadan yakın yerleri sorgulamak için ilgili veri sağlayıcısına (Overpass veya Eczane Adresi) iletilir. Favoriler ve tercihler `localStorage` içinde kalır.
-
-## Yerel çalıştırma
-
-```powershell
-python -m http.server 4173
-```
-
-Ardından `http://localhost:4173` açılır.
-
-## Doğrulama
+Node.js **22** önerilir. GitHub'a ZIP'i açarak dosyaları **depo köküne**, iç içe klasör oluşturmadan yükleyin.
 
 ```bash
-node --check app.js
-node --check sw.js
-npm test
+npm ci
+npm run dev
 ```
 
-GitHub Actions aynı kontrolleri PR ve `main` pushlarında çalıştırır.
+Vite varsayılan yerel geliştirme adresini açar. `npm run dev`, Vercel'in `/api/*` sunucusuz fonksiyonlarını tek başına çalıştırmaz. Gerçek veri için Vercel geliştirme ortamına veya ayrı **Vercel Preview** dağıtımına ihtiyaç vardır. `/?preview` sadece **temsili yerler** gösteren arayüz önizlemesidir; canlı veri doğrulaması değildir.
 
-## Vercel
+```bash
+npm test
+npm run build
+npm run test:mobile
+```
 
-Proje framework gerektirmeyen statik bir sitedir. GitHub repository Vercel'e bağlandığında root'taki `index.html`, `app.js`, `styles.css`, manifest ve service worker doğrudan yayınlanır.
+- `npm test`: mevcut test zinciri, yeni `tests/hardening.cjs` ve build kontrolü.
+- `npm run build`: TypeScript denetimi + Vite üretim çıktısı (`dist`).
+- `npm run test:mobile`: Playwright WebKit iPhone emülasyonu ve Chromium Android emülasyonları. BrowserStack için `.github/workflows/browserstack-mobile.yml` ayrıca mevcut; hesabın sırları gerekebilir.
+- `npm run test:hardening`: yeni konum, API biçimi, önbellek ve güvenlik regresyon testleri (kurulmuş `typescript` bağımlılığı gerekir).
 
-`vercel.json` yalnız güvenlik başlıklarını tanımlar. Ek build komutu veya output directory gerekmez.
+## Vercel ayrı önizleme yayını
 
-Önerilen akış:
+1. Bu ZIP içeriğinden **ayrı bir GitHub deposu** oluşturun veya mevcut deponun karşılaştırma dalına aktarın. Mevcut üretim dalına otomatik aktarım yapmayın.
+2. Vercel'de yeni proje oluşturun, ilgili depoyu seçin. Proje ayarlarında **Root Directory** depo kökü olsun.
+3. Vercel, `vercel.json` ile `framework: vite`, `buildCommand: npm run build` ve `outputDirectory: dist` kullanır; `api/*.js` aynı projede serverless function olarak yayınlanır.
+4. GitHub PR / ayrı dal ile bir **Preview URL** oluşturun. İlk dağıtımın build logunda başarılı tamamlandığını, API yanıtlarını ve harita katmanlarını denetleyin.
+5. Test senaryoları ve gerçek iPhone Safari kontrol listesi `TEST-SONUCLARI.md` içinde verilmiştir.
 
-`feature branch → GitHub CI → main merge → Vercel production deploy`
+Yerel ZIP'e `node_modules`, oluşturulmuş `dist` veya gizli anahtar koyulmamıştır. Bağımlılıklar `package-lock.json` üzerinden dağıtım sırasında kurulur. `api/overture.js` dinamik Node modülleri kullandığından önizlemede bu endpoint ayrıca denenmelidir. **Uyarı:** `.openai/hosting.json` önceki OpenAI statik hosting projesine ait kimliği, `android/` ve `public/.well-known/assetlinks.json` mevcut Android uygulamasının bilgilerini içerir. Bunlar Vercel Preview dağıtımı için kullanılmaz; bu paketi eski hosting projesine otomatik yüklemeyin. Yeni Preview URL'sinin Android TWA bağlantısını otomatik değiştirdiğini varsaymayın.
 
-Bu yaklaşım gereksiz preview/deployment üretimini azaltmak için küçük değişiklikleri toplu geliştirme turunda birleştirmeyi hedefler.
+## Konum, kaynak şeffaflığı ve çevrimdışı kullanım
 
+- Konumunuzu butondan cihaz izniyle veya haritadan elle seçebilirsiniz. iOS Safari'de otomatik yeni izin istemi tetiklenmez; ilk talep kullanıcı hareketiyle yapılır.
+- Kullanılan son konum yaklaşık **6 saat** cihazda saklanır ve silinebilir. Favoriler ayrı yerel saklamada kalır. GPS koordinatları API isteklerine ve ilgili harici sağlayıcılara gidebilir; hassas konumu paylaşmak istemiyorsanız haritadan yaklaşık nokta seçin.
+- Nöbetçi eczanede öncelik e-Devlet/TİTCK verisinin işlenmesidir. Teknik sorunlarda **Eczane Adresi** alternatif, resmî olmayan kaynak olarak gösterilir; gitmeden önce telefonla doğrulama önerilir.
+- Market fiyatı kapsama ve son 48 saat kaydıyla, durak bilgileri Antalya kataloguyla, balıkçılık meteoroloji model verisiyle sınırlıdır. Etkinlik ve kesinti sonuçları kaynakta bulunabilen ilanlardan oluşur; eksiksiz kayıt garantisi verilmez.
+- PWA `public/sw.js` yalnızca uygulama kabuğunu ve kendi statik varlıklarını saklar; `/api/*`, GPS verisi ve üçüncü taraf harita kareleri önbelleğe alınmaz. **Offline modda canlı modüller çalışmaz.** Gerçek tarayıcıda PWA kurulum/yenileme testi bu ortamda yapılamamıştır.
 
-## 2.0.1 veri erişimi
-
-OSM sorgusu seçilen yarıçapla sınırlanır. Ana Overpass sunucusu HTTP/ağ/zaman aşımı hatası veya eksik yanıt döndürürse ikinci sunucu denenir. Her deneme 15 saniye ile sınırlıdır. Her ikisi başarısızsa mevcut önbellek kullanılır; önbellek yoksa yeniden deneme düğmesi gösterilir.
-
-## 2.0.2 aynı alan adından veri erişimi
-
-Tarayıcı `/api/nearby` çağırır. Sunucu yalnız doğrulanmış koordinat ve 1/3/5 km yarıçap kabul eder; sorguyu kendisi oluşturur. Güncel Private.coffee ve FOSSGIS sunucuları sıralı olarak denenir. Service worker API yanıtlarını önbelleğe almaz. Yerel tam uygulama testi Vercel dev gerektirir; basit statik sunucu API yolunu çalıştırmaz.
+Eski kaynaklar veya kapsamlı ileride yapılabilecek teknik düzenlemeler için `ANALIZ.md` dosyasındaki öncelik planına bakın. Bu teslimat orijinal GitHub/Vercel üretim dağıtımını değiştirmez.

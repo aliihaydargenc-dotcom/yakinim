@@ -35,6 +35,9 @@ const radioPayload = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((fixtures) => {
+    // bs-local.com is HTTP, so use a saved manual origin; GPS permission tests
+    // run separately on the secure localhost context.
+    localStorage.setItem("yakinim:v2:last-location", JSON.stringify({lat:36.884,lng:30.704,mode:"manual",savedAt:Date.now()}));
     const position = {
       coords: {
         latitude: 36.884,
@@ -68,6 +71,10 @@ test.beforeEach(async ({ page }) => {
         headers: { "Content-Type": "application/json" },
       });
 
+      if (url.includes("tiles.openfreemap.org/styles/positron")) return json({version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":"#f7f5f1"}}]});
+      if (url.includes("/api/location?")) return json({label:"Antalya"});
+      if (url.includes("/api/nearby?")) return json({elements:[],places:[]});
+      if (url.includes("/api/fishing?")) return json({hourly:[],daily:[]});
       if (url.includes("/api/viewport?")) return json(fixtures.viewport);
       if (url.includes("/api/overture?")) return json(fixtures.overture);
       if (url.includes("/api/duty?")) return json(fixtures.duty);
@@ -99,41 +106,38 @@ test("Yakınım v2 works on a real mobile device", async ({ page }, testInfo) =>
   expect(device.height).toBeGreaterThanOrEqual(600);
   expect(device.userAgent).toMatch(/Android|iPhone|iPad|Mobile/i);
 
-  await expect(page.locator(".brand")).toBeVisible();
-  await expect(page.locator(".location-control")).toBeVisible();
-  await expect(page.locator(".hero-copy h1")).toHaveText("Şu anda sana ne lazım?");
+  await expect(page.locator(".model-header")).toContainText("Yakınım");
+  await expect(page.getByRole("button", {name:"Konumumu bul",exact:true})).toBeVisible();
   await assertNoHorizontalOverflow(page);
-
-  await activateMobile(page.locator(".primary-button"));
-  await expect(page.locator(".results-section")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Yakın Market")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Overture Test Kafe")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".results-meta")).toContainText("sonuç", { timeout: 30_000 });
-
-  await activateMobile(page.locator(".category-pill").filter({ hasText: "Nöbetçi" }));
-  await expect(page.locator(".results-heading h2")).toHaveText("Nöbetçi eczaneler");
-  await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible({ timeout: 30_000 });
-
-  const nav = page.locator(".bottom-nav");
-  await activateMobile(nav.locator("button").filter({ hasText: "Harita" }));
-  await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
-  await expect(page.locator(".map-category-dock")).toBeVisible();
+  await expect(page.locator(".place-row").filter({hasText:"Yakın Market"})).toBeVisible();
+  await expect(page.locator(".place-row").filter({hasText:"Overture Test Kafe"})).toBeVisible();
+  await activateMobile(page.getByRole("button", {name:"Tüm kategorileri aç",exact:true}));
+  await activateMobile(page.getByRole("dialog", {name:"Tüm kategoriler",exact:true}).getByRole("button", {name:"Eczane",exact:true}));
+  await activateMobile(page.getByRole("button", {name:"Nöbetçi",exact:true}));
+  await expect(page.locator(".place-row")).toContainText("Merkez Nöbetçi Eczane");
+  await activateMobile(page.getByRole("button", {name:"Harita",exact:true}));
+  await expect(page.getByRole("button", {name:/Liste ·/})).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-stable-markers");
-  await expect(page.locator(".maplibregl-canvas")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".user-marker")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".place-marker")).toHaveCount(0);
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.locator(".user-marker")).toBeVisible();
+  const marker=page.locator('.stable-place-marker button').filter({hasText:'Merkez Nöbetçi Eczane'});
+  await expect(marker).toBeVisible();
+  const pin=await marker.boundingBox();expect(pin).not.toBeNull();
+  expect(pin!.width).toBeGreaterThanOrEqual(44);expect(pin!.height).toBeGreaterThanOrEqual(44);
+  await activateMobile(marker);
+  await expect(page.locator('.map-place-sheet')).toContainText('Merkez Nöbetçi Eczane');
+  await expect(marker).toHaveAttribute('aria-pressed','true');
   await assertMapChromeDoesNotOverlap(page);
-
-  await activateMobile(nav.locator("button").filter({ hasText: "Haber" }));
-  await expect(page.getByText("Gerçek cihaz test haberi")).toBeVisible({ timeout: 30_000 });
-
-  await activateMobile(nav.locator("button").filter({ hasText: "Radyo" }));
-  await expect(page.getByText("Gerçek Cihaz Test Radyosu")).toBeVisible({ timeout: 30_000 });
-  await activateMobile(page.locator(".station-card").filter({ hasText: "Gerçek Cihaz Test Radyosu" }));
+  await page.screenshot({path:testInfo.outputPath('browserstack-map.png')});
+  await activateMobile(page.getByRole('button',{name:'Yer kartını kapat',exact:true}));
+  const nav = page.locator(".model-nav");
+  await activateMobile(nav.getByRole("button", {name:"Haber",exact:true}));
+  await expect(page.getByText("Gerçek cihaz test haberi",{exact:true})).toBeVisible();
+  await activateMobile(nav.getByRole("button", {name:"Radyo",exact:true}));
+  await expect(page.locator('.station-card')).toContainText("Gerçek Cihaz Test Radyosu");
+  await activateMobile(page.locator(".station-card").filter({hasText:"Gerçek Cihaz Test Radyosu"}));
   await expect(page.locator(".global-radio-player")).toBeVisible();
-
-  await activateMobile(nav.locator("button").filter({ hasText: "Yakınım" }));
-  await expect(page.locator(".hero-copy h1")).toHaveText("Şu anda sana ne lazım?");
+  await activateMobile(nav.getByRole("button", {name:"Keşfet",exact:true}));
   await expect(page.locator(".global-radio-player")).toBeVisible();
 
   await assertNoHorizontalOverflow(page);
@@ -145,7 +149,7 @@ async function activateMobile(locator: import("@playwright/test").Locator) {
   await locator.scrollIntoViewIfNeeded();
   await expect(locator).toBeVisible();
   await expect(locator).toBeEnabled();
-  await locator.click({ force: true, timeout: 60_000 });
+  await locator.click({ timeout: 60_000 });
 }
 
 async function assertNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -154,7 +158,7 @@ async function assertNoHorizontalOverflow(page: import("@playwright/test").Page)
 }
 
 async function assertBottomNavInsideViewport(page: import("@playwright/test").Page) {
-  const navBox = await page.locator(".bottom-nav").boundingBox();
+  const navBox = await page.locator(".model-nav").boundingBox();
   expect(navBox).not.toBeNull();
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   if (!navBox) return;
@@ -164,13 +168,13 @@ async function assertBottomNavInsideViewport(page: import("@playwright/test").Pa
 }
 
 async function assertMapChromeDoesNotOverlap(page: import("@playwright/test").Page) {
-  const header = await page.locator(".app-header").boundingBox();
-  const dock = await page.locator(".map-category-dock").boundingBox();
-  const toolbar = await page.locator(".map-toolbar").boundingBox();
+  const header = await page.locator(".model-header").boundingBox();
+  const dock = await page.locator(".map-workspace .category-rail").boundingBox();
   const canvas = await page.locator(".maplibregl-canvas").boundingBox();
-  expect(header && dock && toolbar && canvas).toBeTruthy();
-  if (!header || !dock || !toolbar || !canvas) return;
+  const nav = await page.locator('.model-nav').boundingBox();
+  expect(header && dock && canvas && nav).toBeTruthy();
+  if (!header || !dock || !canvas || !nav) return;
   expect(dock.y).toBeGreaterThanOrEqual(header.y + header.height - 2);
-  expect(toolbar.y).toBeGreaterThanOrEqual(dock.y + dock.height - 2);
-  expect(canvas.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height - 2);
+  expect(canvas.y).toBeGreaterThanOrEqual(dock.y + dock.height - 2);
+  expect(canvas.y + canvas.height).toBeLessThanOrEqual(nav.y + 2);
 }

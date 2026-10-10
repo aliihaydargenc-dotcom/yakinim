@@ -50,7 +50,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       if (!ids.has(id)) { entry.marker.remove(); markersRef.current.delete(id); }
     }
     const occupied: Array<{left:number;top:number;right:number;bottom:number}> = [];
-    for (const {place,point} of candidates) {
+    for (const [index,{place,point}] of candidates.entries()) {
       let entry = markersRef.current.get(place.id);
       if (!entry) {
         const element = document.createElement("div");
@@ -77,15 +77,21 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       entry.button.setAttribute("aria-label",place.name);
       entry.button.setAttribute("aria-pressed",String(place.id === selectedRef.current?.id));
       if (entry.label.textContent !== place.name) entry.label.textContent = place.name;
-      entry.marker.getElement().hidden = map.getZoom() < 13;
-      // Reserve name space only after a gesture settles. Dots and their touch
-      // targets remain available even when two names cannot fit side by side.
-      const labelWidth = entry.label.offsetWidth || 100;
-      const labelHeight = entry.label.offsetHeight || 32;
-      const rect = {left:point.x-labelWidth/2-4,right:point.x+labelWidth/2+4,top:point.y+14,bottom:point.y+14+labelHeight+4};
+      const zoom = map.getZoom();
+      const selected = place.id === selectedRef.current?.id;
+      entry.marker.getElement().hidden = zoom < 13;
+      entry.marker.getElement().style.zIndex = String(selected ? candidates.length + 1 : candidates.length - index);
+      // Reserve label space only for visible labels. The pin remains tappable
+      // when nearby names cannot all fit in the viewport. Names also avoid
+      // neighbouring pins, so a higher marker cannot cover their text.
+      const labelWidth = entry.label.offsetWidth || 128;
+      const labelHeight = entry.label.offsetHeight || 30;
+      const rect = {left:point.x-labelWidth/2-7,right:point.x+labelWidth/2+7,top:point.y+19,bottom:point.y+19+labelHeight+5};
       const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
-      entry.label.style.visibility = (place.id !== selectedRef.current?.id && (overlap || place.category==='transit'&&map.getZoom()<15.8)) ? "hidden" : "visible";
-      if (!overlap) occupied.push(rect);
+      const overlapsPin = candidates.some(({place:other,point:pin}) => other.id !== place.id && rect.left < pin.x + 16 && rect.right > pin.x - 16 && rect.top < pin.y + 16 && rect.bottom > pin.y - 16);
+      const showName = selected || (zoom >= 13.7 && !overlap && !overlapsPin && !(place.category==='transit'&&zoom<15.8));
+      entry.label.style.visibility = showName ? "visible" : "hidden";
+      if (showName) occupied.push(rect);
     }
   };
 
@@ -272,7 +278,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const observer=new ResizeObserver(focus);observer.observe(sheetRef.current);focus();return ()=>observer.disconnect();
   }, [selectedPlace?.id]);
 
-  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length}>
+  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length} aria-busy={loading}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
@@ -361,7 +367,7 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Alternatif kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
+    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
     <div className="map-place-actions">
       {onOpen ? <button className="solid-button" onClick={onOpen}>Yaklaşan otobüsler</button> : place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
       {place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>}

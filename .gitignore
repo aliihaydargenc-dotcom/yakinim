@@ -12,3 +12,10 @@ android/local.properties
 *.keystore
 *.apk
 *.aab
+
+# Local environment credentials and private signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
