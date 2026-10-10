@@ -9,7 +9,7 @@ const sheet=read('src/components/FeatureSheet.tsx');
 const css=read('src/model1.css');
 const api=read('lib/transit.cjs');
 assert.match(list,/onRoute\?\.\(bus\.code,bus\.direction,bus\.id\)/,'Bus identity must be sent to route map');
-assert.match(screen,/vehicleId\}\)\/?>/,'Route view should receive selected bus identity');
+assert.match(screen,/vehicleId=\{route\.vehicleId\}/,'Route view should receive selected bus identity');
 assert.match(screen,/onBack=\{\(\)=>setRoute\(null\)\}/,'Back should preserve selected stop');
 assert.match(screen,/title=\{route\?\.code\|\|selected\?\.name/,'Route reuses original stop sheet');
 assert.match(sheet,/back\?:boolean/,'Back arrow should be available');
