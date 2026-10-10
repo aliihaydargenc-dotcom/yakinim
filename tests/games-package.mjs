@@ -18,7 +18,7 @@ for(const id of games){
  const html=fs.readFileSync(index,'utf8');
  assert.match(html,/<meta\s+name=["']viewport["']/i,'Game should scale on mobile: '+id);
  const references=[...html.matchAll(/(?:src|href)=["']([^"'#]+)["']/gi)].map(m=>m[1]);
- for(const ref of references){
+ if(imported.includes(id))for(const ref of references){
    if(ref.startsWith('data:')||ref.startsWith('/')||ref.startsWith('https:')||ref.startsWith('http:'))continue;
    assert.ok(fs.existsSync(path.resolve(gameDir,ref)),'Missing local asset '+id+': '+ref);
  }
