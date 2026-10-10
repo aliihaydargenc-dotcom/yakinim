@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {PlaceFacts} from "./PlaceFacts";
-import { Navigation, Phone, X, BusFront, ChevronUp, ChevronDown, MapPin } from "lucide-react";
+import { Navigation, Phone, X, BusFront, ChevronUp, ChevronDown, MapPin, Heart } from "lucide-react";
 import {TransitArrivals} from "./TransitArrivals";
 import {iconForCategory,registerMapIcons} from "./mapIcons";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
@@ -19,7 +19,7 @@ const LABEL_LAYER = "nearby-place-short-labels";
 const SELECTED_LAYER = "nearby-place-selected-halo";
 const HIT_LAYER = "nearby-place-touch-targets";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope,initialCenter }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string;initialCenter?:Coordinates }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope,initialCenter,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string;initialCenter?:Coordinates;onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -37,6 +37,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const [visiblePlaces,setVisiblePlaces]=useState<Place[]>([]);
   const [sheetLevel,setSheetLevel]=useState<"peek"|"half"|"full">("peek");
   const touchStart=useRef<number|null>(null);
+  const suppressTap=useRef(false);
   const visibleRef=useRef<() => void>(()=>{});
   const sourceSignatureRef = useRef("");
   const trafficStateRef=useRef(onTrafficState);trafficStateRef.current=onTrafficState;
@@ -256,9 +257,10 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         if(touchStart.current===null)return;
         const difference=touchStart.current-(e.changedTouches[0]?.clientY??touchStart.current);touchStart.current=null;
         if(Math.abs(difference)<35)return;
+        suppressTap.current=true;
         setSheetLevel(level=>difference>0?(level==='peek'?'half':'full'):(level==='full'?'half':'peek'));
       }}>
-        <button type="button" className="map-sheet-toggle" aria-expanded={sheetLevel!=='peek'} onClick={()=>setSheetLevel(level=>level==='peek'?'half':level==='half'?'full':'half')}>
+        <button type="button" className="map-sheet-toggle" aria-expanded={sheetLevel!=='peek'} onClick={()=>{if(suppressTap.current){suppressTap.current=false;return;}setSheetLevel(level=>level==='peek'?'half':level==='half'?'full':'half');}}>
           <span className="map-sheet-grabber" aria-hidden="true"/>
           {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Haritadaki yerler</strong><small>{visiblePlaces.length} sonuç</small></span>}
           {sheetLevel==='full'?<ChevronDown size={20}/>:<ChevronUp size={20}/>}
@@ -266,7 +268,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         {selectedPlace&&<button type="button" className="map-sheet-close" aria-label="Yer kartını kapat" onClick={()=>{setSelectedPlace(null);setSheetLevel('half');}}><X size={20}/></button>}
       </div>
       <div className="map-sheet-content" id="map-sheet-content">
-        {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>{setSelectedPlace(null);setSheetLevel('half');}}/>:
+        {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>{setSelectedPlace(null);setSheetLevel('half');}} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/>:
           <div className="map-sheet-place-list" aria-label="Görünen yerler">
             {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':'Bu alanda yer bulunamadı.'}</p>:
               visiblePlaces.slice(0,36).map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
@@ -277,7 +279,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         }
       </div>
     </section>}
-    {selectedPlace&&!enableList&&<div ref={sheetRef} className="map-sheet-holder" key={selectedPlace.id}><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>setSelectedPlace(null)}/></div>}
+    {selectedPlace&&!enableList&&<div ref={sheetRef} className="map-sheet-holder" key={selectedPlace.id}><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>setSelectedPlace(null)} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/></div>}
   </div>;
 }
 
@@ -329,7 +331,7 @@ function emptyFeatureCollection() {
   return { type: "FeatureCollection", features: [] } as any;
 }
 
-function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () => void; onOpen?: () => void }) {
+function MapPlaceSheet({ place, onClose, onOpen, onSave, saved=false }: { place: Place; onClose: () => void; onOpen?: () => void; onSave?: () => void; saved?:boolean }) {
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   return <aside className="map-place-sheet" aria-label={`${place.name} detayları`}>
     <div className="map-place-heading">
@@ -337,7 +339,7 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
     {place.category==='transit'?<TransitArrivals stop={place}/>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
-    {place.category!=='transit'&&<div className="map-place-actions">{onOpen?<button type="button" className="solid-button" onClick={onOpen}>Ayrıntılar</button>:place.phone?<a href={`tel:${place.phone}`}><Phone size={17}/> Ara</a>:null}<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/> Yol tarifi</a></div>}
+    <div className="map-place-actions">{place.category!=='transit'&&(onOpen?<button type="button" className="solid-button" onClick={onOpen}>Ayrıntılar</button>:place.phone?<a href={`tel:${place.phone}`}><Phone size={17}/> Ara</a>:null)}{place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/> Yol tarifi</a>}{onSave&&<button className="map-save-place" aria-label="Yeri kaydet" aria-pressed={saved} onClick={onSave}><Heart size={19} fill={saved?'currentColor':'none'}/></button>}</div>
   </aside>;
 }
 
