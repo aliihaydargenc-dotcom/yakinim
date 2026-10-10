@@ -129,3 +129,12 @@ body{background:var(--canvas);color:var(--ink)}
  .places-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:30px}
  .model-nav button{flex-direction:row;gap:10px}
 }
+
+/* Region prices and map-first Antalya stops */
+.price-region-label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:600}
+.price-region-label select{min-height:44px;min-width:150px;max-width:65%;padding:8px 32px 8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);color:var(--text,#192e2b);font:inherit;font-size:15px}
+.map-stop-search{position:relative;flex-shrink:0;margin:4px 16px 8px}
+.transit-map-panel .pilot-map{min-height:clamp(260px,48dvh,720px)}
+.transit-map-open .transit-map-panel .pilot-map{min-height:0;flex:1}
+.transit-map-panel .map-stage,.transit-map-panel .map-canvas{height:100%;min-height:100%}
+@media(max-width:650px){.price-region-label{align-items:stretch}.price-region-label select{flex:1;min-width:0;max-width:70%}.transit-map-panel>.pilot-title h2{font-size:17px}}
