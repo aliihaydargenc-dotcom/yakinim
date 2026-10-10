@@ -9,13 +9,12 @@ import {
 import discoveryCategories from '../../../lib/discovery-categories.json';
 import type {CategoryId} from '../../types';
 
-export type Tab = 'explore'|'map'|'services'|'saved'|'more';
+export type Tab = 'explore'|'services'|'saved'|'more';
 export type Service = 'prices'|'transit'|'traffic'|'events';
 export type Media = 'news'|'radio'|'games';
 export type NavOption = {id:Tab;label:string;Icon:LucideIcon};
 export const tabs:NavOption[] = [
   {id:'explore',label:'Keşfet',Icon:Compass},
-  {id:'map',label:'Harita',Icon:MapIcon},
   {id:'services',label:'Hizmetler',Icon:Grid2X2},
   {id:'saved',label:'Kaydedilen',Icon:Bookmark},
   {id:'more',label:'Diğer',Icon:Ellipsis},
