@@ -1,4 +1,4 @@
-.shell-app{min-height:100dvh;--shell-nav:76px;--nav:76px}
+.shell-app{min-height:100dvh;--shell-nav:76px;--nav:76px;--accent:#365d7b;--accent-deep:#243e53;--accent-soft:#e8f0f6;--muted:#657987;--line:#e2eaef;--surface:#ffffff;--text:#243e53;--ui-radius:16px;--ui-motion:cubic-bezier(.2,.8,.2,1)}
 .shell-body{min-width:0;padding-bottom:calc(var(--shell-nav) + env(safe-area-inset-bottom))}
 .shell-sidebar{display:none}
 .shell-body .model-app{max-width:none;padding-bottom:0}
@@ -95,3 +95,8 @@
  .shell-content{padding:22px 18px 24px}
  .shell-content h1{font-size:25px}
 }
+
+.shell-app .shell-service-grid>button,.shell-app .shell-saved-place{border-color:var(--line);box-shadow:0 3px 18px rgba(37,63,81,.035)}
+.shell-app .shell-service-grid>button:hover{background:#f4f8fb;border-color:#c4d4df}
+.shell-app .shell-card-icon{background:var(--accent-soft);color:var(--accent-deep)}
+.shell-app .shell-nav button[aria-current=page]{color:var(--accent-deep)}
