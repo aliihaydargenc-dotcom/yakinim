@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {ArrowLeft,Blocks,Grid2X2,Brain,Worm,Bomb,Grid3X3,BookOpen,BrickWall,PersonStanding} from 'lucide-react';
+import {ArrowLeft,Blocks,Grid2X2,Brain,Worm,Bomb,BookOpen,BrickWall,PersonStanding} from 'lucide-react';
 
 const games=[
  {id:'2048',title:'2048',kind:'Zekâ',Icon:Grid2X2,legacy:true},
@@ -8,10 +8,8 @@ const games=[
  {id:'snake',title:'Yılan',kind:'Arcade',Icon:Worm,legacy:true},
  {id:'mines',title:'Mayın Tarlası',kind:'Zekâ',Icon:Bomb,legacy:true},
  {id:'breaker',title:'Tuğla Kırma',kind:'Arcade',Icon:BrickWall,legacy:false},
- {id:'sudoku',title:'Sudoku',kind:'Zekâ',Icon:Grid3X3,legacy:false},
  {id:'runner',title:'Engel Atlama',kind:'Arcade',Icon:PersonStanding,legacy:false},
  {id:'words',title:'Kelime Tahmini',kind:'Zekâ',Icon:BookOpen,legacy:false},
- {id:'puzzle',title:'15 Bulmacası',kind:'Zekâ',Icon:Grid3X3,legacy:false}
 ];
 export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>void}){
  const [selected,setSelected]=useState<string|null>(null);
