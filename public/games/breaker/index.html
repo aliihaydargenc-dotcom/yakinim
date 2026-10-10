@@ -164,11 +164,11 @@
 <body>
 
   <header id="header">
-    <div class="stat"><span class="label">Level</span><span class="value" id="levelVal">1</span></div>
-    <div class="stat"><span class="label">Score</span><span class="value" id="scoreVal">0</span></div>
-    <div class="stat"><span class="label">High</span><span class="value" id="highVal">0</span></div>
-    <div class="stat" id="livesStat"><span class="label">Lives</span><span class="value" id="livesVal">3</span></div>
-    <div class="stat" id="difficultyStat"><span class="label">Mode</span><span class="value" id="diffVal">--</span></div>
+    <div class="stat"><span class="label">Seviye</span><span class="value" id="levelVal">1</span></div>
+    <div class="stat"><span class="label">Puan</span><span class="value" id="scoreVal">0</span></div>
+    <div class="stat"><span class="label">Rekor</span><span class="value" id="highVal">0</span></div>
+    <div class="stat" id="livesStat"><span class="label">Can</span><span class="value" id="livesVal">3</span></div>
+    <div class="stat" id="difficultyStat"><span class="label">Zorluk</span><span class="value" id="diffVal">--</span></div>
   </header>
 
   <div id="gameWrap">
@@ -177,11 +177,11 @@
 
   <div id="controls">
     <div id="buttonRow">
-      <button class="btn" id="pauseBtn">Pause</button>
-      <button class="btn pink" id="restartBtn">Restart</button>
+      <button class="btn" id="pauseBtn">Duraklat</button>
+      <button class="btn pink" id="restartBtn">Yeniden başlat</button>
     </div>
     <div id="instructions">
-      Move: Mouse / Touch / Arrow Keys &nbsp;|&nbsp; Launch: Click / Tap / Space &nbsp;|&nbsp; Pause: P
+      Hareket: Dokun / yön tuşları &nbsp;|&nbsp; Başlat: Dokun / boşluk &nbsp;|&nbsp; Duraklat: P
     </div>
   </div>
 
@@ -224,9 +224,9 @@
      DIFFICULTY DEFINITIONS
   =================================================================== */
   const DIFFICULTIES = {
-    Easy:   { ballSpeed: 5.0, paddleW: 140, speedUp: 0,    label: "EASY" },
+    Easy:   { ballSpeed: 5.0, paddleW: 140, speedUp: 0,    label: "KOLAY" },
     Normal: { ballSpeed: 6.5, paddleW: 110, speedUp: 0,    label: "NORMAL" },
-    Hard:   { ballSpeed: 8.5, paddleW: 77,  speedUp: 0.12, label: "HARD" }
+    Hard:   { ballSpeed: 8.5, paddleW: 77,  speedUp: 0.12, label: "ZOR" }
   };
 
   /* ===================================================================
@@ -689,17 +689,17 @@
         drawReadyHint();
         break;
       case STATE.PAUSED:
-        drawOverlay("PAUSED", "Press P or tap Pause to resume", "#00f0ff");
+        drawOverlay("DURDURULDU", "Devam etmek için P", "#00f0ff");
         break;
       case STATE.LEVEL_CLEARED:
-        drawOverlay("LEVEL " + (game.level + 1) + " CLEARED!",
-                    "Tap / Click / Space for next level", "#39ff14");
+        drawOverlay("SEVİYE " + (game.level + 1) + " TAMAMLANDI!",
+                    "Sonraki seviye için dokun", "#39ff14");
         break;
       case STATE.GAME_OVER:
-        drawOverlay("GAME OVER", "Score: " + game.score + "  -  Tap / Space to restart", "#ff2d95");
+        drawOverlay("OYUN BİTTİ", "Puan: " + game.score + "  -  Tekrar dokun", "#ff2d95");
         break;
       case STATE.VICTORY:
-        drawOverlay("VICTORY!", "All levels cleared! Score: " + game.score, "#ffea00");
+        drawOverlay("KAZANDIN!", "Tüm seviyeler bitti! Puan: " + game.score, "#ffea00");
         break;
     }
   }
@@ -813,7 +813,7 @@
     ctx.font = "bold 22px 'Courier New', monospace";
     ctx.shadowColor = "#00f0ff";
     ctx.shadowBlur = 10;
-    ctx.fillText("TAP / CLICK / SPACE TO LAUNCH", GAME_W / 2, GAME_H - 80);
+    ctx.fillText("BAŞLATMAK İÇİN DOKUN", GAME_W / 2, GAME_H - 80);
     ctx.restore();
   }
 
@@ -826,18 +826,18 @@
     ctx.fillStyle = "#ff2d95";
     ctx.shadowColor = "#ff2d95";
     ctx.shadowBlur = 25;
-    ctx.fillText("BRICK BREAKER", GAME_W / 2, 130);
+    ctx.fillText("TUĞLA KIRMA", GAME_W / 2, 130);
 
     ctx.font = "bold 20px 'Courier New', monospace";
     ctx.fillStyle = "#00f0ff";
     ctx.shadowColor = "#00f0ff";
     ctx.shadowBlur = 12;
-    ctx.fillText("- NEON ARCADE EDITION -", GAME_W / 2, 168);
+    ctx.fillText("- NEON OYUN -", GAME_W / 2, 168);
 
     ctx.font = "18px 'Courier New', monospace";
     ctx.fillStyle = "#ffffff";
     ctx.shadowBlur = 0;
-    ctx.fillText("SELECT DIFFICULTY", GAME_W / 2, 225);
+    ctx.fillText("ZORLUK SEÇ", GAME_W / 2, 225);
 
     // Difficulty buttons
     const colors = { Easy: "#39ff14", Normal: "#00f0ff", Hard: "#ff2d95" };
@@ -856,15 +856,15 @@
 
       ctx.fillStyle = col;
       ctx.font = "bold 24px 'Courier New', monospace";
-      ctx.fillText(btn.name.toUpperCase(), btn.x + btn.w / 2, btn.y + btn.h / 2 + 8);
+      ctx.fillText((btn.name==="Easy"?"KOLAY":btn.name==="Hard"?"ZOR":"NORMAL"), btn.x + btn.w / 2, btn.y + btn.h / 2 + 8);
 
       // small description
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.font = "12px 'Courier New', monospace";
       let desc = "";
-      if (btn.name === "Easy")   desc = "Slow ball - Wide paddle";
-      if (btn.name === "Normal") desc = "Standard speed & size";
-      if (btn.name === "Hard")   desc = "Fast ball - Small paddle - Speeds up";
+      if (btn.name === "Easy")   desc = "Yavaş top - Geniş palet";
+      if (btn.name === "Normal") desc = "Normal hız ve boyut";
+      if (btn.name === "Hard")   desc = "Hızlı top - Dar palet";
       ctx.fillText(desc, btn.x + btn.w / 2, btn.y + btn.h + 16);
     }
     ctx.restore();
