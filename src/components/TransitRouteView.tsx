@@ -19,8 +19,8 @@ async function request<T>(url:string,signal?:AbortSignal):Promise<T>{
 function valid(p:Point){return Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&p.lat>35.5&&p.lat<38&&p.lng>29&&p.lng<33;}
 function clock(value:string|null){return value?new Date(value).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Istanbul'}):'';}
 
-export function TransitRouteView({stop,code,direction,vehicleId,onBack,onDirectionChange}:{
- stop:Stop;code:string;direction:number;vehicleId?:string;onBack:()=>void;onDirectionChange:(direction:number)=>void;
+export function TransitRouteView({stop,code,direction,vehicleId,onBack}:{
+ stop:Stop;code:string;direction:number;vehicleId?:string;onBack:()=>void;
 }){
  useBackLayer(true,onBack);
  const containerRef=useRef<HTMLDivElement|null>(null);
@@ -144,10 +144,6 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack,onDirecti
  return <div className="transit-route-view">
   <div className="transit-route-top">
    <div className="transit-route-label"><strong>{path.data?.name||code}</strong><small>{stop.name} · {stop.id}</small></div>
-   <div className="transit-route-directions" aria-label="Hat yönü">
-    <button type="button" aria-pressed={direction===0} onClick={()=>onDirectionChange(0)}>Gidiş</button>
-    <button type="button" aria-pressed={direction===1} onClick={()=>onDirectionChange(1)}>Dönüş</button>
-   </div>
   </div>
   <div className="transit-route-map-frame">
    <div ref={containerRef} className="transit-route-map" role="region" aria-label={code+' güzergâh haritası'}/>
@@ -158,7 +154,7 @@ export function TransitRouteView({stop,code,direction,vehicleId,onBack,onDirecti
   <div className="transit-route-footer">
    <div className="transit-route-status" role="status" aria-live="polite">
     <span className={active?'transit-route-live':'transit-route-offline'}><BusFront size={18}/>{status}</span>
-    <small>{sourceAt?'Son konum: '+clock(sourceAt)+' · ':''}Otomatik yenileme: 20 sn</small>
+    <small>{sourceAt?'Son konum: '+clock(sourceAt)+(vehicleId?' · ':''):''}{vehicleId?'Otomatik yenileme: 20 sn':''}</small>
    </div>
    <button type="button" className="transit-route-refresh" onClick={()=>{void path.refetch();if(vehicleId)void arrivals.refetch();}} disabled={path.isFetching||arrivals.isFetching} aria-label="Güzergâhı ve otobüs konumunu yenile"><RefreshCw size={19}/><span>Yenile</span></button>
   </div>

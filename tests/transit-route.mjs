@@ -14,6 +14,10 @@ assert.match(screen,/onBack=\{\(\)=>setRoute\(null\)\}/,'Back should preserve se
 assert.match(screen,/title=\{route\?\.code\|\|selected\?\.name/,'Route reuses original stop sheet');
 assert.match(sheet,/back\?:boolean/,'Back arrow should be available');
 assert.match(map,/refetchInterval:vehicleId\?20000:false/,'Vehicle position should poll every 20 seconds');
+assert.doesNotMatch(map,/onDirectionChange|transit-route-directions|Hat yönü/,'Selected bus must not switch direction and lose its identity');
+assert.doesNotMatch(screen,/onDirectionChange/,'The parent must preserve the selected bus identity until leaving the route');
+assert.match(screen,/key=\{route\.code\+':'\+route\.direction\+':'\+\(route\.vehicleId\|\|'\'\)\}/,'Selected bus key must remain stable while the route is open');
+assert.match(map,/\{vehicleId\?'Otomatik yenileme: 20 sn':''\}/,'Do not promise automatic live updates for route-only view');
 assert.match(map,/arrivals\.data\.buses\.find\(b=>b\.id===vehicleId/,'Must track exact selected vehicle, not any bus on route');
 assert.match(map,/!arrivals\.data\?\.fresh/,'Must distinguish stale source data');
 assert.match(map,/is-last-seen/,'Old positions must not appear live');
