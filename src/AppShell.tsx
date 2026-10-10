@@ -14,8 +14,8 @@ export default function AppShell(){
  const [desktop,setDesktop]=useState(()=>window.matchMedia('(min-width:1100px)').matches);
  const {setSection,setCategory,setSearch,savedIds,savedPlaces,toggleSaved}=useAppStore();
  useEffect(()=>{const q=window.matchMedia('(min-width:1100px)');const change=()=>setDesktop(q.matches);q.addEventListener('change',change);return()=>q.removeEventListener('change',change);},[]);
- function navigate(next:Tab){setTab(next);setService(null);setMedia(null);setPlaying(false);setSection(next==='map'?'map':'nearby');if(next==='map'||next==='explore'&&service){setCategory('all');setSearch('');}}
- function openService(next:Service){setService(next);setSection('nearby');setSearch('');setCategory(next==='prices'?'market':next==='traffic'?'transit':next);}
+ function navigate(next:Tab){setTab(next);setService(null);setMedia(null);setPlaying(false);setSection(next==='map'?'map':'nearby');if(next==='services'||next==='map'||next==='explore'&&service){setCategory('all');setSearch('');}}
+ function openService(next:Service){setSearch('');if(next==='transit'){setTab('map');setService(null);setSection('map');setCategory('transit');return;}setService(next);setSection('nearby');setCategory(next==='prices'?'market':next==='traffic'?'transit':next);}
  function openMedia(next:Media){setMedia(next);setSection(next);}
  const appVisible=tab==='explore'||tab==='map'||tab==='services'&&!!service||tab==='more'&&!!media;
  const unresolved=savedIds.filter(id=>!savedPlaces.some(p=>p.id===id));
