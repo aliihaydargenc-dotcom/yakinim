@@ -1,7 +1,7 @@
 import type {LucideIcon} from 'lucide-react';
 import {
   Compass, Map as MapIcon, Grid2X2, Bookmark, Ellipsis, ShoppingBasket, UtensilsCrossed, Coffee,
-  Cross, Fuel, CarFront, BusFront, CalendarDays, Fish, Waves, CircleAlert, ShoppingCart, MapPin,
+  Cross, Fuel, CarFront, BusFront, CalendarDays, Waves, ShoppingCart, MapPin,
   Trees, Landmark, Dumbbell, ParkingCircle, Hospital, Banknote, Store, Pill, Accessibility,
   Droplets, Dog, PlugZap, Baby, Recycle, Tent, Binoculars, Footprints, Newspaper, Radio, Gamepad2,
   MapPinned, Heart, TrendingDown, Navigation, type LucideProps
@@ -10,7 +10,7 @@ import discoveryCategories from '../../../lib/discovery-categories.json';
 import type {CategoryId} from '../../types';
 
 export type Tab = 'explore'|'map'|'services'|'saved'|'more';
-export type Service = 'prices'|'transit'|'traffic'|'events'|'outages'|'fishing';
+export type Service = 'prices'|'transit'|'traffic'|'events';
 export type Media = 'news'|'radio'|'games';
 export type NavOption = {id:Tab;label:string;Icon:LucideIcon};
 export const tabs:NavOption[] = [
@@ -25,8 +25,6 @@ export const services:{id:Service;label:string;description:string;Icon:LucideIco
   {id:'transit',label:'Toplu ulaşım',description:'Durak ve araç bilgileri',Icon:BusFront},
   {id:'traffic',label:'Trafik',description:'Haritadaki yoğunluk',Icon:Navigation},
   {id:'events',label:'Etkinlikler',description:'Duyurular ve program',Icon:CalendarDays},
-  {id:'outages',label:'Kesintiler',description:'Planlı ve güncel bildirim',Icon:CircleAlert},
-  {id:'fishing',label:'Balıkçılık',description:'Kıyı ve deniz koşulları',Icon:Fish},
 ];
 export const categories:{id:CategoryId;label:string;Icon:LucideIcon}[] = [
   {id:'all',label:'Tümü',Icon:Compass},
