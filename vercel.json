@@ -60,13 +60,10 @@
     "api/events.js": {
       "maxDuration": 30
     },
-    "api/outages.js": {
-      "maxDuration": 60
-    },
-    "api/fishing.js": {
-      "maxDuration": 30
-    },
     "api/location.js": {
+      "maxDuration": 15
+    },
+    "api/weather.js": {
       "maxDuration": 15
     }
   },
