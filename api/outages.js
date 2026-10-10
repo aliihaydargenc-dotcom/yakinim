@@ -1,3 +1,0 @@
-'use strict';
-const {query}=require('../lib/outages.cjs');
-module.exports=async(req,res)=>{if(req.method!=='GET'){res.setHeader('Allow','GET');return res.status(405).json({error:'method_not_allowed'});}const kind=req.query?.kind||new URL(req.url,'https://local').searchParams.get('kind');if(!['water','electric'].includes(kind))return res.status(400).json({error:'invalid_kind'});try{const data=await query(kind);res.setHeader('Cache-Control','public, max-age=0, s-maxage=60');return res.status(200).json(data);}catch{res.setHeader('Cache-Control','no-store');return res.status(503).json({error:'outages_unavailable'});}};

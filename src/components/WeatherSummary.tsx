@@ -1,7 +1,16 @@
-import AirQuality from './AirQuality';
 import type {Coordinates} from '../types';
-import {useForecast,dayKey,measure} from '../services/forecast';
+import {useWeather} from '../services/weather';
+
+const format=(value:number,unit:string)=>`${Math.round(value).toLocaleString('tr-TR')} ${unit}`;
+
 export default function WeatherSummary({location}:{location:Coordinates}){
- const forecast=useForecast(location,'weather');const h=forecast.data?.hourly.find(h=>h.time>=Math.floor(Date.now()/3600000)*3600);const daily=forecast.data?.daily.find(d=>dayKey(d.time)===dayKey(Date.now()/1000));
- return <section className="weather-summary" aria-label="Konumuna göre hava özeti">{forecast.isPending?<small>Hava bilgisi yükleniyor…</small>:!h?<><small>Hava bilgisi şu an alınamıyor.</small><button onClick={forecast.refresh}>Yenile</button></>:<><div><strong>{measure(h.airTemperature,'°C')}</strong><small>Hissedilen {measure(h.feelsLike,'°C')}</small></div><div><span>Yağış {measure(h.rain,'%')}</span><small>UV {measure(daily?.uv,'')}</small></div><small className="weather-attribution"><a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a> · Model tahmini</small><details><summary>Hava ayrıntıları</summary><p>Rüzgâr {measure(h.wind,'m/sn')} · Görüş {measure(h.visibility==null?null:h.visibility/1000,'km')}</p><small>Model tahmini · {new Date(forecast.data!.fetchedAt).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Istanbul'})} · <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a></small>{forecast.isError&&<p>Yenilenemedi; son alınan tahmin gösteriliyor.</p>}{Date.now()>Date.parse(forecast.data!.expiresAt)&&<p>Tahminin yenilenmesi gerekiyor.</p>}<button onClick={forecast.refresh}>Hava bilgisini yenile</button></details></>}<AirQuality location={location}/></section>;
+  const weather=useWeather(location);
+  const data=weather.data;
+  return <section className="weather-summary" aria-label="Konuma göre hava durumu">
+    {weather.isPending&&!data?<small>Hava durumu yükleniyor…</small>:!data?<div><strong>Hava durumu alınamadı</strong><button onClick={()=>void weather.refetch()}>Yenile</button></div>:<>
+      <div><strong>{format(data.temperature,'°C')}</strong><small>{data.condition}</small></div>
+      <div><span>Rüzgâr {format(data.windSpeed*3.6,'km/sa')}</span><small>{data.precipitation!==null?`Yağış ${data.precipitation.toLocaleString('tr-TR',{maximumFractionDigits:1})} mm`:''}</small></div>
+      <small className="weather-attribution"><a href="https://api.met.no/doc/License" target="_blank" rel="noreferrer">MET Norway</a></small>
+    </>}
+  </section>;
 }

@@ -3,7 +3,7 @@ import {Grid2X2} from 'lucide-react';
 import type { CategoryId } from '../types';
 import {FeatureSheet} from './FeatureSheet';
 import discoveryCategories from '../../lib/discovery-categories.json';
-const CATEGORIES:[CategoryId,string][]=[['all','Tümü'],['market','Market'],['fishing','Balıkçılık'],['transit','Ulaşım'],['events','Etkinlik'],['outages','Kesintiler'],['food','Yemek'],['pharmacy','Eczane'],['cafe','Kafe'],['bakery','Fırın'],['atm','ATM'],['park','Park'],['hospital','Sağlık'],['fuel','Akaryakıt'],['parking','Otopark'],['greengrocer','Manav'],['shopping','Alışveriş'],...discoveryCategories.map(c=>[c.id as CategoryId,c.label] as [CategoryId,string])];
+const CATEGORIES:[CategoryId,string][]=[['all','Tümü'],['market','Market'],['food','Yemek'],['pharmacy','Eczane'],['cafe','Kafe'],['bakery','Fırın'],['atm','ATM'],['park','Park'],['hospital','Sağlık'],['fuel','Akaryakıt'],['parking','Otopark'],['greengrocer','Manav'],['shopping','Alışveriş'],...discoveryCategories.map(c=>[c.id as CategoryId,c.label] as [CategoryId,string])];
 export function CategoryRail({value,onChange,variant}:{value:CategoryId;onChange:(c:CategoryId)=>void;variant?:string}){
  const [open,setOpen]=useState(false);const selected=(id:CategoryId)=>value===id||id==='pharmacy'&&value==='duty';
  const rail=useRef<HTMLDivElement>(null);
