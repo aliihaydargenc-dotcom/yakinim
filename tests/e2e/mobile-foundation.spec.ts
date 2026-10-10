@@ -14,11 +14,16 @@ test.beforeEach(async({page})=>{
  await page.route('**/api/events?**',r=>r.fulfill({json:{items:[{id:'one',title:'Tarihi doğrulanmamış etkinlik',startsAt:null,endsAt:null,venue:null,source:'Etkinlik.io',url:'https://etkinlik.io/etkinlik/123/test'}],coverage:'Antalya',fetchedAt:new Date().toISOString(),partial:true}}));
 });
 test('Keşfet is a full map with no search, weather, category rail or nearby list',async({page})=>{
+ await page.route('https://tiles.openfreemap.org/styles/liberty',r=>r.fulfill({json:{version:8,sources:{credits:{type:'geojson',data:{type:'FeatureCollection',features:[]},attribution:'<a href="https://openfreemap.org/">OpenFreeMap</a> | © OpenStreetMap'}},layers:[{id:'background',type:'background',paint:{'background-color':'#e8f4ee'}},{id:'credits',type:'circle',source:'credits'}]}}));
  let calls=0;page.on('request',r=>{if(/\/api\/(viewport|overture|transit|weather)\?/.test(r.url()))calls++;});
  await page.goto('/');await expect(page.locator('.map-stage')).toBeVisible();await expect(page.locator('.location-label')).toHaveText('Konum seç');
  await expect(page.locator('.place-row,.category-navigation,.weather-summary,.unified-search')).toHaveCount(0);
  const map=await page.locator('.map-canvas').boundingBox(),bottom=await nav(page).boundingBox();
  expect(map!.width).toBe(await page.evaluate(()=>innerWidth));expect(map!.height).toBeGreaterThan(600);expect(map!.y+map!.height).toBeLessThanOrEqual(bottom!.y+1);expect(calls).toBe(0);
+ const credits=page.locator('details.maplibregl-ctrl-attrib');
+ await expect(credits.locator('.maplibregl-ctrl-attrib-inner')).toContainText('OpenFreeMap');
+ await expect(credits).not.toHaveAttribute('open','');
+ await credits.locator('summary').click();await expect(credits).toHaveAttribute('open','');await expect(credits.getByRole('link',{name:'OpenFreeMap',exact:true})).toBeVisible();
 });
 test('home shows at most two nearby places per category and has a small location dot',async({page})=>{
  await storeLocation(page);await page.goto('/');await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count','2');
@@ -49,7 +54,7 @@ test('services search submits the typed term and back restores services',async({
 test('events keep city choice and unknown dates without coverage prose',async({page})=>{
  await storeLocation(page);await page.goto('/');await nav(page).getByRole('button',{name:'Hizmetler'}).click();await page.getByRole('button',{name:'Etkinlikler',exact:true}).click();
  await expect(page.locator('.event-card')).toContainText('Tarih yok');await expect(page.locator('.category-navigation')).toHaveCount(0);await expect(page.locator('.pilot-panel')).not.toContainText(/Kapsam:|Bazı etkinlik|doğrulanmadı/);
- await page.getByRole('textbox',{name:'Etkinlik ara'}).fill('bulunmayan');await expect(page.locator('.event-card')).toHaveCount(0);await page.goBack();await expect(page.locator('.shell-service-grid')).toBeVisible();
+ await page.getByRole('textbox',{name:'Etkinlik ara'}).fill('bulunmayan');await expect(page.locator('.event-card')).toHaveCount(0);await page.goBack();await expect(page.locator('.service-category-grid')).toBeVisible();
  await page.getByRole('button',{name:'Etkinlikler',exact:true}).click();await expect(page.getByRole('textbox',{name:'Etkinlik ara'})).toHaveValue('');
  await nav(page).getByRole('button',{name:'Keşfet'}).click();await expect(page.locator('.map-stage')).toBeVisible();await expect(page.getByRole('textbox')).toHaveCount(0);
 });

@@ -9,8 +9,12 @@
 | Konumu sil | Konumu, işaretini ve takibi kaldırır |
 | Haritada sürükleme | Kullanıcının kamera tercihini korur; tekrar cihaz konumu seçilince merkezlenir |
 | Harita işaretleri | Keşfet'te tür başına en fazla 2, toplam en fazla 12 kayıt |
-| Hizmetler | Yer araması, kategori seçenekleri, Market, Toplu ulaşım ve Etkinlikler |
-| Market | Tek Ürünler görünümü; il, kategori ve ürün arama; kısa fiyat satırları |
+| Hizmetler | Yer araması ve bütün hizmetleri içeren tek kare düğme ızgarası |
+| Hizmet seçimi | Yalnızca seçilen hizmetin araması ve sonuçları; ortak yatay kategori çubuğu yok |
+| Eczane | Tüm eczaneler / Nöbetçi; kısa sonuç listesi ve Harita düğmesi |
+| Market | Tek Ürünler görünümü; il, tek düğmeden kategori seçimi ve ürün arama; kısa fiyat satırları |
+| Marketler | Yalnızca market yerleri; ürün ekranına geçiş Hizmetler menüsünden |
+| Harita kaynak bilgisi | Açılışta kapalı bilgi düğmesi; dokununca kaynak atıfları |
 | Fiyat satırı | Şube, birim fiyat, kaynak zamanı ve yol tarifi |
 | Toplu ulaşım | Antalya durakları; liste/harita; aynı kısa durak kartı ve geliş tahminleri |
 | Hat | Gidiş/dönüş ve durak sırası; geri ile durağa dönüş |

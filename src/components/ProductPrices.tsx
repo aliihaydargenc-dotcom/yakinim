@@ -47,7 +47,7 @@ export function ProductPrices({input}:{location:Coordinates|null;input:string}){
  const chooseCategory=(id:string)=>{setCategory(id);setPage(0);setVisibleCount(24);setCategoryOpen(false);};
  return <section className="pilot-panel prices-panel">
   <div className="pilot-title price-controls"><label className="price-region-label"><select aria-label="Karşılaştırma ili" value={choice.id} onChange={e=>chooseRegion(e.target.value)}>{REGIONS.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><button aria-label="Fiyatları yenile" onClick={()=>void prices.refetch()} disabled={prices.isFetching}><RefreshCw size={18}/></button></div>
-  <div className="pharmacy-filter feature-categories" aria-label="Ürün kategorileri">{categories.filter(c=>['all','meat-fish','dairy',category].includes(c.id)).map(c=><button key={c.id} aria-label={c.label} aria-pressed={category===c.id} onClick={()=>chooseCategory(c.id)}>{c.id==='dairy'?'Süt ürünleri':c.label}</button>)}<button aria-label="Diğer kategoriler" onClick={()=>setCategoryOpen(true)}>•••</button></div>
+  <button className="product-category-select" aria-label="Ürün kategorileri" onClick={()=>setCategoryOpen(true)}>{category==='all'?'Tüm ürünler':categories.find(c=>c.id===category)?.label}<span aria-hidden="true">⌄</span></button>
   {search.length===1?<p>En az iki harf yaz.</p>:<>
    {prices.isPending&&<p role="status">Fiyatlar yükleniyor…</p>}
    {prices.isError&&<Retry onClick={()=>void prices.refetch()}/>}

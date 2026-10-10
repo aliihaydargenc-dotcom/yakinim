@@ -77,6 +77,21 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // MapLibre opens compact attribution when source credits first arrive.
+    // Keep it closed initially while preserving the user's later toggle.
+    let attributionTouched=false;
+    const collapseInitialAttribution=()=>{
+      if(attributionTouched)return;
+      const control=map.getContainer().querySelector('details.maplibregl-ctrl-attrib');
+      control?.removeAttribute('open');
+      control?.classList.remove('maplibregl-compact-show');
+    };
+    const attributionToggle=(event:MouseEvent)=>{
+      if(event.target instanceof Element&&event.target.closest('.maplibregl-ctrl-attrib-button'))attributionTouched=true;
+    };
+    map.on('styledata',collapseInitialAttribution);
+    map.on('sourcedata',collapseInitialAttribution);
+    map.getContainer().addEventListener('click',attributionToggle,true);
     mapRef.current = map;
 
     const syncSource = () => {
@@ -152,6 +167,9 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
     return () => {
       resizeObserver.disconnect();
+      map.off('styledata',collapseInitialAttribution);
+      map.off('sourcedata',collapseInitialAttribution);
+      map.getContainer().removeEventListener('click',attributionToggle,true);
       map.off("load", setup);
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);

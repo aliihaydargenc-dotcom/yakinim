@@ -7,7 +7,31 @@ test.beforeEach(async({page})=>{
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));await page.route('**/api/nearby?**',r=>r.fulfill({json:{elements:[],places:[]}}));
 });
 test('four tabs keep services and media accessible without traffic',async({page})=>{
- let traffic=0;page.on('request',r=>{if(r.url().includes('/api/traffic'))traffic++;});await page.goto('/?preview');await expect(mobileNav(page).getByRole('button')).toHaveCount(4);await mobileNav(page).getByRole('button',{name:'Hizmetler'}).click();await expect(page.locator('.shell-service-grid>button')).toHaveCount(3);await expect(page.getByRole('button',{name:'Trafik',exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'Yer ara'})).toBeVisible();await mobileNav(page).getByRole('button',{name:'Diğer'}).click();await expect(page.locator('.shell-service-grid>button')).toHaveCount(3);expect(traffic).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ let traffic=0;page.on('request',r=>{if(r.url().includes('/api/traffic'))traffic++;});await page.goto('/?preview');await expect(mobileNav(page).getByRole('button')).toHaveCount(4);await mobileNav(page).getByRole('button',{name:'Hizmetler'}).click();await expect(page.locator('.service-category-grid>button')).toHaveCount(28);await expect(page.locator('.services-menu .shell-service-grid')).toHaveCount(0);await expect(page.getByRole('button',{name:'Trafik',exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'Yer ara'})).toBeVisible();await mobileNav(page).getByRole('button',{name:'Diğer'}).click();await expect(page.locator('.shell-service-grid>button')).toHaveCount(3);expect(traffic).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('every service opens without a category rail and place results stay within the chosen service',async({page})=>{
+ await page.route('**/api/transit?**',r=>r.fulfill({json:{stops:[],partial:false}}));
+ await page.route('**/api/events?**',r=>r.fulfill({json:{items:[],partial:false}}));
+ await page.route('**/api/prices?**',r=>r.fulfill({json:{products:[],depotCount:0,partial:false}}));
+ await page.goto('/?preview');await mobileNav(page).getByRole('button',{name:'Hizmetler'}).click();
+ const menu=page.locator('.service-category-grid');
+ const labels=await menu.locator('button').allTextContents();
+ const dimensions=await menu.locator('button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {w:r.width,h:r.height};}));
+ for(const size of dimensions){expect(Math.abs(size.w-size.h)).toBeLessThan(1);expect(size.w).toBeGreaterThanOrEqual(96);expect(Math.abs(size.w-dimensions[0].w)).toBeLessThan(1);}
+ const expected:Record<string,string>={'Yemek':'Örnek Yemek Yeri','Kafe':'Örnek Sahil Kafesi','Eczane':'Örnek Eczane','Marketler':'Örnek Mahalle Marketi','Nöbetçi eczane':'Örnek Nöbetçi Eczane'};
+ for(const label of labels){
+  await menu.getByRole('button',{name:label,exact:true}).click();
+  await expect(page.locator('.discovery-intro h1')).toBeVisible();
+  await expect(page.locator('.category-navigation,.category-rail,.feature-categories')).toHaveCount(0);
+  if(expected[label]){await expect(page.locator('.place-row')).toHaveCount(1);await expect(page.locator('.place-row')).toContainText(expected[label]);}
+  if(label==='Eczane'||label==='Nöbetçi eczane'){await expect(page.getByRole('heading',{name:'Eczaneler',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Tüm eczaneler',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Nöbetçi',exact:true})).toBeVisible();}
+  if(label==='Marketler')await expect(page.getByRole('button',{name:'Ürün fiyatları',exact:true})).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.getByRole('button',{name:'Hizmetlere dön',exact:true}).click();await expect(menu).toBeVisible();
+ }
+ await page.setViewportSize({width:1440,height:1000});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ const desktop=await menu.locator('button').first().boundingBox();expect(Math.abs(desktop!.width-desktop!.height)).toBeLessThan(1);
 });
 test('saved place survives reload and can be removed',async({page})=>{
  await page.addInitScript(()=>{if(!localStorage.getItem('yakinim:v2:last-location'))localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.884,lng:30.704,mode:'manual',savedAt:Date.now()}));});await page.goto('/');await mobileNav(page).getByRole('button',{name:'Hizmetler'}).click();await page.locator('.service-category-grid').getByRole('button',{name:'Marketler',exact:true}).click();await page.locator('.place-row').click();await page.getByRole('button',{name:'Yeri kaydet',exact:true}).click();await page.getByRole('button',{name:'Kapat',exact:true}).click();await mobileNav(page).getByRole('button',{name:'Kaydedilen'}).click();await expect(page.locator('.shell-saved-place')).toContainText('Kaydedilen Market');await page.reload();await mobileNav(page).getByRole('button',{name:'Kaydedilen'}).click();await expect(page.locator('.shell-saved-place')).toContainText('Kaydedilen Market');await page.getByRole('button',{name:'Kaydedilen Market kaydını kaldır'}).click();await expect(page.getByText('Henüz kaydedilen yer yok')).toBeVisible();
