@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Compass, LocateFixed, MapPin, Newspaper, Radio, Search, ChevronRight, Gamepad2, Cross, X, Navigation, Phone, Heart, List, Layers, ArrowLeft } from "lucide-react";
+import { Compass, LocateFixed, MapPin, Newspaper, Radio, Search, ChevronRight, Gamepad2, Cross, X, Navigation, Phone, Heart, List, Layers, ArrowLeft, ShoppingBasket, Utensils, Coffee, Fuel, CircleParking, Trees, Banknote } from "lucide-react";
 import discoveryCategories from '../lib/discovery-categories.json';
 import { CategoryRail } from "./components/CategoryRail";
 import {PlaceFacts} from "./components/PlaceFacts";
@@ -183,10 +183,17 @@ export default function App() {
   return <div className={`model-app ${active&&mapOpen?'map-active':''} ${playingGame?'game-active':currentRadio?'with-player':''}`}>
     {DEMO && <div className="preview-strip">Tasarım önizlemesi · temsili yerler</div>}
     {active ? <>
-      <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong>Yakınım</strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
+      <header className="model-header">{mapOpen ? <button aria-label="Listeye dön" onClick={()=>{setMapOpen(false);setPicking(false);}}><ArrowLeft size={20}/>Keşfet</button> : <strong className="brand-lockup"><span className="brand-mark"><MapPin size={22}/></span><span>yakınım<span className="brand-period">.</span></span></strong>}{mapOpen && <strong>Harita</strong>}<button onClick={requestLocation} disabled={locating} aria-label="Konumumu bul"><LocateFixed size={19}/>{!mapOpen && <span>{locating?'Bulunuyor…':'Konum'}</span>}</button></header>
       {!mapOpen&&<LocationStatus location={location} manual={useAppStore.getState().locationMode==="manual"} restored={restoredLocation} demo={DEMO} onChooseMap={chooseOnMap} onClear={()=>{stopLocationWatch();++locationRequest.current;setLocating(false);clearLocation();}}/>}
       <main ref={workspace} className={mapOpen?'map-workspace':'list-workspace'}>
+        {!mapOpen && <section className="discovery-intro"><small>ÇEVRENDE NELER VAR?</small><h1>{category==='all'?'Yakınında ne var?':LABELS[category]}</h1><p>İhtiyacın olan yeri hızlıca bul.</p></section>}
         {!mapOpen && category!=="fishing" && <label className="search-box section-search"><Search size={19}/><input aria-label={searchMode==='traffic'?'Trafikte yer ara':searchMode==='prices'?'Ürün ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik ara':category==='outages'?'Kesinti ara':'Yer ara'} placeholder={searchMode==='traffic'?'Cadde veya yer ara':searchMode==='prices'?'Ürün veya marka ara':category==='transit'?'Durak veya hat ara':category==='events'?'Etkinlik veya mekan ara':category==='outages'?'İlçe veya mahalle ara':`${LABELS[category]} ara`} value={pilot?activeSearch:search} onChange={e=>{setSectionSearch(v=>({...v,[searchMode]:e.target.value}));setSearch(e.target.value);}}/>{(pilot?activeSearch:search) && <button onClick={()=>{setSearch('');setSectionSearch(v=>({...v,[searchMode]:''}));}} aria-label="Aramayı temizle"><X size={18}/></button>}</label>}
+        {!mapOpen && category==='all' && <div className="quick-categories" aria-label="Hızlı kategoriler">{[
+          {id:'market' as const,label:'Market',Icon:ShoppingBasket},{id:'food' as const,label:'Yemek',Icon:Utensils},
+          {id:'cafe' as const,label:'Kafe',Icon:Coffee},{id:'duty' as const,label:'Nöbetçi eczane',Icon:Cross},
+          {id:'fuel' as const,label:'Akaryakıt',Icon:Fuel},{id:'parking' as const,label:'Otopark',Icon:CircleParking},
+          {id:'park' as const,label:'Park',Icon:Trees},{id:'atm' as const,label:'ATM',Icon:Banknote},
+        ].map(({id,label,Icon})=><button key={id} onClick={()=>{setCategory(id);setSearch(sectionSearch[id]||'');setSelected(null);}}><span><Icon size={24}/></span><small>{label}</small></button>)}</div>}
         <CategoryRail variant={mapOpen?"map":"list"} value={category} onChange={c=>{setCategory(c);setSearch(sectionSearch[c]||'');setSelected(null);if(c==="fishing"||c==="transit"||c==="events"||c==="outages")setMapOpen(false);setPicking(false);}}/>
         {category==='all'&&location&&!mapOpen&&!picking&&<Suspense fallback={null}><WeatherSummary location={location}/></Suspense>}
         {category==='market'&&<div className="pharmacy-filter"><button aria-pressed={!productMode} onClick={()=>{setProductMode(false);setSearch(sectionSearch.market||'');}}>Marketler</button><button aria-pressed={productMode} onClick={()=>{setProductMode(true);setMapOpen(false);}}>Ürün fiyatları</button></div>}

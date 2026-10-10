@@ -304,7 +304,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     source: PLACES_SOURCE,
     filter: ["has", "point_count"],
     paint: {
-      "circle-color": "#79576d",
+      "circle-color": "#127765",
       "circle-radius": ["step", ["get", "point_count"], 14, 10, 16, 30, 19],
       "circle-stroke-color": "rgba(255,255,255,.95)",
       "circle-stroke-width": 2,
@@ -333,7 +333,7 @@ function ensurePlaceLayers(map: MapLibreMap) {
     type: "circle",
     source: PLACES_SOURCE,
     filter: ["!", ["has", "point_count"]],
-    paint: {"circle-radius":4,"circle-color":"#79576d","circle-stroke-color":"white","circle-stroke-width":1.5},
+    paint: {"circle-radius":4,"circle-color":"#127765","circle-stroke-color":"white","circle-stroke-width":1.5},
   } as any);
 
 }
