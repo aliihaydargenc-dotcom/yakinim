@@ -128,18 +128,38 @@ body{background:var(--canvas);color:var(--ink)}
 .transit-map-panel .map-stage,.transit-map-panel .map-canvas{height:100%;min-height:100%}
 @media(max-width:650px){.price-region-label{align-items:stretch}.price-region-label select{flex:1;min-width:0;max-width:70%}.transit-map-panel>.pilot-title h2{font-size:17px}}
 
-/* MapLibre cluster icons + viewport-synchronized results, without DOM pins. */
-.map-results-dock{position:absolute;z-index:18;left:12px;right:12px;bottom:12px;display:flex;align-items:flex-start;pointer-events:none}
-.map-results-toggle{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;max-width:min(100%,320px);padding:8px 14px;background:#fff;color:#243c44;border:1px solid #dce6e7;border-radius:14px;box-shadow:0 4px 18px #182c3540;font-weight:650;font-size:14px}
-.map-results-toggle span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.map-results-toggle .map-chevron-open{transform:rotate(180deg)}
-.map-visible-list{position:absolute;pointer-events:auto;left:0;right:0;bottom:56px;max-height:min(48dvh,420px);overflow:auto;overscroll-behavior:contain;background:#fff;border:1px solid #dce6e7;border-radius:18px;padding:5px 7px;box-shadow:0 5px 25px #182c3533;z-index:19}
-.map-visible-list>p{font-size:14px;color:var(--muted);padding:18px 12px}
-.map-visible-row{width:100%;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;align-items:center;text-align:left;min-height:64px;padding:8px 10px;border-bottom:1px solid var(--line);border-radius:10px}
-.map-visible-row:last-child{border-bottom:none}
-.map-visible-row:active{background:#eef3f5}
-.map-visible-row strong{display:block;font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.map-visible-row small{display:block;font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.map-visible-symbol{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#e2ebef;color:#31536b;font-weight:700;font-size:12px}
-.map-visible-more{display:block;padding:12px;font-size:12px}
-@media(min-width:900px){.map-results-dock{max-width:350px}.map-visible-list{max-height:min(60dvh,500px)}}
+
+/* One-tap map: horizontal places, direct arrivals, compact animated sheet. */
+.map-nearby-strip{position:absolute;z-index:18;left:0;right:0;bottom:0;display:flex;align-items:stretch;gap:9px;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;padding:14px 14px calc(15px + env(safe-area-inset-bottom));pointer-events:auto;mask-image:linear-gradient(to right,#000 94%,transparent 100%)}
+.map-nearby-strip::-webkit-scrollbar{display:none}
+.map-place-chip{display:flex;flex:0 0 188px;align-items:center;text-align:left;gap:10px;min-width:0;min-height:64px;max-width:188px;padding:10px 12px;border-radius:16px;border:1px solid #e0e8ed;background:rgba(255,255,255,.97);box-shadow:0 6px 18px #172a3230;scroll-snap-align:start;transition:transform .16s ease,box-shadow .16s ease}
+.map-place-chip:active{transform:scale(.975)}
+.map-chip-symbol{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:12px;background:#e6edf3;color:#365d7b;font-weight:800}
+.map-place-chip>span:last-child{min-width:0;flex:1}
+.map-place-chip strong{display:block;max-width:100%;font-size:13px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-place-chip small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;font-size:11px}
+.map-strip-empty{min-height:45px;display:grid;place-items:center;padding:8px 14px;background:#fff;border-radius:12px;font-size:13px;color:var(--muted)}
+.map-sheet-holder{animation:map-sheet-rise .24s cubic-bezier(.22,1,.36,1);will-change:transform}
+.map-sheet-holder .map-place-sheet{max-height:min(69dvh,540px);overflow:auto;overscroll-behavior:contain;border-radius:20px 20px 0 0;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+.map-place-heading{align-items:flex-start}
+.map-place-heading strong{display:block;line-height:1.35;overflow-wrap:anywhere}
+.map-place-heading>button{flex:0 0 44px;min-width:44px;border-radius:50%;background:#f2f5f8;display:grid;place-items:center}
+.map-transit-arrivals{display:flex;flex-direction:column;gap:9px}
+.map-arrivals-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1px}
+.map-arrivals-heading strong{font-size:15px}
+.map-arrivals-heading button{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#eff4f8}
+.map-transit-arrivals>p{font-size:13px;line-height:1.5;color:var(--muted);padding:12px 0}
+.map-bus-list{display:flex;flex-direction:column}
+.map-bus-item{display:grid;grid-template-columns:50px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);min-height:54px}
+.map-bus-item>strong{color:#365d7b;font-size:16px;overflow:hidden;text-overflow:ellipsis}
+.map-bus-item>span{font-size:12px;line-height:1.3;min-width:0}
+.map-bus-item>span small{display:block;font-size:11px;margin-top:3px}
+.map-bus-item>b{font-size:14px;white-space:nowrap}
+.map-arrivals-time{font-size:11px;color:var(--muted)}
+.map-transit-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px}
+.map-transit-routes{color:var(--muted);max-width:100%;line-height:1.4}
+.map-transit-footer a{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 11px;border:1px solid var(--line);border-radius:10px;color:#365d7b;white-space:nowrap}
+.shell-body .map-stage .map-nearby-strip{max-width:100%}
+@keyframes map-sheet-rise{from{opacity:.55;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(min-width:900px){.map-nearby-strip{max-width:100%;padding-bottom:16px}.map-sheet-holder .map-place-sheet{max-width:440px;left:auto;right:16px;bottom:10px;border-radius:18px;box-shadow:0 5px 24px #172a3240}}
+@media(prefers-reduced-motion:reduce){.map-place-chip,.map-sheet-holder{animation:none;transition:none}}
