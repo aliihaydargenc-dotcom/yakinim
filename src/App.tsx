@@ -44,8 +44,8 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
   const [transitMode,setTransitMode]=useState<"stops"|"traffic">("stops");
   const searchMode=category==='transit'&&transitMode==='traffic'?'traffic':category==='market'&&productMode?'prices':category;
   const activeSearch=sectionSearch[searchMode]||'';
-  const pilot = category === "transit" || category === "events" || category === "market" && productMode && !mapOpen;
   const [mapOpen,setMapOpen] = useState(false);
+  const pilot = (category === "transit" || category === "events" || category === "market" && productMode) && !mapOpen;
   const [selected,setSelected] = useState<Place|null>(null);
   const [picking,setPicking] = useState(false);
   useBackLayer(mapOpen,()=>{setMapOpen(false);setPicking(false);onMapChange?.(false);});
