@@ -118,6 +118,7 @@ export default function App({embedded=false, splitMap=false, service, isVisible=
       return res.json() as Promise<{stops:{id:string;name:string;lat:number;lng:number;routes:string[];distanceM:number}[];partial:boolean}>;
     },
     enabled:!DEMO&&active&&section==='map'&&mapOpen&&areaReady&&(category==='transit'||category==='all'),
+    placeholderData:(previous)=>previous,
     staleTime:300000,retry:0,
   });
   const transitPlaces:Place[]=(transitMapQuery.data?.stops||[]).map(s=>({id:`transit:${s.id}`,name:s.name,category:'transit',lat:s.lat,lng:s.lng,address:`Durak ${s.id} · ${s.routes.join(', ')}`,distanceM:location&&inAntalya(location)?distance(location,s):undefined,source:'Antalyakart / Kentkart'}));
