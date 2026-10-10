@@ -26,6 +26,7 @@ TomTom resmi kapsam tablosunda Türkiye hem Traffic Flow hem Traffic Incidents i
 
 - Vercel'in sunucu ortamına `TOMTOM_API_KEY` eklendiğinde `/api/traffic` katman yapılandırmasını döndürür. Anahtarın tarayıcıya, istemci paketine veya JSON yanıtına gitmesi gerekmez.
 - `/api/traffic?action=tile&z=...&x=...&y=...` yalnızca sınırları geçerli sabit TomTom trafik PNG adreslerini çağırır; kullanıcıdan hedef URL kabul etmez. HTTP hatası veya PNG olmayan yanıt yoğunluk verisi gibi gösterilmez.
+- Vercel rewrite bu adresi mevcut ulaşım fonksiyonuna yönlendirir; trafik ayrı bir serverless fonksiyon eklemez. `service=traffic` yönlendirmesi diğer ulaşım işlemlerinden ayrılır; istemcinin API adresi korunur.
 - Mevcut MapLibre/OpenFreeMap üzerinde raster katmanı açılır; dış siteye veya gömülü haritaya geçilmez. Katman iki dakikada bir yenilenir, sağlayıcı atfı gösterilir. Veri bulunmayan yollar için yoğunluk varsayılmaz.
 - Anahtar yokken katman açılmaz. Mevcut İBB şehir endeksi yalnızca İstanbul kapsamıyla kalır; ülke geneli yol trafiği gibi sunulmaz.
 - Anahtar bulunmadığından gerçek TomTom uç noktası ve Türkiye yol kalitesi bu çalışma sırasında test edilmedi. PNG/anahtar gizliliği, geçersiz koordinatlar ve harita katmanı fixture ile test edildi. Etkinleştirmeden önce seçilen planın temel harita üzerinde gösterime izin verdiği, atıf ve kota koşulları kontrol edilmelidir.
