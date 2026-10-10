@@ -196,3 +196,7 @@ body{background:var(--canvas);color:var(--ink)}
 .map-unified-sheet .map-transit-arrivals{padding:0}
 @media(min-width:900px){.map-unified-sheet{left:auto;right:16px;width:min(440px,calc(100% - 24px));bottom:16px;border-radius:18px;border:1px solid #dce5ec;height:90px}.map-unified-sheet[data-level=half]{height:min(55%,410px)}.map-unified-sheet[data-level=full]{height:80%}}
 @media(prefers-reduced-motion:reduce){.map-unified-sheet{transition:none}}
+
+.map-unified-sheet .map-place-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:wrap;margin-top:14px}
+.map-unified-sheet .map-save-place{display:grid;place-items:center;margin-left:auto;flex:0 0 44px;height:44px;border:1px solid #dce5ec;border-radius:12px;background:#f2f6f8;color:#3c6783}
+.map-unified-sheet .map-save-place[aria-pressed=true]{background:#e5eff7;color:#2c5775}
