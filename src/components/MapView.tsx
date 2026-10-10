@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {PlaceFacts} from "./PlaceFacts";
-import { Navigation, Phone, X } from "lucide-react";
+import { Navigation, Phone, X, List, ChevronDown } from "lucide-react";
+import {iconForCategory,registerMapIcons} from "./mapIcons";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { ViewportBounds } from "../services/api";
 import {useBackLayer} from "../hooks/useBackLayer";
@@ -12,9 +13,11 @@ const PLACES_SOURCE = "nearby-places";
 const CLUSTER_LAYER = "nearby-place-clusters";
 const CLUSTER_COUNT_LAYER = "nearby-place-cluster-count";
 const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
-type PlaceMarker = { marker: Marker; button: HTMLButtonElement; label: HTMLSpanElement };
+const ICON_LAYER = "nearby-place-category-icons";
+const LABEL_LAYER = "nearby-place-short-labels";
+const SELECTED_LAYER = "nearby-place-selected-halo";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -28,72 +31,19 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(()=>memoryKey?cameras.get(memoryKey)?.selected??null:null);
   useBackLayer(!!selectedPlace,()=>setSelectedPlace(null));
   const selectedRef = useRef<Place | null>(null);
-  const markersRef = useRef(new Map<string, PlaceMarker>());
-  const syncMarkersRef = useRef<() => void>(() => {});
+  const [listOpen,setListOpen]=useState(false);
+  const [visiblePlaces,setVisiblePlaces]=useState<Place[]>([]);
+  const visibleRef=useRef<() => void>(()=>{});
   const sourceSignatureRef = useRef("");
   const trafficStateRef=useRef(onTrafficState);trafficStateRef.current=onTrafficState;
-  selectedRef.current = selectedPlace;
-  // Native markers retain their DOM identity through zooming and GeoJSON tile
-  // rebuilds. Updating one place never removes the other clickable markers.
-  syncMarkersRef.current = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    const { clientWidth: width, clientHeight: height } = map.getContainer();
-    const candidates = placesRef.current.flatMap(place => {
-      if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return [];
-      const point = map.project([place.lng, place.lat]);
-      if (place.id !== selectedRef.current?.id && (point.x < -160 || point.x > width + 160 || point.y < -160 || point.y > height + 160)) return [];
-      return [{place, point}];
-    }).sort((a,b) => Number(b.place.id === selectedRef.current?.id) - Number(a.place.id === selectedRef.current?.id)
-      || Math.hypot(a.point.x-width/2,a.point.y-height/2)-Math.hypot(b.point.x-width/2,b.point.y-height/2)).slice(0,500);
-    const ids = new Set(candidates.map(({place}) => place.id));
-    for (const [id, entry] of markersRef.current) {
-      if (!ids.has(id)) { entry.marker.remove(); markersRef.current.delete(id); }
-    }
-    const occupied: Array<{left:number;top:number;right:number;bottom:number}> = [];
-    for (const [index,{place,point}] of candidates.entries()) {
-      let entry = markersRef.current.get(place.id);
-      if (!entry) {
-        const element = document.createElement("div");
-        element.className = "stable-place-marker";
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.placeId = place.id;
-        const label = document.createElement("span");
-        label.className = "stable-place-name";
-        button.append(label); element.append(button);
-        button.addEventListener("click", event => {
-          event.stopPropagation();
-          const current = placesRef.current.find(candidate => candidate.id === place.id);
-          if (!current) return;
-          if (pickingRef.current) { onPickRef.current(current); return; }
-          setSelectedPlace(current);
-          map.easeTo({center:[current.lng,current.lat],duration:180});
-        });
-        const marker = new maplibregl.Marker({element,anchor:"center"}).setLngLat([place.lng,place.lat]).addTo(map);
-        entry = {marker,button,label};
-        markersRef.current.set(place.id,entry);
-      }
-      entry.marker.setLngLat([place.lng,place.lat]);
-      entry.button.setAttribute("aria-label",place.name);
-      entry.button.setAttribute("aria-pressed",String(place.id === selectedRef.current?.id));
-      if (entry.label.textContent !== place.name) entry.label.textContent = place.name;
-      const zoom = map.getZoom();
-      const selected = place.id === selectedRef.current?.id;
-      entry.marker.getElement().hidden = zoom < 13;
-      entry.marker.getElement().style.zIndex = String(selected ? candidates.length + 1 : candidates.length - index);
-      // Reserve label space only for visible labels. The pin remains tappable
-      // when nearby names cannot all fit in the viewport. Names also avoid
-      // neighbouring pins, so a higher marker cannot cover their text.
-      const labelWidth = entry.label.offsetWidth || 128;
-      const labelHeight = entry.label.offsetHeight || 30;
-      const rect = {left:point.x-labelWidth/2-7,right:point.x+labelWidth/2+7,top:point.y+19,bottom:point.y+19+labelHeight+5};
-      const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
-      const overlapsPin = candidates.some(({place:other,point:pin}) => other.id !== place.id && rect.left < pin.x + 16 && rect.right > pin.x - 16 && rect.top < pin.y + 16 && rect.bottom > pin.y - 16);
-      const showName = selected || (zoom >= 13.7 && !overlap && !overlapsPin && !(place.category==='transit'&&zoom<15.8));
-      entry.label.style.visibility = showName ? "visible" : "hidden";
-      if (showName) occupied.push(rect);
-    }
+  selectedRef.current=selectedPlace;
+  visibleRef.current=()=>{
+    const map=mapRef.current;
+    if(!map)return;
+    const bounds=map.getBounds(),center=map.getCenter();
+    const results=placesRef.current.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&bounds.contains([p.lng,p.lat]))
+      .sort((a,b)=>Math.hypot(a.lat-center.lat,a.lng-center.lng)-Math.hypot(b.lat-center.lat,b.lng-center.lng));
+    setVisiblePlaces(previous=>previous.length===results.length&&previous.every((p,i)=>p.id===results[i].id&&p.name===results[i].name)?previous:results);
   };
 
   placesRef.current = places;
@@ -117,16 +67,18 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     mapRef.current = map;
 
     const syncSource = () => {
-      const signature = JSON.stringify(placesRef.current.map(({id,lat,lng}) => [id,lat,lng]));
+      const signature = JSON.stringify(placesRef.current.map(({id,lat,lng,category,name}) => [id,lat,lng,category,name]));
       if (signature !== sourceSignatureRef.current && map.getSource(PLACES_SOURCE)) {
         updatePlaceSource(map, placesRef.current);
         sourceSignatureRef.current = signature;
       }
     };
     const setup = () => {
+      registerMapIcons(map);
       ensurePlaceLayers(map);
       syncSource();
-      syncMarkersRef.current();
+      visibleRef.current();
+      handleMoveEnd();
     };
 
     const handleClick = async (event: maplibregl.MapMouseEvent) => {
@@ -136,7 +88,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         return;
       }
 
-      const interactiveLayers = [CLUSTER_LAYER, OVERVIEW_POINT_LAYER]
+      const interactiveLayers = [CLUSTER_LAYER, ICON_LAYER, LABEL_LAYER, OVERVIEW_POINT_LAYER]
         .filter((layerId) => Boolean(map.getLayer(layerId)));
       if (interactiveLayers.length === 0) return;
 
@@ -156,8 +108,9 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       }
       const place = placesRef.current.find(candidate => candidate.id === String(properties.id));
       if (place) {
+        setListOpen(false);
         setSelectedPlace(place);
-        map.easeTo({center:[place.lng,place.lat],zoom:Math.max(13,map.getZoom()),duration:180});
+        map.easeTo({center:[place.lng,place.lat],zoom:Math.max(14,map.getZoom()),duration:180});
       }
     };
 
@@ -174,7 +127,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
 
     const handleMoveEnd = () => {
       syncSource();
-      syncMarkersRef.current();
+      visibleRef.current();
       if (pickingRef.current) return;
       const center = map.getCenter();
       if(memoryKey)cameras.set(memoryKey,{center:[center.lng,center.lat],zoom:map.getZoom(),selected:selectedRef.current});
@@ -186,13 +139,9 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     map.on("click", handleClick);
     map.on("mousemove", handlePointer);
     map.on("moveend", handleMoveEnd);
-    const handleZoom = () => {
-      for (const entry of markersRef.current.values()) entry.marker.getElement().hidden = map.getZoom() < 13;
-    };
-    map.on("zoom", handleZoom);
     const resizeObserver = new ResizeObserver(() => {
       map.resize();
-      syncMarkersRef.current();
+      visibleRef.current();
     });
     resizeObserver.observe(containerRef.current);
 
@@ -202,9 +151,6 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       map.off("click", handleClick);
       map.off("mousemove", handlePointer);
       map.off("moveend", handleMoveEnd);
-      map.off("zoom", handleZoom);
-      for (const entry of markersRef.current.values()) entry.marker.remove();
-      markersRef.current.clear();
       sourceSignatureRef.current = "";
       map.remove();
       mapRef.current = null;
@@ -270,12 +216,12 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const sync = () => {
       ensurePlaceLayers(map);
       if (map.isMoving()) return;
-      const signature = JSON.stringify(places.map(({id,lat,lng}) => [id,lat,lng]));
+      const signature = JSON.stringify(places.map(({id,lat,lng,category,name}) => [id,lat,lng,category,name]));
       if (signature !== sourceSignatureRef.current) {
         updatePlaceSource(map,places);
         sourceSignatureRef.current = signature;
       }
-      syncMarkersRef.current();
+      visibleRef.current();
     };
 
     if (map.isStyleLoaded()) sync();
@@ -305,70 +251,51 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    syncMarkersRef.current();
+    if(map.getLayer(SELECTED_LAYER))map.setFilter(SELECTED_LAYER,["==",["get","id"],selectedPlace?.id||""]);
     if(!selectedPlace||!sheetRef.current)return;
     const focus=()=>{const height=sheetRef.current?.getBoundingClientRect().height||0;map.easeTo({center:[selectedPlace.lng,selectedPlace.lat],offset:[0,-height/2],duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:220});};
     const observer=new ResizeObserver(focus);observer.observe(sheetRef.current);focus();return ()=>observer.disconnect();
   }, [selectedPlace?.id]);
 
-  return <div className="map-stage" data-map-renderer="maplibre-stable-markers" data-place-count={places.length} aria-busy={loading}>
+  return <div className="map-stage" data-map-renderer="maplibre-layered-discovery" data-place-count={places.length} aria-busy={loading}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
+    {enableList&&!picking&&!selectedPlace&&<div className="map-results-dock">
+      <button type="button" className="map-results-toggle" aria-expanded={listOpen} aria-controls="map-visible-places" onClick={()=>setListOpen(open=>!open)}><List size={18}/><span>Haritadaki yerler · {visiblePlaces.length}</span><ChevronDown size={18} className={listOpen?'map-chevron-open':''}/></button>
+      {listOpen&&<section id="map-visible-places" className="map-visible-list" aria-label="Haritada görünen yerlerin listesi">
+        {!visiblePlaces.length?<p>{loading?'Yerler yükleniyor…':'Bu alanda yer bulunamadı.'}</p>:visiblePlaces.slice(0,80).map(place=><button type="button" className="map-visible-row" key={place.id} onClick={()=>{
+          setListOpen(false);setSelectedPlace(place);mapRef.current?.easeTo({center:[place.lng,place.lat],zoom:Math.max(15,mapRef.current.getZoom()),duration:280});
+        }}><span className="map-visible-symbol">{categoryLabel(place.category).slice(0,1)}</span><span><strong>{place.name}</strong><small>{categoryLabel(place.category)}{place.distanceM!==undefined?' · '+distanceLabel(place.distanceM):''}</small></span></button>)}
+        {visiblePlaces.length>80&&<small className="map-visible-more">İlk 80 yer gösteriliyor. Haritayı yakınlaştırarak listeyi daralt.</small>}
+      </section>}
+    </div>}
     {selectedPlace && <div ref={sheetRef} className="map-sheet-holder"><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} /></div>}
   </div>;
 }
 
 function ensurePlaceLayers(map: MapLibreMap) {
-  if (map.getSource(PLACES_SOURCE)) return;
-
-  map.addSource(PLACES_SOURCE, {
-    type: "geojson",
-    data: emptyFeatureCollection(),
-    cluster: true,
-    clusterRadius: 52,
-    clusterMaxZoom: 12,
-  });
-
-  map.addLayer({
-    id: CLUSTER_LAYER,
-    maxzoom: 13,
-    type: "circle",
-    source: PLACES_SOURCE,
-    filter: ["has", "point_count"],
-    paint: {
-      "circle-color": "#127765",
-      "circle-radius": ["step", ["get", "point_count"], 14, 10, 16, 30, 19],
-      "circle-stroke-color": "rgba(255,255,255,.95)",
-      "circle-stroke-width": 2,
-      "circle-opacity": 0.96,
-    },
-  } as any);
-
-  map.addLayer({
-    id: CLUSTER_COUNT_LAYER,
-    maxzoom: 13,
-    type: "symbol",
-    source: PLACES_SOURCE,
-    filter: ["has", "point_count"],
-    layout: {
-      "text-field": ["get", "point_count_abbreviated"],
-      "text-size": 12,
-      "text-allow-overlap": true,
-      "text-ignore-placement": true,
-    },
-    paint: { "text-color": "#ffffff" },
-  } as any);
-
-  map.addLayer({
-    id: OVERVIEW_POINT_LAYER,
-    maxzoom: 13,
-    type: "circle",
-    source: PLACES_SOURCE,
-    filter: ["!", ["has", "point_count"]],
-    paint: {"circle-radius":4,"circle-color":"#127765","circle-stroke-color":"white","circle-stroke-width":1.5},
-  } as any);
-
+  if(map.getSource(PLACES_SOURCE))return;
+  map.addSource(PLACES_SOURCE,{type:'geojson',data:emptyFeatureCollection(),cluster:true,clusterRadius:56,clusterMaxZoom:15});
+  map.addLayer({id:CLUSTER_LAYER,type:'circle',source:PLACES_SOURCE,filter:['has','point_count'],paint:{
+    'circle-color':['step',['get','point_count'],'#42687c',12,'#355f78',50,'#2d526d'],
+    'circle-radius':['step',['get','point_count'],16,12,20,50,25],
+    'circle-stroke-color':'white','circle-stroke-width':2.5,'circle-opacity':0.97
+  }} as any);
+  map.addLayer({id:CLUSTER_COUNT_LAYER,type:'symbol',source:PLACES_SOURCE,filter:['has','point_count'],layout:{
+    'text-field':['get','point_count_abbreviated'],'text-size':12,'text-allow-overlap':true,'text-ignore-placement':true
+  },paint:{'text-color':'#ffffff'}} as any);
+  map.addLayer({id:OVERVIEW_POINT_LAYER,type:'circle',source:PLACES_SOURCE,maxzoom:11.6,filter:['!',['has','point_count']],
+    paint:{'circle-radius':4,'circle-color':'#42687c','circle-stroke-width':1.5,'circle-stroke-color':'#ffffff'}} as any);
+  map.addLayer({id:SELECTED_LAYER,type:'circle',source:PLACES_SOURCE,minzoom:11.5,
+    filter:['==',['get','id'],''],paint:{'circle-radius':18,'circle-color':'#ffffff','circle-opacity':0.9,'circle-stroke-width':3,'circle-stroke-color':'#42687c'}} as any);
+  map.addLayer({id:ICON_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:11.5,filter:['!',['has','point_count']],
+    layout:{'icon-image':['get','icon'],'icon-size':['interpolate',['linear'],['zoom'],11.5,0.8,15.5,1.1],
+      'icon-allow-overlap':false,'icon-ignore-placement':false,'icon-padding':2}} as any);
+  map.addLayer({id:LABEL_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:15.5,filter:['!',['has','point_count']],
+    layout:{'text-field':['get','name'],'text-size':11.5,'text-anchor':'top','text-offset':[0,1.2],
+      'text-max-width':11,'text-allow-overlap':false,'text-optional':true},
+    paint:{'text-color':'#243c44','text-halo-color':'#ffffff','text-halo-width':1.8}} as any);
 }
 
 function updatePlaceSource(map: MapLibreMap, places: Place[]) {
@@ -383,6 +310,7 @@ function updatePlaceSource(map: MapLibreMap, places: Place[]) {
         id: place.id,
         name: place.name,
         category: place.category,
+        icon: iconForCategory(place.category),
         distanceM: place.distanceM ?? 999999,
       },
     })),
