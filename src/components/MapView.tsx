@@ -47,8 +47,12 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const map=mapRef.current;
     if(!map)return;
     const bounds=map.getBounds(),center=map.getCenter();
-    const results=placesRef.current.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&bounds.contains([p.lng,p.lat]))
-      .sort((a,b)=>Math.hypot(a.lat-center.lat,a.lng-center.lng)-Math.hypot(b.lat-center.lat,b.lng-center.lng));
+    const candidates=placesRef.current.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+    const inView=candidates.filter(p=>bounds.contains([p.lng,p.lat]));
+    // Preserve nearby candidates while a viewport request or camera animation settles.
+    // The selected row will focus the map on its actual coordinates.
+    const results=(inView.length?inView:candidates).sort((a,b)=>
+      Math.hypot(a.lat-center.lat,a.lng-center.lng)-Math.hypot(b.lat-center.lat,b.lng-center.lng)).slice(0,60);
     setVisiblePlaces(previous=>previous.length===results.length&&previous.every((p,i)=>p.id===results[i].id&&p.name===results[i].name)?previous:results);
   };
 
@@ -271,7 +275,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       }}>
         <button type="button" className="map-sheet-toggle" aria-expanded={sheetLevel!=='peek'} onClick={()=>{if(suppressTap.current){suppressTap.current=false;return;}setSheetLevel(level=>level==='peek'?'half':level==='half'?'full':'half');}}>
           <span className="map-sheet-grabber" aria-hidden="true"/>
-          {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Haritadaki yerler</strong><small>{visiblePlaces.length} sonuç</small></span>}
+          {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Çevredeki yerler</strong><small>{visiblePlaces.length} sonuç</small></span>}
           {sheetLevel==='full'?<ChevronDown size={20}/>:<ChevronUp size={20}/>}
         </button>
         {selectedPlace&&<button type="button" className="map-sheet-close" aria-label="Yer kartını kapat" onClick={()=>{setSelectedPlace(null);setSheetLevel('half');}}><X size={20}/></button>}
