@@ -10,7 +10,8 @@ const games=[
  {id:'breaker',title:'Tuğla Kırma',kind:'Arcade',Icon:BrickWall,legacy:false},
  {id:'sudoku',title:'Sudoku',kind:'Zekâ',Icon:Grid3X3,legacy:false},
  {id:'runner',title:'Engel Atlama',kind:'Arcade',Icon:PersonStanding,legacy:false},
- {id:'words',title:'Kelime Oyunu',kind:'Zekâ',Icon:BookOpen,legacy:false}
+ {id:'words',title:'Kelime Tahmini',kind:'Zekâ',Icon:BookOpen,legacy:false},
+ {id:'puzzle',title:'15 Bulmacası',kind:'Zekâ',Icon:Grid3X3,legacy:false}
 ];
 export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>void}){
  const [selected,setSelected]=useState<string|null>(null);
@@ -32,7 +33,7 @@ export function GamesView({onActiveChange}:{onActiveChange:(active:boolean)=>voi
  return <section className={`content-screen ${game?'game-screen':''}`}>
   {game?<div className="game-play-layout">
     <div className="game-heading"><button aria-label="Oyunlara dön" onClick={back}><ArrowLeft size={20}/></button><h2>{game.title}</h2>
-    {game.legacy&&<a className="game-license" href={`/games/${game.id}/LICENSE`} target="_blank" rel="noreferrer" aria-label="Kaynak ve lisans">Lisans</a>}</div>
+    {<a className="game-license" href={`/games/${game.id}/LICENSE`} target="_blank" rel="noreferrer" aria-label="Kaynak ve lisans">Lisans</a>}</div>
     <iframe key={game.id} className="game-frame" title={game.title} src={`/games/${game.id}/index.html`} sandbox="allow-scripts allow-same-origin" loading="eager"/>
    </div>:
    <><div className="screen-heading game-library-heading"><h2>Oyunlar</h2></div>

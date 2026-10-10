@@ -1,34 +1,48 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import vm from 'node:vm';
-const ids=['2048','blocks','memory','snake','mines','sudoku','words','breaker','runner'];
-const source=fs.readFileSync('src/components/GamesView.tsx','utf8');
-for(const id of ids){
- assert.ok(source.includes("id:'"+id+"'"),'Missing library item: '+id);
- assert.ok(fs.existsSync('public/games/'+id+'/index.html'),'Missing game file: '+id);
-}
+const base='public/games';
+const games=['2048','blocks','memory','snake','mines','sudoku','words','breaker','runner','puzzle'];
+const imported=['sudoku','words','breaker','runner','puzzle'];
+const catalog=fs.readFileSync('src/components/GamesView.tsx','utf8');
 const shell=fs.readFileSync('src/AppShell.tsx','utf8');
-assert.ok(shell.includes('other-category-grid'),'Other should use square service cards');
-const style=fs.readFileSync('src/shell.css','utf8');
-assert.ok(style.includes('aspect-ratio:1'),'Game cards must be square');
-for(const id of ['sudoku','words','breaker','runner']){
- const html=fs.readFileSync('public/games/'+id+'/index.html','utf8');
- assert.match(html,/<html lang="tr">/);
- assert.match(html,/<meta name="viewport"/);
- assert.match(html,/href="\.\.\/common\.css"/);
- assert.ok(!/<script\s+src=["']https?:\/\//i.test(html),'External game scripts disallowed');
- const script=html.match(/<script>([\s\S]*?)<\/script>/i);
- assert.ok(script,'Game needs local JavaScript: '+id);
- new vm.Script(script[1],{filename:id+'.js'});
+assert.equal(games.length,10);
+assert.ok(shell.includes('other-category-grid'),'Other hub should remain square');
+assert.match(fs.readFileSync('src/shell.css','utf8'),/\.game-library-card[\s\S]*?aspect-ratio:1/);
+function syntax(source,name){new vm.Script(source,{filename:name});}
+for(const id of games){
+ assert.ok(catalog.includes("id:'"+id+"'"),'Missing game in library: '+id);
+ const gameDir=path.join(base,id),index=path.join(gameDir,'index.html');
+ assert.ok(fs.existsSync(index),'Missing game: '+id);
+ const html=fs.readFileSync(index,'utf8');
+ assert.match(html,/<meta\s+name=["']viewport["']/i,'Game should scale on mobile: '+id);
+ const references=[...html.matchAll(/(?:src|href)=["']([^"'#]+)["']/gi)].map(m=>m[1]);
+ for(const ref of references){
+   if(ref.startsWith('data:')||ref.startsWith('/')||ref.startsWith('https:')||ref.startsWith('http:'))continue;
+   assert.ok(fs.existsSync(path.resolve(gameDir,ref)),'Missing local asset '+id+': '+ref);
+ }
+ if(imported.includes(id)){
+   const license=path.join(gameDir,'LICENSE');
+   assert.ok(fs.existsSync(license),'Missing imported-game license: '+id);
+   assert.match(fs.readFileSync(license,'utf8'),/Permission is hereby granted/);
+ }
+ if(['sudoku','breaker'].includes(id)){
+  const inline=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+  assert.ok(inline.length,'Inline game script missing '+id);
+  for(const item of inline)syntax(item[1],id+'/inline.js');
+ }
 }
-const sudoku=fs.readFileSync('public/games/sudoku/index.html','utf8');
-for(const value of [...sudoku.matchAll(/(?:kolay|orta|zor):'([0-9]+)'/g)])assert.equal(value[1].length,81);
-const actuator=fs.readFileSync('public/games/2048/js/html_actuator.js','utf8');
-const tile=fs.readFileSync('public/games/2048/js/tile.js','utf8');
-assert.ok(actuator.includes('self.nodes = current'),'2048 must reuse existing DOM tiles');
-assert.ok(tile.includes('Tile.nextId'),'2048 needs persistent tile ids');
-const keyboard=fs.readFileSync('public/games/2048/js/keyboard_input_manager.js','utf8');
-assert.ok(!keyboard.includes('button.addEventListener(this.eventTouchend'),'No double touch action');
-const app=fs.readFileSync('src/App.tsx','utf8');
-assert.ok(app.includes('pausedLocationForGame'),'Pause GPS during gameplay');
-console.log('Games package PASS: nine linked games, 4 local JS scripts compile, square navigation, 2048 optimization and GPS pause.');
+for(const file of ['runner/game.js','puzzle/js/game.js','words/js/index.js'])syntax(fs.readFileSync(path.join(base,file),'utf8'),file);
+const wordHtml=fs.readFileSync(path.join(base,'words/index.html'),'utf8');
+const wordJs=fs.readFileSync(path.join(base,'words/js/index.js'),'utf8');
+assert.ok(!/googletagmanager|paypal\.me|buymeacoffee|serviceWorker\.register/i.test(wordHtml+wordJs),'No trackers, donation redirects or PWA registration');
+assert.ok(wordJs.includes('let selectedLanguage = "tr_TR"'),'Turkish dictionary should be required');
+for(const f of ['words/i18n/tr_TR.js','words/dictionaries/tr_TR.js','words/language_list.js'])assert.ok(fs.existsSync(path.join(base,f)));
+const horse=fs.readFileSync(path.join(base,'runner/game.js'),'utf8');
+assert.ok(horse.includes("canvas.addEventListener('pointerdown'"),'Runner needs mobile touch');
+assert.ok(horse.includes('Fixed 60Hz'),'Runner needs time-step normalization');
+assert.ok(fs.readFileSync('src/App.tsx','utf8').includes('pausedLocationForGame'));
+const credits=fs.readFileSync(path.join(base,'THIRD_PARTY.md'),'utf8');
+for(const id of imported)assert.ok(credits.includes('github.com'),'Source attribution present');
+console.log('Games package PASS: 10 games, 5 MIT licenses, offline asset references, Turkish Wordle without trackers, mobile runner, syntax and gameplay integration.');

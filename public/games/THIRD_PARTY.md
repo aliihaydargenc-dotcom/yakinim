@@ -5,3 +5,13 @@
 - Düşen Bloklar: https://github.com/paulfxyz/tetris — MIT, commit 0c9ee448873995cbd3b4a5c52c5a3613726cea27. Lisans blocks/LICENSE içinde. Skor sunucusu bağlantıları devre dışı, müzik dosyası çıkarıldı, harici fontlar çıkarıldı, oyun service worker kaydı kapatıldı; Türkçe/mobil kontrol uyarlaması.
 
 Orijinal telif ve izin metinleri korunur. Oyunlar üçüncü taraf portal iframe'i yerine bu uygulamanın kendi statik dosyalarından yüklenir.
+
+## Yeni uyarlanan oyunlar (MIT)
+
+- Sudoku: https://github.com/memostudycode/sudoku-game — MIT. Mobil yerleşim ve Türkçe arayüz uyarlaması.
+- Türkçe Kelime Tahmini: https://github.com/caglarorhan/turkcewordle — MIT. Türkçe sözlük, izleme kodları, bağış bağlantıları ve service worker temizliği; yalnızca yerel oyun.
+- Tuğla Kırma: https://github.com/samecchang/BrickBreaker — MIT. Tek HTML dosyası, dokunmatik ve neon görünüm.
+- Engel Atlama: https://github.com/chigerartem/pixel-horse-runner — MIT. Mobil dokunma ve eğilme kontrolü, Türkçeleştirme, sabit zaman adımlı simülasyon.
+- 15 Bulmacası: https://github.com/alfredang/openclaw-puzzle-game — MIT. Mobil yerleşim, Türkçe etiketler.
+
+Her oyun klasöründe kaynağın özgün LICENSE dosyası korunur. Oyunlar Yakınım alan adından, reklam ve ücretli API gerektirmeden yüklenir. Dış depolardaki kodlar bağımsız eserlerdir.
