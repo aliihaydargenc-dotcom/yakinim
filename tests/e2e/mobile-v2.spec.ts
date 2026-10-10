@@ -97,7 +97,7 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
 
   const nav = page.getByRole("navigation", { name: "Ana navigasyon" });
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Haritadaki yerler/ })).toBeVisible();
+  await expect(page.locator(".map-place-chip").first()).toBeVisible();
   await expect(page.locator(".map-category-dock")).toBeVisible();
   await expect(page.locator(".map-stage")).toHaveAttribute("data-map-renderer", "maplibre-layered-discovery");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
@@ -119,7 +119,7 @@ test("mobile layout and core flows stay inside the device viewport", async ({ pa
   await expect(page.getByText("Merkez Nöbetçi Eczane")).toBeVisible();
 
   await nav.getByRole("button", { name: "Harita", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Liste", exact: true })).toBeVisible();
+  await expect(page.locator(".map-place-chip").first()).toBeVisible();
   await assertMapChromeDoesNotOverlap(page);
   await assertNoHorizontalOverflow(page);
 

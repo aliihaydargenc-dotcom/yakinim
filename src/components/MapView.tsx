@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {PlaceFacts} from "./PlaceFacts";
-import { Navigation, Phone, X, List, ChevronDown } from "lucide-react";
+import { Navigation, Phone, X, BusFront } from "lucide-react";
+import {TransitArrivals} from "./TransitArrivals";
 import {iconForCategory,registerMapIcons} from "./mapIcons";
 import maplibregl, { type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import type { ViewportBounds } from "../services/api";
@@ -16,8 +17,9 @@ const OVERVIEW_POINT_LAYER = "nearby-place-overview-points";
 const ICON_LAYER = "nearby-place-category-icons";
 const LABEL_LAYER = "nearby-place-short-labels";
 const SELECTED_LAYER = "nearby-place-selected-halo";
+const HIT_LAYER = "nearby-place-touch-targets";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -30,8 +32,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const onViewportChangeRef = useRef(onViewportChange);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(()=>memoryKey?cameras.get(memoryKey)?.selected??null:null);
   useBackLayer(!!selectedPlace,()=>setSelectedPlace(null));
+  useEffect(()=>setSelectedPlace(null),[selectionScope]);
   const selectedRef = useRef<Place | null>(null);
-  const [listOpen,setListOpen]=useState(false);
   const [visiblePlaces,setVisiblePlaces]=useState<Place[]>([]);
   const visibleRef=useRef<() => void>(()=>{});
   const sourceSignatureRef = useRef("");
@@ -81,50 +83,38 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       handleMoveEnd();
     };
 
-    const handleClick = async (event: maplibregl.MapMouseEvent) => {
-      if (pickingRef.current) {
-        setSelectedPlace(null);
-        onPickRef.current({ lat: event.lngLat.lat, lng: event.lngLat.lng });
-        return;
-      }
-
-      const interactiveLayers = [CLUSTER_LAYER, ICON_LAYER, LABEL_LAYER, OVERVIEW_POINT_LAYER]
-        .filter((layerId) => Boolean(map.getLayer(layerId)));
-      if (interactiveLayers.length === 0) return;
-
-      const feature = map.queryRenderedFeatures(event.point, { layers: interactiveLayers })[0];
-      if (!feature) return;
-
-      const properties = feature.properties || {};
-      if (properties.cluster) {
-        const clusterId = Number(properties.cluster_id);
-        const source = map.getSource(PLACES_SOURCE) as maplibregl.GeoJSONSource | undefined;
-        if (!source || !Number.isFinite(clusterId) || feature.geometry.type !== "Point") return;
-        const coordinates = feature.geometry.coordinates as [number, number];
-        const zoom = await source.getClusterExpansionZoom(clusterId);
-        setSelectedPlace(null);
-        map.easeTo({ center: coordinates, zoom: Math.min(18, zoom), duration: 280 });
-        return;
-      }
-      const place = placesRef.current.find(candidate => candidate.id === String(properties.id));
-      if (place) {
-        setListOpen(false);
-        setSelectedPlace(place);
-        map.easeTo({center:[place.lng,place.lat],zoom:Math.max(14,map.getZoom()),duration:180});
-      }
+    const getHits=(point:{x:number;y:number})=>{
+      const layers=[CLUSTER_LAYER,HIT_LAYER,ICON_LAYER,LABEL_LAYER,OVERVIEW_POINT_LAYER].filter(id=>Boolean(map.getLayer(id)));
+      if(!layers.length)return [];
+      const pad=18;
+      return map.queryRenderedFeatures([[point.x-pad,point.y-pad],[point.x+pad,point.y+pad]],{layers})
+        .filter(f=>f.geometry.type==='Point')
+        .sort((a,b)=>{
+          const ap=map.project((a.geometry as GeoJSON.Point).coordinates as [number,number]);
+          const bp=map.project((b.geometry as GeoJSON.Point).coordinates as [number,number]);
+          return Math.hypot(ap.x-point.x,ap.y-point.y)-Math.hypot(bp.x-point.x,bp.y-point.y);
+        });
     };
-
-    const handlePointer = (event: maplibregl.MapMouseEvent) => {
-      if (pickingRef.current) {
-        map.getCanvas().style.cursor = "crosshair";
-        return;
+    const handleClick=async(event:maplibregl.MapMouseEvent)=>{
+      if(pickingRef.current){setSelectedPlace(null);onPickRef.current({lat:event.lngLat.lat,lng:event.lngLat.lng});return;}
+      const f=getHits(event.point)[0];
+      if(!f)return;
+      const props=f.properties||{};
+      if(props.cluster){
+        const source=map.getSource(PLACES_SOURCE) as maplibregl.GeoJSONSource|undefined;
+        const id=Number(props.cluster_id);
+        if(!source||!Number.isFinite(id)||f.geometry.type!=='Point')return;
+        const center=f.geometry.coordinates as [number,number];
+        try{const target=await source.getClusterExpansionZoom(id);map.easeTo({center,zoom:Math.min(18,Math.max(target,map.getZoom()+1)),duration:300});}
+        catch{map.easeTo({center,zoom:Math.min(18,map.getZoom()+2),duration:300});}
+        setSelectedPlace(null);return;
       }
-      const interactiveLayers = [CLUSTER_LAYER, OVERVIEW_POINT_LAYER]
-        .filter((layerId) => Boolean(map.getLayer(layerId)));
-      const overFeature = interactiveLayers.length > 0 && map.queryRenderedFeatures(event.point, { layers: interactiveLayers }).length > 0;
-      map.getCanvas().style.cursor = overFeature ? "pointer" : "grab";
+      const place=placesRef.current.find(p=>p.id===String(props.id));
+      if(place){setSelectedPlace(place);const pos=map.project([place.lng,place.lat]);if(pos.y>map.getContainer().clientHeight-190)map.easeTo({center:[place.lng,place.lat],offset:[0,-110],duration:240});}
     };
-
+    const handlePointer=(event:maplibregl.MapMouseEvent)=>{
+      map.getCanvas().style.cursor=pickingRef.current?'crosshair':getHits(event.point).length?'pointer':'grab';
+    };
     const handleMoveEnd = () => {
       syncSource();
       visibleRef.current();
@@ -227,7 +217,7 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     if (map.isStyleLoaded()) sync();
     else map.once("load", sync);
 
-    setSelectedPlace(current => current ? places.find(place => place.id === current.id) ?? null : null);
+    setSelectedPlace(current=>current?places.find(place=>place.id===current.id)||current:null);
     return () => { map.off("load", sync); };
   }, [places]);
 
@@ -252,31 +242,28 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const map = mapRef.current;
     if (!map) return;
     if(map.getLayer(SELECTED_LAYER))map.setFilter(SELECTED_LAYER,["==",["get","id"],selectedPlace?.id||""]);
-    if(!selectedPlace||!sheetRef.current)return;
-    const focus=()=>{const height=sheetRef.current?.getBoundingClientRect().height||0;map.easeTo({center:[selectedPlace.lng,selectedPlace.lat],offset:[0,-height/2],duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:220});};
-    const observer=new ResizeObserver(focus);observer.observe(sheetRef.current);focus();return ()=>observer.disconnect();
+    // Arrival updates must not repeatedly move the camera.
   }, [selectedPlace?.id]);
 
   return <div className="map-stage" data-map-renderer="maplibre-layered-discovery" data-place-count={places.length} aria-busy={loading}>
     <div ref={containerRef} className="map-canvas" />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
-    {enableList&&!picking&&!selectedPlace&&<div className="map-results-dock">
-      <button type="button" className="map-results-toggle" aria-expanded={listOpen} aria-controls="map-visible-places" onClick={()=>setListOpen(open=>!open)}><List size={18}/><span>Haritadaki yerler · {visiblePlaces.length}</span><ChevronDown size={18} className={listOpen?'map-chevron-open':''}/></button>
-      {listOpen&&<section id="map-visible-places" className="map-visible-list" aria-label="Haritada görünen yerlerin listesi">
-        {!visiblePlaces.length?<p>{loading?'Yerler yükleniyor…':'Bu alanda yer bulunamadı.'}</p>:visiblePlaces.slice(0,80).map(place=><button type="button" className="map-visible-row" key={place.id} onClick={()=>{
-          setListOpen(false);setSelectedPlace(place);mapRef.current?.easeTo({center:[place.lng,place.lat],zoom:Math.max(15,mapRef.current.getZoom()),duration:280});
-        }}><span className="map-visible-symbol">{categoryLabel(place.category).slice(0,1)}</span><span><strong>{place.name}</strong><small>{categoryLabel(place.category)}{place.distanceM!==undefined?' · '+distanceLabel(place.distanceM):''}</small></span></button>)}
-        {visiblePlaces.length>80&&<small className="map-visible-more">İlk 80 yer gösteriliyor. Haritayı yakınlaştırarak listeyi daralt.</small>}
-      </section>}
+    {enableList&&!picking&&!selectedPlace&&<div className="map-nearby-strip" aria-label="Haritada görünen yerler">
+      {!visiblePlaces.length?<span className="map-strip-empty">{loading?'Yerler yükleniyor…':'Haritayı hareket ettirerek yerleri keşfet'}</span>:
+      visiblePlaces.slice(0,10).map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
+        setSelectedPlace(place);
+        const map=mapRef.current;
+        if(map&&map.project([place.lng,place.lat]).y>map.getContainer().clientHeight-190)map.easeTo({center:[place.lng,place.lat],offset:[0,-110],duration:240});
+      }}><span className="map-chip-symbol">{place.category==='transit'?<BusFront size={18}/>:categoryLabel(place.category).slice(0,1)}</span><span><strong>{place.name}</strong><small>{place.category==='transit'?'Gelen otobüsleri gör':categoryLabel(place.category)}</small></span></button>)}
     </div>}
-    {selectedPlace && <div ref={sheetRef} className="map-sheet-holder"><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} /></div>}
+    {selectedPlace && <div ref={sheetRef} className="map-sheet-holder" key={selectedPlace.id}><MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen ? () => onPlaceOpen(selectedPlace) : undefined} onClose={() => setSelectedPlace(null)} /></div>}
   </div>;
 }
 
 function ensurePlaceLayers(map: MapLibreMap) {
   if(map.getSource(PLACES_SOURCE))return;
-  map.addSource(PLACES_SOURCE,{type:'geojson',data:emptyFeatureCollection(),cluster:true,clusterRadius:56,clusterMaxZoom:15});
+  map.addSource(PLACES_SOURCE,{type:'geojson',data:emptyFeatureCollection(),cluster:true,clusterRadius:56,clusterMaxZoom:14});
   map.addLayer({id:CLUSTER_LAYER,type:'circle',source:PLACES_SOURCE,filter:['has','point_count'],paint:{
     'circle-color':['step',['get','point_count'],'#42687c',12,'#355f78',50,'#2d526d'],
     'circle-radius':['step',['get','point_count'],16,12,20,50,25],
@@ -291,11 +278,12 @@ function ensurePlaceLayers(map: MapLibreMap) {
     filter:['==',['get','id'],''],paint:{'circle-radius':18,'circle-color':'#ffffff','circle-opacity':0.9,'circle-stroke-width':3,'circle-stroke-color':'#42687c'}} as any);
   map.addLayer({id:ICON_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:11.5,filter:['!',['has','point_count']],
     layout:{'icon-image':['get','icon'],'icon-size':['interpolate',['linear'],['zoom'],11.5,0.8,15.5,1.1],
-      'icon-allow-overlap':false,'icon-ignore-placement':false,'icon-padding':2}} as any);
+      'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-padding':1}} as any);
   map.addLayer({id:LABEL_LAYER,type:'symbol',source:PLACES_SOURCE,minzoom:15.5,filter:['!',['has','point_count']],
     layout:{'text-field':['get','name'],'text-size':11.5,'text-anchor':'top','text-offset':[0,1.2],
       'text-max-width':11,'text-allow-overlap':false,'text-optional':true},
     paint:{'text-color':'#243c44','text-halo-color':'#ffffff','text-halo-width':1.8}} as any);
+  map.addLayer({id:HIT_LAYER,type:'circle',source:PLACES_SOURCE,filter:['!',['has','point_count']],paint:{'circle-radius':22,'circle-color':'#ffffff','circle-opacity':0.001}} as any);
 }
 
 function updatePlaceSource(map: MapLibreMap, places: Place[]) {
@@ -328,11 +316,8 @@ function MapPlaceSheet({ place, onClose, onOpen }: { place: Place; onClose: () =
       <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
-    {place.category==='transit'?<details className="map-stop-details"><summary>Hatlar ve yol tarifi</summary><p className="map-place-address">{place.address}</p><a className="outline-button" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/>Yol tarifi</a></details>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
-    <div className="map-place-actions">
-      {onOpen ? <button className="solid-button" onClick={onOpen}>Yaklaşan otobüsler</button> : place.phone ? <a href={`tel:${place.phone}`}><Phone size={17} /> Ara</a> : <span />}
-      {place.category!=='transit'&&<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17} /> Yol tarifi</a>}
-    </div>
+    {place.category==='transit'?<TransitArrivals stop={place}/>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}
+    {place.category!=='transit'&&<div className="map-place-actions">{onOpen?<button type="button" className="solid-button" onClick={onOpen}>Ayrıntılar</button>:place.phone?<a href={`tel:${place.phone}`}><Phone size={17}/> Ara</a>:null}<a className="is-primary" href={mapsUrl} target="_blank" rel="noreferrer"><Navigation size={17}/> Yol tarifi</a></div>}
   </aside>;
 }
 

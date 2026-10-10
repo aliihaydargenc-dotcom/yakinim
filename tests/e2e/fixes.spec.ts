@@ -354,15 +354,30 @@ test('market prices compare exact products in nearby branches inside the app',as
  await page.getByRole('button',{name:'Marketler',exact:true}).click();await expect(page.locator('.place-row')).toHaveCount(1);
 });
 
-test('transit map opens arrivals and section search stays above categories',async({page})=>{
+test('transit service opens a usable map and stop selection shows arrivals in one tap',async({page})=>{
  const stop={id:'11265',name:'TONGUÇ CD-6',lat:36.8615,lng:30.6377,routes:['511'],distanceM:0};
  await page.route('https://tiles.openfreemap.org/styles/liberty',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
  await page.route('**/api/transit?**',r=>r.fulfill({json:new URL(r.request().url()).searchParams.get('action')==='arrivals'?{fresh:true,sourceAt:new Date().toISOString(),buses:[{id:'bus',code:'511',name:'Test güzergahı',direction:0,minutes:3,stops:2}]}:{stops:[stop],coverage:['511'],partial:false}}));
- await page.goto('/?preview');await page.getByRole('button',{name:'Ulaşım',exact:true}).click();
- const search=page.getByRole('textbox',{name:'Durak veya hat ara'});await expect(search).toBeVisible();
- expect(await search.evaluate(el=>el.getBoundingClientRect().top)).toBeLessThan(await page.locator('.category-rail').evaluate(el=>el.getBoundingClientRect().top));
- await expect(page.locator('.pilot-map')).toBeVisible();await page.getByRole('button',{name:/Haritadaki yerler/}).click();await page.locator('.map-visible-row').filter({hasText:'TONGUÇ CD-6'}).click();await expect(page.locator('.stop-row')).toHaveCount(0);await expect(page.locator('.map-stop-details')).not.toHaveAttribute('open','');await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');await page.getByRole('button',{name:'Yaklaşan otobüsler',exact:true}).click();await expect(page.locator('.bus-row')).toContainText('3 dk');
- await page.goBack();await expect(page.locator('.pilot-map')).toBeVisible();await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
+ await page.addInitScript(()=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.8615,lng:30.6377,mode:'manual',savedAt:Date.now()})));
+ await page.route('**/api/location?**',r=>r.fulfill({json:{label:'Antalya'}}));
+ await page.goto('/');
+ await page.locator('.shell-nav--mobile').getByRole('button',{name:'Hizmetler'}).click();
+ await page.getByRole('button',{name:/Toplu ulaşım/}).click();
+ await expect(page.locator('.map-stage')).toBeVisible();
+ await expect(page.locator('.map-place-chip').filter({hasText:'TONGUÇ CD-6'})).toBeVisible();
+ await page.locator('.map-place-chip').filter({hasText:'TONGUÇ CD-6'}).click();
+ await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
+ await expect(page.locator('.map-bus-item')).toContainText('3 dk');
+ await expect(page.getByRole('button',{name:'Yaklaşan otobüsler'})).toHaveCount(0);
+ await page.getByRole('button',{name:'Yer kartını kapat'}).click();
+ const canvas=page.locator('.maplibregl-canvas');
+ const box=await canvas.boundingBox();
+ expect(box).not.toBeNull();
+ await canvas.click({position:{x:box!.width/2,y:box!.height/2}});
+ await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
+ await expect(page.locator('.map-bus-item')).toContainText('3 dk');
+ await page.locator('.shell-nav--mobile').getByRole('button',{name:'Hizmetler'}).click();
+ await expect(page.getByRole('heading',{name:'Şehir hizmetleri'})).toBeVisible();
 });
 
 test('prices open with basics and search remains sticky while scrolling',async({page})=>{

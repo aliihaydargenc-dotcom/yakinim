@@ -15,7 +15,7 @@ async function setup(page:Page){
  await expect(page.locator('.map-stage')).toHaveAttribute('data-map-renderer','maplibre-layered-discovery');
   await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count',String(elements.length));
   await expect(page.locator('.stable-place-marker')).toHaveCount(0);
-  await expect(page.getByRole('button',{name:/Haritadaki yerler/})).toBeVisible();
+  await expect(page.locator('.map-place-chip')).toHaveCount(elements.length);
  await expect(page.locator('.map-loading-indicator')).toHaveCount(0);
  await expect.poll(()=>page.locator('.category-rail').evaluate(rail=>{const b=rail.querySelector('[aria-pressed=true]')!.getBoundingClientRect(),r=rail.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1;})).toBe(true);
 }
@@ -48,19 +48,17 @@ for(const outcome of ['success','error'] as const){
   await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count',String(elements.length));
  });
 }
-test('dense places use native map layers and accessible viewport list',async({page})=>{
+test('mobile places use map layers and directly clickable horizontal cards',async({page})=>{
  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
  await setup(page);
- await page.getByRole('button',{name:/Haritadaki yerler/}).click();
- const rows=page.locator('.map-visible-row');
- await expect(rows).toHaveCount(elements.length);
- const targets=await rows.evaluateAll(nodes=>nodes.map(el=>el.getBoundingClientRect().height));
- expect(targets.every(height=>height>=44)).toBe(true);
- await rows.filter({hasText:'Veteriner Kliniği 1'}).click();
+ const cards=page.locator('.map-place-chip');
+ await expect(cards).toHaveCount(elements.length);
+ expect((await cards.evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().height))).every(v=>v>=44)).toBe(true);
+ await cards.filter({hasText:'Veteriner Kliniği 1'}).click();
  await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
- await expect(page.locator('.map-visible-list')).toHaveCount(0);
- await page.screenshot({path:test.info().outputPath('map-layered-list.png')});
+ await expect(cards).toHaveCount(0);
+ await page.screenshot({path:test.info().outputPath('map-swipable-cards.png')});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -69,8 +67,7 @@ test('category sheets and map details work without secure-context randomUUID',as
  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
  await setup(page);
- await page.getByRole('button',{name:/Haritadaki yerler/}).click();
-  await page.locator('.map-visible-row').filter({hasText:'Veteriner Kliniği 1'}).click();
+ await page.locator('.map-place-chip').filter({hasText:'Veteriner Kliniği 1'}).click();
  await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
  await page.goBack();await expect(page.locator('.map-place-sheet')).toHaveCount(0);
  await expect(page.locator('.map-stage')).toBeVisible();
