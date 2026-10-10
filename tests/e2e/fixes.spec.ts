@@ -358,7 +358,9 @@ test('transit service opens a usable map and stop selection shows arrivals in on
  const stop={id:'11265',name:'TONGUÇ CD-6',lat:36.8615,lng:30.6377,routes:['511'],distanceM:0};
  await page.route('https://tiles.openfreemap.org/styles/liberty',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#f7f5f1'}}]}}));
  await page.route('**/api/transit?**',r=>r.fulfill({json:new URL(r.request().url()).searchParams.get('action')==='arrivals'?{fresh:true,sourceAt:new Date().toISOString(),buses:[{id:'bus',code:'511',name:'Test güzergahı',direction:0,minutes:3,stops:2}]}:{stops:[stop],coverage:['511'],partial:false}}));
- await page.goto('/?preview');
+ await page.addInitScript(()=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.8615,lng:30.6377,mode:'manual',savedAt:Date.now()})));
+ await page.route('**/api/location?**',r=>r.fulfill({json:{label:'Antalya'}}));
+ await page.goto('/');
  await page.locator('.shell-nav--mobile').getByRole('button',{name:'Hizmetler'}).click();
  await page.getByRole('button',{name:/Toplu ulaşım/}).click();
  await expect(page.locator('.map-stage')).toBeVisible();
