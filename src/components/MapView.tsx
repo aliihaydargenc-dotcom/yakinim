@@ -19,13 +19,14 @@ const LABEL_LAYER = "nearby-place-short-labels";
 const SELECTED_LAYER = "nearby-place-selected-halo";
 const HIT_LAYER = "nearby-place-touch-targets";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope,initialCenter,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string;initialCenter?:Coordinates;onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope,initialCenter,focusTarget,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string;initialCenter?:Coordinates;focusTarget?:{key:string;position:Coordinates};onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const locationMarkerRef = useRef<Marker | null>(null);
   const previousLocation = useRef(location);
   const lastAutoFit=useRef('');
+  const lastFocusKey=useRef<string|null>(null);
   const placesRef = useRef<Place[]>(places);
   const pickingRef = useRef(picking);
   const onPickRef = useRef(onPick);
@@ -223,6 +224,14 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     setSelectedPlace(current=>current?places.find(place=>place.id===current.id)||current:null);
     return () => { map.off("load", sync); };
   }, [places]);
+
+  useEffect(()=>{
+    if(!focusTarget){lastFocusKey.current=null;return;}
+    const map=mapRef.current;
+    if(!map||lastFocusKey.current===focusTarget.key)return;
+    lastFocusKey.current=focusTarget.key;
+    map.easeTo({center:[focusTarget.position.lng,focusTarget.position.lat],zoom:Math.max(13.3,map.getZoom()),duration:380});
+  },[focusTarget?.key,focusTarget?.position.lat,focusTarget?.position.lng]);
 
   useEffect(() => {
     if(!autoFitKey || !places.length || lastAutoFit.current===autoFitKey)return;
