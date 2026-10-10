@@ -87,3 +87,15 @@ test('device movement tracks continuously and manual selection stops the watch',
  await page.getByRole('button',{name:'Konum',exact:true}).click();await dialog.getByRole('button',{name:'Haritadan seç'}).click();await page.locator('.maplibregl-canvas').click({position:{x:140,y:180}});await expect(page.getByText('Haritada istediğin noktaya dokun')).toHaveCount(0);
  const manual=await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')!));await context.setGeolocation({latitude:36.888,longitude:30.709,accuracy:10});await page.waitForTimeout(300);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')!).lat)).toBe(manual.lat);
 });
+test('empty partial sources remain short missing-data states, never definitive no-result claims',async({page})=>{
+ await page.route('**/api/transit?**',r=>r.fulfill({json:{stops:[],partial:true}}));await page.route('**/api/events?**',r=>r.fulfill({json:{items:[],partial:true}}));await page.route('**/api/prices?**',r=>r.fulfill({json:{products:[],depotCount:0,partial:true}}));
+ await page.goto('/');await nav(page).getByRole('button',{name:'Hizmetler'}).click();
+ for(const service of ['Toplu ulaşım','Etkinlikler','Market']){
+  await page.getByRole('button',{name:service,exact:true}).click();await expect(page.locator('.pilot-panel').getByRole('status')).toHaveText('Veri eksik');await expect(page.locator('.pilot-panel')).not.toContainText(/Eşleşme yok|Etkinlik bulunamadı|Ürün bulunamadı|Şube bulunamadı/);await page.getByRole('button',{name:'Hizmetlere dön'}).click();
+ }
+});
+test('a GPS update in the same location cell cannot cancel a pending pan query',async({page,context})=>{
+ await context.grantPermissions(['geolocation']);await context.setGeolocation({latitude:origin.lat,longitude:origin.lng,accuracy:15});let requests=0;page.on('request',r=>{if(r.url().includes('/api/viewport?'))requests++;});await page.goto('/');await expect.poll(async()=>Number(await page.locator('.map-canvas').getAttribute('data-map-zoom'))).toBeGreaterThanOrEqual(15);await expect(page.locator('.map-stage')).toHaveAttribute('aria-busy','false');
+ const before=requests,box=await page.locator('.maplibregl-canvas').boundingBox();await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down();await page.mouse.move(box!.x+box!.width/2-120,box!.y+box!.height/2,{steps:5});await page.mouse.up();
+ await context.setGeolocation({latitude:36.8843,longitude:origin.lng,accuracy:20});await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('yakinim:v2:last-location')!).lat)).toBe(36.8843);await expect.poll(()=>requests).toBeGreaterThan(before);await expect(page.locator('.map-stage')).toHaveAttribute('aria-busy','false');
+});

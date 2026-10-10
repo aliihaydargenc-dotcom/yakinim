@@ -52,8 +52,8 @@ export function ProductPrices({input}:{location:Coordinates|null;input:string}){
    {prices.isPending&&<p role="status">Fiyatlar yükleniyor…</p>}
    {prices.isError&&<Retry onClick={()=>void prices.refetch()}/>}
    {prices.data&&!prices.isError&&<>
-    {!prices.data.depotCount&&<p>Şube bulunamadı</p>}
-    {!!prices.data.depotCount&&!all.length&&<p>Ürün bulunamadı</p>}
+    {!prices.data.depotCount&&<p role={prices.data.partial?'status':undefined}>{prices.data.partial?'Veri eksik':'Şube bulunamadı'}</p>}
+    {!!prices.data.depotCount&&!all.length&&<p role={prices.data.partial?'status':undefined}>{prices.data.partial?'Veri eksik':'Ürün bulunamadı'}</p>}
     {!!displayed.length&&<small>{all.length} ürün</small>}
     {displayed.map(product=><PriceCard key={product.id} product={product}/>)}
     {all.length>visibleCount&&<button className="outline-button" onClick={()=>setVisibleCount(n=>n+24)}>Daha fazla ürün göster</button>}

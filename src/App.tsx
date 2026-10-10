@@ -178,7 +178,6 @@ export default function App({embedded=false, homeMap=false, onBack, service, isV
       if(lastFix&&distance(lastFix,next)<20)return;
       lastFix=next;
       bestAccuracy=Math.min(bestAccuracy,precision);
-      clearTimeout(moveTimer.current);
       setLocation({lat:latitude,lng:longitude});setLocating(false);setPicking(false);
       setLocationPanel(false);
     };
