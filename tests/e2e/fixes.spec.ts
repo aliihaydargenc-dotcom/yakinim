@@ -369,6 +369,13 @@ test('transit service opens a usable map and stop selection shows arrivals in on
  await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
  await expect(page.locator('.map-bus-item')).toContainText('3 dk');
  await expect(page.getByRole('button',{name:'Yaklaşan otobüsler'})).toHaveCount(0);
+ await page.getByRole('button',{name:'Yer kartını kapat'}).click();
+ const canvas=page.locator('.maplibregl-canvas');
+ const box=await canvas.boundingBox();
+ expect(box).not.toBeNull();
+ await canvas.click({position:{x:box!.width/2,y:box!.height/2}});
+ await expect(page.locator('.map-place-sheet')).toContainText('TONGUÇ CD-6');
+ await expect(page.locator('.map-bus-item')).toContainText('3 dk');
  await page.locator('.shell-nav--mobile').getByRole('button',{name:'Hizmetler'}).click();
  await expect(page.getByRole('heading',{name:'Şehir hizmetleri'})).toBeVisible();
 });
