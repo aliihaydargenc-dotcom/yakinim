@@ -30,7 +30,7 @@ try{
  await assert.rejects(()=>tiles.tile(params,{fetchImpl:async()=>({ok:true,arrayBuffer:async()=>Buffer.from('<html>error</html>')})}),/traffic_invalid_tile/);
  const res={headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.code=n;return this;},json(x){this.body=x;return this;}};
  await handler({method:'GET',url:'/api/traffic?lat=36.88&lng=30.70'},res);assert.equal(res.code,200);assert.equal(res.body.scope,'road');assert.ok(!JSON.stringify(res.body).includes('test-secret'));
- const transit=require('../api/transit.js');await transit({method:'GET',url:'/api/transit?service=traffic&lat=36.88&lng=30.70'},res);assert.equal(res.code,200);assert.equal(res.body.scope,'road');
+ const transit=require('../api/transit.js');await transit({method:'GET',url:'/api/transit?service=traffic&lat=36.88&lng=30.70'},res);assert.equal(res.code,200);assert.equal(res.body.scope,'road');await transit({method:'GET',url:'/api/traffic?lat=36.88&lng=30.70'},res);assert.equal(res.body.scope,'road');
  const config=require('../vercel.json');assert.deepEqual(config.rewrites.find(r=>r.source==='/api/traffic'),{source:'/api/traffic',destination:'/api/transit?service=traffic'});
  delete process.env.TOMTOM_API_KEY;await assert.rejects(()=>tiles.tile(params),/traffic_not_configured/);
 }finally{if(original===undefined)delete process.env.TOMTOM_API_KEY;else process.env.TOMTOM_API_KEY=original;}
