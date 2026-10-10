@@ -53,6 +53,12 @@ test('dense mobile pins retain touch targets, readable labels and selected name'
  const labels=await page.locator('.stable-place-name').evaluateAll(nodes=>nodes.filter(el=>getComputedStyle(el).visibility==='visible').map(el=>{const b=el.getBoundingClientRect();return{x:b.x,y:b.y,right:b.right,bottom:b.bottom};}));
  expect(labels.length).toBeGreaterThan(0);expect(labels.length).toBeLessThan(elements.length);
  for(let i=0;i<labels.length;i++)for(let j=i+1;j<labels.length;j++){const a=labels[i],b=labels[j];expect(a.x<b.right&&a.right>b.x&&a.y<b.bottom&&a.bottom>b.y).toBe(false);}
+ const coveredNames=await page.locator('.stable-place-marker').evaluateAll(markers=>markers.some(marker=>{
+  const label=marker.querySelector('.stable-place-name') as HTMLElement;
+  if(getComputedStyle(label).visibility!=='visible')return false;
+  const name=label.getBoundingClientRect();
+  return markers.some(other=>{if(other===marker)return false;const pin=other.getBoundingClientRect(),x=pin.x+pin.width/2,y=pin.y+pin.height/2;return name.left<x+13&&name.right>x-13&&name.top<y+13&&name.bottom>y-13;});
+ }));expect(coveredNames).toBe(false);
  await pins.filter({hasText:'Veteriner Kliniği 1'}).click();
  const selected=page.getByRole('button',{name:'Veteriner Kliniği 1',exact:true});
  await expect(selected).toHaveAttribute('aria-pressed','true');await expect(selected.locator('.stable-place-name')).toBeVisible();

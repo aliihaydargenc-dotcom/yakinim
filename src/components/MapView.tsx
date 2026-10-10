@@ -82,12 +82,14 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       entry.marker.getElement().hidden = zoom < 13;
       entry.marker.getElement().style.zIndex = String(selected ? candidates.length + 1 : candidates.length - index);
       // Reserve label space only for visible labels. The pin remains tappable
-      // when nearby names cannot all fit in the viewport.
+      // when nearby names cannot all fit in the viewport. Names also avoid
+      // neighbouring pins, so a higher marker cannot cover their text.
       const labelWidth = entry.label.offsetWidth || 128;
       const labelHeight = entry.label.offsetHeight || 30;
       const rect = {left:point.x-labelWidth/2-7,right:point.x+labelWidth/2+7,top:point.y+19,bottom:point.y+19+labelHeight+5};
       const overlap = occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
-      const showName = selected || (zoom >= 13.7 && !overlap && !(place.category==='transit'&&zoom<15.8));
+      const overlapsPin = candidates.some(({place:other,point:pin}) => other.id !== place.id && rect.left < pin.x + 16 && rect.right > pin.x - 16 && rect.top < pin.y + 16 && rect.bottom > pin.y - 16);
+      const showName = selected || (zoom >= 13.7 && !overlap && !overlapsPin && !(place.category==='transit'&&zoom<15.8));
       entry.label.style.visibility = showName ? "visible" : "hidden";
       if (showName) occupied.push(rect);
     }
