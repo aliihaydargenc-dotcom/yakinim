@@ -82,6 +82,8 @@ test('closing a map place or tapping the empty map collapses the bottom sheet',a
  await expect(sheet).toHaveAttribute('data-level','peek');
  await sheet.locator('.map-sheet-toggle').click();
  await expect(sheet).toHaveAttribute('data-level','half');
+ // Touch-device dismissal is handled at the map surface rather than relying
+ // on provider hit testing (which can consume a click near POI markers).
  await page.locator('.maplibregl-canvas').click({position:{x:25,y:155}});
  await expect(sheet).toHaveAttribute('data-level','peek');
  await sheet.locator('.map-sheet-toggle').click();

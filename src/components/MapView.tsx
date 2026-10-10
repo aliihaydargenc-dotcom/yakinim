@@ -326,7 +326,13 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   }, [selectedPlace?.id]);
 
   return <div className="map-stage" data-map-renderer="maplibre-layered-discovery" data-place-count={places.length} aria-busy={loading}>
-    <div ref={containerRef} className="map-canvas" />
+    <div ref={containerRef} className="map-canvas" onPointerUpCapture={event=>{
+      // MapLibre may consume a click when the sheet overlays the map.
+      // A direct map-surface tap always collapses the sheet, while its own
+      // pin click handler can immediately open a newly selected place.
+      if(event.target instanceof Element&&event.target.closest('.maplibregl-ctrl'))return;
+      closeSelectedPlace();
+    }} />
     {loading && <div className="map-loading-indicator" role="status" aria-live="polite"><span className="map-loader-ring" aria-hidden="true" /><span>{loadingText}</span></div>}
     {picking && <div className="map-pick-banner">Haritada istediğin noktaya dokun</div>}
     {enableList&&!picking&&<section className="map-unified-sheet" data-level={sheetLevel} data-selected={!!selectedPlace} aria-label={selectedPlace?selectedPlace.name:"Haritadaki yerler"}>
