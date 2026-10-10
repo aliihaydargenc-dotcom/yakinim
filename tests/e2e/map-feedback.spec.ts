@@ -12,7 +12,10 @@ async function setup(page:Page){
  await page.getByRole('dialog',{name:'Tüm kategoriler',exact:true}).getByRole('button',{name:'Veteriner',exact:true}).click();
  await expect(page.locator('.place-row')).toHaveCount(elements.length);
  await page.getByRole('button',{name:'Harita',exact:true}).click();
- await expect(page.locator('.stable-place-marker button')).toHaveCount(elements.length);
+ await expect(page.locator('.map-stage')).toHaveAttribute('data-map-renderer','maplibre-layered-discovery');
+  await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count',String(elements.length));
+  await expect(page.locator('.stable-place-marker')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Haritadaki yerler/})).toBeVisible();
  await expect(page.locator('.map-loading-indicator')).toHaveCount(0);
  await expect.poll(()=>page.locator('.category-rail').evaluate(rail=>{const b=rail.querySelector('[aria-pressed=true]')!.getBoundingClientRect(),r=rail.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1;})).toBe(true);
 }
@@ -45,27 +48,19 @@ for(const outcome of ['success','error'] as const){
   await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count',String(elements.length));
  });
 }
-test('dense mobile pins retain touch targets, readable labels and selected name',async({page})=>{
+test('dense places use native map layers and accessible viewport list',async({page})=>{
  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
  await setup(page);
- const pins=page.locator('.stable-place-marker button');
- const targets=await pins.evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return{width:b.width,height:b.height};}));
- expect(targets.every(t=>t.width>=44&&t.height>=44)).toBe(true);
- const labels=await page.locator('.stable-place-name').evaluateAll(nodes=>nodes.filter(el=>getComputedStyle(el).visibility==='visible').map(el=>{const b=el.getBoundingClientRect();return{x:b.x,y:b.y,right:b.right,bottom:b.bottom};}));
- expect(labels.length).toBeGreaterThan(0);expect(labels.length).toBeLessThan(elements.length);
- for(let i=0;i<labels.length;i++)for(let j=i+1;j<labels.length;j++){const a=labels[i],b=labels[j];expect(a.x<b.right&&a.right>b.x&&a.y<b.bottom&&a.bottom>b.y).toBe(false);}
- const coveredNames=await page.locator('.stable-place-marker').evaluateAll(markers=>markers.some(marker=>{
-  const label=marker.querySelector('.stable-place-name') as HTMLElement;
-  if(getComputedStyle(label).visibility!=='visible')return false;
-  const name=label.getBoundingClientRect();
-  return markers.some(other=>{if(other===marker)return false;const pin=other.getBoundingClientRect(),x=pin.x+pin.width/2,y=pin.y+pin.height/2;return name.left<x+13&&name.right>x-13&&name.top<y+13&&name.bottom>y-13;});
- }));expect(coveredNames).toBe(false);
- await pins.filter({hasText:'Veteriner Kliniği 1'}).click();
- const selected=page.getByRole('button',{name:'Veteriner Kliniği 1',exact:true});
- await expect(selected).toHaveAttribute('aria-pressed','true');await expect(selected.locator('.stable-place-name')).toBeVisible();
+ await page.getByRole('button',{name:/Haritadaki yerler/}).click();
+ const rows=page.locator('.map-visible-row');
+ await expect(rows).toHaveCount(elements.length);
+ const targets=await rows.evaluateAll(nodes=>nodes.map(el=>el.getBoundingClientRect().height));
+ expect(targets.every(height=>height>=44)).toBe(true);
+ await rows.filter({hasText:'Veteriner Kliniği 1'}).click();
  await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
- await page.screenshot({path:test.info().outputPath('map-labels.png')});
+ await expect(page.locator('.map-visible-list')).toHaveCount(0);
+ await page.screenshot({path:test.info().outputPath('map-layered-list.png')});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
@@ -74,7 +69,8 @@ test('category sheets and map details work without secure-context randomUUID',as
  await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
  await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
  await setup(page);
- await page.getByRole('button',{name:'Veteriner Kliniği 1',exact:true}).click();
+ await page.getByRole('button',{name:/Haritadaki yerler/}).click();
+  await page.locator('.map-visible-row').filter({hasText:'Veteriner Kliniği 1'}).click();
  await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
  await page.goBack();await expect(page.locator('.map-place-sheet')).toHaveCount(0);
  await expect(page.locator('.map-stage')).toBeVisible();
