@@ -11,7 +11,7 @@ const context={DEMO:false,window:{isSecureContext:true},navigator:{geolocation:{
  watchPosition:(success,error,opts)=>{update=success;watchOptions=opts;return 42;},
  clearWatch:id=>cleared.push(id)
 }},locationRequest:{current:0},mounted:{current:true},locationWatch:watch,locationWatchTimer:watchTimer,
- moveTimer:{current:null},setLocating:()=>{},setLocationError:()=>{},setPicking:()=>{},setLocationPanel:()=>{},setRecenter:()=>{},distance:(a,b)=>Math.abs(a.lat-b.lat)*111000,setLocation:c=>{location=c;},
+ manualViewport:{current:false},moveTimer:{current:null},setLocating:()=>{},setLocationError:()=>{},setPicking:()=>{},setLocationPanel:()=>{},setRecenter:()=>{},distance:(a,b)=>Math.abs(a.lat-b.lat)*111000,setLocation:c=>{location=c;},
  clearTimeout:()=>{},setTimeout:()=>1,stopLocationWatch:()=>{if(watch.current!==null)cleared.push(watch.current);watch.current=null;}};
 vm.createContext(context);
 vm.runInContext(ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);

@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "node tests/transit-route.mjs && node tests/games-package.mjs && tsc --noEmit && vite build",
-    "test": "node tests/transit-route.mjs && node tests/games-package.mjs && node tests/audit-fixes.mjs && node tests/audit-ui.cjs && node tests/location-refinement.mjs && node tests/nearby-refresh.mjs && node tests/map-viewport.cjs && node tests/hardening.cjs && node --check api/duty.js && node --check api/overture.js && node tests/duty.mjs && node tests/viewport.mjs && node tests/overture.mjs && node tests/media.mjs && node tests/model1-data.mjs && node tests/prices.mjs && node tests/fishing.mjs && node tests/location-label.mjs && node tests/discovery.mjs && node tests/discovery-extensions.mjs && node tests/pilot.mjs && node tests/city-services.mjs && node tests/traffic.mjs && node tests/general-data.mjs && npm run build",
+    "test": "node tests/run-regressions.cjs",
     "test:mobile": "playwright test",
     "test:hardening": "node tests/hardening.cjs",
     "test:legacy": "node --check app.js && node --check sprint1.js && node --check sprint2.js && node --check sprint3.js",
     "test:model1": "node tests/model1-browser.cjs",
-    "refresh:transit": "python scripts/refresh-transit.py"
+    "refresh:transit": "python scripts/refresh-transit.py",
+    "test:legacy-ui": "node tests/audit-ui.cjs",
+    "test:mobile:extended": "playwright test --config=playwright.extended.config.ts"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",

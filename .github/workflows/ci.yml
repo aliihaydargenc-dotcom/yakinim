@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -23,12 +27,10 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
-      - name: Legacy syntax guard
-        run: |
-          node --check app.js
-          node --check sw.js
+      - name: Active service worker syntax guard
+        run: node --check public/sw.js
 
       - name: API + React build verification
         run: npm test
@@ -36,7 +38,7 @@ jobs:
       - name: Install mobile browser engines
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Mobile device emulation tests
+      - name: Current mobile acceptance smoke (12 browser scenarios)
         run: npm run test:mobile
 
       - name: Upload mobile test artifacts

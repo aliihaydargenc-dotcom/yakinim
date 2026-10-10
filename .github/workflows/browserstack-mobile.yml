@@ -1,15 +1,8 @@
 name: BrowserStack Real Mobile
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "tests/e2e/**"
-      - "playwright.browserstack.config.ts"
-      - "browserstack.yml"
-      - "package.json"
-      - ".github/workflows/browserstack-mobile.yml"
+  # The external paid service's Automate time is exhausted. Run manually
+  # only when account capacity is confirmed; free local emulation remains CI.
   workflow_dispatch:
 
 permissions:
@@ -21,7 +14,6 @@ concurrency:
 
 jobs:
   real-mobile:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

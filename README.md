@@ -1,64 +1,107 @@
-# Yakınım — React/Vite uygulaması
+# Yakınım
 
-**Geliştirilmiş karşılaştırma paketi · 10 Ekim 2026**
+**Konumuna göre çalışan, mobil öncelikli yakın çevre uygulaması.**
 
-Yakınım; konuma göre yer keşfi, harita, nöbetçi eczane, market fiyatları, Antalya toplu ulaşımı, etkinlikler, kesintiler, balıkçılık, haber, radyo ve oyun modülleri içeren mobil öncelikli web uygulamasıdır. Bu paket mevcut mimari ve veri kaynakları korunarak iyileştirilmiştir; yeni ücretli servis veya API anahtarı gerektiren bağımlılık eklenmemiştir.
+[Uygulamayı aç](https://yakinim.vercel.app/) · [GitHub deposu](https://github.com/aliihaydargenc-dotcom/yakinim) · [Geliştirme ve mobil kontrol listesi](docs/mobile-release-checklist.md)
 
-**Önemli:** Bu inceleme ortamında npm paketleri indirilemediği için tam `npm run build` ve gerçek cihaz testi **doğrulanamadı**. Kaynak yapısı Vercel/Vite dağıtımına uygun hazırlanmıştır; yayın öncesi aşağıdaki kontroller zorunludur. Teknik ayrıntılar `ANALIZ.md`, `DEGISIKLIKLER.md` ve `TEST-SONUCLARI.md` dosyalarında yer alır.
+Yakınım; yakınındaki yerleri keşfetmeyi, Antalya'daki toplu ulaşım ve günlük hizmet bilgilerine erişmeyi tek bir mobil arayüzde birleştirir. Uygulama **React + TypeScript + Vite** ile geliştirilir, Vercel üzerinde yayımlanır. Konum haritası MapLibre kullanır.
 
-## Aktif mimari
+## Uygulamanın bölümleri
 
-| Konum | İşlev |
-|---|---|
-| `index.html`, `src/main.tsx`, `src/App.tsx` | **Aktif** React 18 / TypeScript uygulaması |
-| `src/components/` | Liste/harita, fiyat, ulaşım, balıkçılık, haber, radyo, oyun arayüzleri |
-| `src/services/` ve `src/store.ts` | İstemci API sorguları, konum ve tercihler |
-| `api/` | Vercel Functions; sunucu tarafı kaynak doğrulama/erişim |
-| `lib/` | Veri kaynakları için normalleştiriciler, statik durak kataloğu |
-| `public/` | Vite'nin statik çıktıya kopyaladığı PWA, ikonlar ve lisanslı oyunlar |
-| `tests/`, `playwright.config.ts` | Node regresyon ve tarayıcı senaryoları |
-| `vercel.json` | Vite build, `dist` çıktısı, API fonksiyonları, güvenlik başlıkları |
+| Bölüm | Neler var? |
+| --- | --- |
+| **Keşfet** | Konuma dayalı harita, yakındaki noktalar, harita üzerinden konum seçimi |
+| **Hizmetler** | Kategori bazlı yer arama, nöbetçi eczaneler, market ürün fiyatları, Antalya toplu ulaşımı ve etkinlikler |
+| **Kaydedilen** | Kaydettiğin yerler ve yol tarifi bağlantıları |
+| **Diğer** | Haberler, radyo ve altı oyunluk kütüphane |
 
-Kök dizindeki `app.js`, `styles.css`, `sprint*.js`, `mobile-flow.*`, **kök `sw.js`** ve kök `manifest.webmanifest` önceki statik sürümün kalıntılarıdır; mevcut `index.html` tarafından yüklenmezler. Mevcut projeyle karşılaştırma ve geriye dönüş için bu turda silinmemişlerdir. **Yayınlanan servis çalışanı `public/sw.js` dosyasıdır.** Eski statik testlerin bir kısmı artık aktif uygulamayı test etmez.
+Diğer çevre hizmetleri arasında, veri kapsamı elverdiğinde, trafik, kesinti ve kıyı/balıkçılık bilgileri de bulunur. Erişilebilir veri, şehir ve kaynak bazında değişebilir.
 
-## Kurulum ve çalıştırma
+### Antalya toplu ulaşımı
 
-Node.js **22** önerilir. GitHub'a ZIP'i açarak dosyaları **depo köküne**, iç içe klasör oluşturmadan yükleyin.
+- Durağa göre yaklaşan otobüsler ve kaynağın bildirdiği tahmini varış süreleri.
+- Seçilen otobüsün güzergâhı, üzerindeki duraklar ve son bildirilen araç konumu.
+- Haritada **seçtiğin durak** için belirgin işaret ve otobüs ile durak arasındaki yaklaşık mesafe.
+- Araç koordinatlarının otomatik sorgulanması (20 saniyelik uygulama aralığı) ve manuel **Yenile**.
+- Güzergâhtan geri dönünce aynı durağın otobüs listesinin korunması.
+
+**Canlı takip sınırı:** Otobüs GPS'i telefonun konumu gibi kesintisiz akmaz. Kaynak yeni koordinat bildirdiğinde güncellenir. Bir araç izlenen duraktan sonra kaynak listesinden çıkarsa takip kesilebilir. Güzergâh üzerinden ölçülemeyen mesafe açıkça **kuş uçuşu** olarak belirtilir.
+
+### Etkinlik ve diğer kaynaklar
+
+Etkinlik.io kayıtlarında RSS akışının bildirdiği etkinlik başlangıç tarihi ve saati değerlendirilir; aynı etkinliğin farklı seansları ayrı tutulur. Diğer kaynaklar için yayın saati otomatik olarak etkinlik saati sayılmaz. Kaynakta olmayan saat, fiyat, konum veya kesinlik üretilmez.
+
+Nöbetçi eczane, fiyat, kesinti ve ulaşım verileri üçüncü taraf/resmî sağlayıcıların güncelliğine bağlıdır. Özellikle eczane nöbetini yola çıkmadan önce teyit etmek yararlı olabilir. Harita verisinin atıf ve lisans bağlantıları harita bilgi denetiminden açılabilir.
+
+## Geliştirme ortamı
+
+**Gereksinim:** Node.js 22 ve npm.
 
 ```bash
+git clone https://github.com/aliihaydargenc-dotcom/yakinim.git
+cd yakinim
 npm ci
 npm run dev
 ```
 
-Vite varsayılan yerel geliştirme adresini açar. `npm run dev`, Vercel'in `/api/*` sunucusuz fonksiyonlarını tek başına çalıştırmaz. Gerçek veri için Vercel geliştirme ortamına veya ayrı **Vercel Preview** dağıtımına ihtiyaç vardır. `/?preview` sadece **temsili yerler** gösteren arayüz önizlemesidir; canlı veri doğrulaması değildir.
+Vite'ın gösterdiği yerel adresi açın. **Dikkat:** `npm run dev` komutu, Vercel'deki `/api/*` sunucusuz fonksiyonlarını tek başına çalıştırmaz. Gerçek kaynak entegrasyonu için uygun bir Vercel geliştirme veya Preview ortamı gerekir. `/?preview` parametresi örnek arayüz verileriyle çalışabilir; canlı veri doğrulaması yerine geçmez.
 
-```bash
-npm test
-npm run build
-npm run test:mobile
+### Test ve derleme komutları
+
+| Komut | Kapsam |
+| --- | --- |
+| `npm test` | Kod, veri, güvenlik ve React derlemesini kapsayan bağımsız regresyon kontrolleri; ilk hatada durmaz, sonunda başarısız adımları bildirir |
+| `npm run build` | TypeScript denetimi ve Vite üretim çıktısı (`dist/`) |
+| `npm run test:mobile` | Aktif arayüz için dört akış × üç mobil tarayıcı profili = **12 kısa Playwright senaryosu** |
+| `npm run test:mobile:extended` | Geçmişten gelen kapsamlı E2E paketi; bakım amaçlı, otomatik CI kapısından ayrı |
+| `npm run test:hardening` | API, konum, önbellek ve gizlilik doğrulamaları |
+
+Playwright için yerel tarayıcı motorları kurulmamışsa önce `npx playwright install chromium webkit` çalıştırın. CI, gerekli Linux bağımlılıklarını da yükler.
+
+**Testlerin kapsamı:** Kısa mobil paket, aktif uygulamanın temel akışlarını denetler; geçmişte yazılmış tüm senaryoların geçtiği anlamına gelmez. Gerçek Android/iOS telefon testinin yerini tutmaz. Haricî BrowserStack gerçek-cihaz akışı hesap kullanım hakkına bağlıdır ve **yalnızca manuel** tetiklenir.
+
+## Proje yapısı
+
+```text
+src/
+  AppShell.tsx       Dört ana sekme, alt navigasyon
+  App.tsx            Hizmetler, konum, kaynak durumları
+  components/        Harita, ulaşım, etkinlik, fiyat, oyun, medya
+  services/          İstemci veri sorguları
+  store.ts           Yerel uygulama durumu
+api/                 Vercel sunucusuz uç noktaları
+lib/                 Kaynak ayrıştırma ve veri normalleştirme
+public/              PWA varlıkları, servis çalışanı, oyun içerikleri
+tests/               Node kontrolleri ve Playwright senaryoları
+.github/workflows/   CI ve isteğe bağlı test işleri
 ```
 
-- `npm test`: mevcut test zinciri, yeni `tests/hardening.cjs` ve build kontrolü.
-- `npm run build`: TypeScript denetimi + Vite üretim çıktısı (`dist`).
-- `npm run test:mobile`: Playwright WebKit iPhone emülasyonu ve Chromium Android emülasyonları. BrowserStack için `.github/workflows/browserstack-mobile.yml` ayrıca mevcut; hesabın sırları gerekebilir.
-- `npm run test:hardening`: yeni konum, API biçimi, önbellek ve güvenlik regresyon testleri (kurulmuş `typescript` bağımlılığı gerekir).
+Aktif uygulamanın giriş noktası **`src/main.tsx`**, ana kabuğu **`src/AppShell.tsx`** dosyasıdır. PWA servis çalışanı **`public/sw.js`** üzerinden yayımlanır.
 
-## Vercel ayrı önizleme yayını
+Kök dizindeki `app.js`, `sprint*.js`, eski `sw.js` ve bazı statik dosyalar tarihsel sürümden kalmıştır. Bu aşamada geri dönüş ve karşılaştırma için korunmuştur; yeni uygulamanın aktif giriş noktası olarak değerlendirilmemelidir.
 
-1. Bu ZIP içeriğinden **ayrı bir GitHub deposu** oluşturun veya mevcut deponun karşılaştırma dalına aktarın. Mevcut üretim dalına otomatik aktarım yapmayın.
-2. Vercel'de yeni proje oluşturun, ilgili depoyu seçin. Proje ayarlarında **Root Directory** depo kökü olsun.
-3. Vercel, `vercel.json` ile `framework: vite`, `buildCommand: npm run build` ve `outputDirectory: dist` kullanır; `api/*.js` aynı projede serverless function olarak yayınlanır.
-4. GitHub PR / ayrı dal ile bir **Preview URL** oluşturun. İlk dağıtımın build logunda başarılı tamamlandığını, API yanıtlarını ve harita katmanlarını denetleyin.
-5. Test senaryoları ve gerçek iPhone Safari kontrol listesi `TEST-SONUCLARI.md` içinde verilmiştir.
+## Yayınlama ve değişiklik yönetimi
 
-Yerel ZIP'e `node_modules`, oluşturulmuş `dist` veya gizli anahtar koyulmamıştır. Bağımlılıklar `package-lock.json` üzerinden dağıtım sırasında kurulur. `api/overture.js` dinamik Node modülleri kullandığından önizlemede bu endpoint ayrıca denenmelidir. **Uyarı:** `.openai/hosting.json` önceki OpenAI statik hosting projesine ait kimliği, `android/` ve `public/.well-known/assetlinks.json` mevcut Android uygulamasının bilgilerini içerir. Bunlar Vercel Preview dağıtımı için kullanılmaz; bu paketi eski hosting projesine otomatik yüklemeyin. Yeni Preview URL'sinin Android TWA bağlantısını otomatik değiştirdiğini varsaymayın.
+1. Yeni geliştirmeleri `main` dışında bir **feature/stabilizasyon dalında** hazırlayın.
+2. GitHub'da pull request açın; bağımsız kod/veri kontrolleri ile **12 senaryoluk mobil kabul testini** değerlendirin.
+3. Gerekirse gerçek telefonda kontrol edin; [mobil kontrol listesi](docs/mobile-release-checklist.md) temel akışları içerir.
+4. Onaylanan paketi tercihen **squash merge** ile `main` dalına alın. Üretim dağıtımını Vercel'de doğrulayın.
 
-## Konum, kaynak şeffaflığı ve çevrimdışı kullanım
+`main` dalı üretim dağıtımını tetikler. Pull request dalları Vercel'de ayrı **Preview** dağıtımları oluşturur. Preview ile üretim aynı adres değildir.
 
-- Konumunuzu butondan cihaz izniyle veya haritadan elle seçebilirsiniz. iOS Safari'de otomatik yeni izin istemi tetiklenmez; ilk talep kullanıcı hareketiyle yapılır.
-- Kullanılan son konum yaklaşık **6 saat** cihazda saklanır ve silinebilir. Favoriler ayrı yerel saklamada kalır. GPS koordinatları API isteklerine ve ilgili harici sağlayıcılara gidebilir; hassas konumu paylaşmak istemiyorsanız haritadan yaklaşık nokta seçin.
-- Nöbetçi eczanede öncelik e-Devlet/TİTCK verisinin işlenmesidir. Teknik sorunlarda **Eczane Adresi** alternatif, resmî olmayan kaynak olarak gösterilir; gitmeden önce telefonla doğrulama önerilir.
-- Market fiyatı kapsama ve son 48 saat kaydıyla, durak bilgileri Antalya kataloguyla, balıkçılık meteoroloji model verisiyle sınırlıdır. Etkinlik ve kesinti sonuçları kaynakta bulunabilen ilanlardan oluşur; eksiksiz kayıt garantisi verilmez.
-- PWA `public/sw.js` yalnızca uygulama kabuğunu ve kendi statik varlıklarını saklar; `/api/*`, GPS verisi ve üçüncü taraf harita kareleri önbelleğe alınmaz. **Offline modda canlı modüller çalışmaz.** Gerçek tarayıcıda PWA kurulum/yenileme testi bu ortamda yapılamamıştır.
+## Konum, gizlilik ve çevrimdışı kullanım
 
-Eski kaynaklar veya kapsamlı ileride yapılabilecek teknik düzenlemeler için `ANALIZ.md` dosyasındaki öncelik planına bakın. Bu teslimat orijinal GitHub/Vercel üretim dağıtımını değiştirmez.
+- Konum izni kullanıcı işlemiyle istenir; alternatif olarak haritadan elle konum seçilebilir.
+- Son konum ve kaydedilen yerler tarayıcıda yerel olarak saklanabilir; konumu silme kontrolü bulunur.
+- Konum bazlı servislerin çalışabilmesi için yaklaşık veya kesin koordinatlar ilgili API'lere aktarılabilir. Hassas GPS iznini vermek istemeyenler haritadan yaklaşık bir nokta seçebilir.
+- Servis çalışanı uygulama kabuğu ve statik varlıklar için kullanılır. Canlı API sonuçları ve harita karoları çevrimdışı kullanılacak biçimde önbelleklenmez. **İnternet olmadan canlı veriler güncellenmez.**
+- Kaynağın cevap vermemesi, boş sonuç döndürmesi ve eski kayıt sunması aynı durum değildir; arayüz geliştirmelerinde bu fark korunmalıdır.
+
+## Dokümantasyon
+
+- [Mobil yayın ve kontrol listesi](docs/mobile-release-checklist.md)
+- [Veri kaynakları ve tasarım yol haritası](docs/data-and-design-roadmap.md)
+- [Kaynak envanteri](docs/data-source-inventory.md)
+- [Eski inceleme notları](ANALIZ.md)
+
+Önceki sürümlerden kalan inceleme dosyaları tarihsel referanstır; güncel çalışma biçimi için bu README, aktif kaynak kod ve GitHub Actions sonuçları esas alınır.
