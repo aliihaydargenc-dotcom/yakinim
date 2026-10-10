@@ -99,10 +99,15 @@ function placeQuality(place: Place) {
 function dedupePlaces(places: Place[]) {
   const ordered = places.filter(p=>!excludedPlaceIds.has(p.id) && (p.category!=="market" || !marketNameExclusions.some(pattern=>pattern.test(p.name.toLocaleLowerCase('tr'))))).map(p=>({...p,address:cleanAddress(p.address)})).sort((a, b) => placeQuality(b) - placeQuality(a));
   const result: Place[] = [];
+  // Group by type/name before doing the comparatively expensive distance check.
+  const byName = new Map<string, Place[]>();
   for (const place of ordered) {
-    const name = canonicalName(place.name);
-    const duplicate = result.some((current) => current.category === place.category && canonicalName(current.name) === name && distanceMeters(current, place) <= 90);
-    if (!duplicate) result.push(place);
+    const key = `${place.category}:${canonicalName(place.name)}`;
+    const candidates = byName.get(key) ?? [];
+    if (candidates.some(current => distanceMeters(current, place) <= 90)) continue;
+    candidates.push(place);
+    byName.set(key, candidates);
+    result.push(place);
   }
   return result;
 }
@@ -170,7 +175,8 @@ export async function fetchOvertureSupplement(location: Coordinates, signal?: Ab
   const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(OVERTURE_RADIUS_M), quality:"3" });
   if(category)params.set('category',category);
   const payload = await getJson<SupplementalResponse>(`/api/overture?${params}`, signal);
-  return payload.places || [];
+  if (!Array.isArray(payload.places)) throw new Error("invalid_overture_payload");
+  return payload.places.filter(place => place && typeof place.id === "string" && typeof place.name === "string" && Number.isFinite(place.lat) && Number.isFinite(place.lng) && Math.abs(place.lat) <= 90 && Math.abs(place.lng) <= 180);
 }
 function mergePlaces(places: Place[]) {
   return dedupePlaces(places).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
@@ -206,7 +212,8 @@ export async function fetchViewport(location: Coordinates): Promise<Place[]> {
 export async function fetchDuty(location: Coordinates): Promise<Place[]> {
   const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: "20000", limit: "24" });
   const payload = await getJson<DutyResponse>(`/api/duty?${params}`);
-  return (payload.pharmacies || []).flatMap((row, index) => {
+  if (!Array.isArray(payload.pharmacies)) throw new Error("invalid_duty_payload");
+  return payload.pharmacies.flatMap((row, index) => {
     const lat = row.latitude==null?NaN:Number(row.latitude), lng = row.longitude==null?NaN:Number(row.longitude);
     return [{ id: String(row.id || `duty:${index}`), name: String(row.name || "Nöbetçi Eczane"), category: "duty", lat, lng, address: String(row.address || "Adres bilgisi yok"), source: String(row.source||payload.source||""), queryDate:payload.queryDate, phone: row.phone ? String(row.phone) : undefined, distanceM: row.distance_m!=null && Number.isFinite(Number(row.distance_m)) ? Number(row.distance_m) : Number.isFinite(lat)&&Number.isFinite(lng)?Math.round(distanceMeters(location, { lat, lng })):undefined } satisfies Place];
   }).sort((a, b) => (a.distanceM || Infinity) - (b.distanceM || Infinity));
@@ -225,7 +232,8 @@ export async function fetchArea(bounds: ViewportBounds, origin: Coordinates, sig
     const response = await fetch(`/api/viewport?${params}`, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload: ViewportResponse = await response.json();
-    return mergePlaces(osmPlacesFromElements(payload.elements || [], origin));
+    if (!Array.isArray(payload.elements)) throw new Error("invalid_viewport_payload");
+    return mergePlaces(osmPlacesFromElements(payload.elements, origin));
   } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
 }
 export function combinePlaceSources(places: Place[]) { return mergePlaces(places); }
