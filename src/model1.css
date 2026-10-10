@@ -13,17 +13,6 @@
 .game-screen .game-frame,.with-player .game-screen .game-frame{flex:1;min-height:0;height:100%;display:block;width:100%;border:0}
 .content-screen.game-screen{padding-left:0;padding-right:0}.game-screen .game-heading{padding-left:12px;padding-right:12px}
 
-/* Place buttons are stable DOM markers, independent of map tile refreshes. */
-.stable-place-marker{width:44px;height:44px;z-index:2}
-.stable-place-marker[hidden]{display:none}
-.stable-place-marker button{position:relative;display:block;width:44px;height:44px;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer;color:#192e2b;overflow:visible}
-.stable-place-marker button::before{content:"";position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:#174b43;border:3px solid #fff;box-shadow:0 2px 10px #174b4355}
-.stable-place-marker button::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;transform:translate(-50%,-50%);border-radius:50%;background:#fff}
-.stable-place-marker button[aria-pressed=true]::before{background:#0f3f36;box-shadow:0 0 0 5px #12776550,0 3px 12px #174b4366}
-.stable-place-marker button:focus-visible{outline:3px solid #127765;outline-offset:1px;border-radius:50%}
-.stable-place-name{position:absolute;top:42px;left:50%;transform:translateX(-50%);width:max-content;max-width:176px;padding:5px 8px;border:1px solid #12776530;border-radius:8px;background:#fffffffa;color:#192e2b;font-size:13px;line-height:17px;font-weight:600;text-align:center;overflow-wrap:anywhere;box-shadow:0 2px 9px #174b4329;pointer-events:none}
-.stable-place-marker button[aria-pressed=true] .stable-place-name{border-color:#12776599;box-shadow:0 3px 12px #174b4338}
-
 .user-marker{pointer-events:none;width:40px;height:40px;display:grid;place-items:center;background:white;border:3px solid white;border-radius:13px;box-shadow:0 0 0 5px #2d2b2d24,0 2px 10px #2d2b2d40;z-index:4}
 .user-marker img{display:block;width:32px;height:32px;border-radius:9px}
 
@@ -138,3 +127,19 @@ body{background:var(--canvas);color:var(--ink)}
 .transit-map-open .transit-map-panel .pilot-map{min-height:0;flex:1}
 .transit-map-panel .map-stage,.transit-map-panel .map-canvas{height:100%;min-height:100%}
 @media(max-width:650px){.price-region-label{align-items:stretch}.price-region-label select{flex:1;min-width:0;max-width:70%}.transit-map-panel>.pilot-title h2{font-size:17px}}
+
+/* MapLibre cluster icons + viewport-synchronized results, without DOM pins. */
+.map-results-dock{position:absolute;z-index:18;left:12px;right:12px;bottom:12px;display:flex;align-items:flex-start;pointer-events:none}
+.map-results-toggle{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;max-width:min(100%,320px);padding:8px 14px;background:#fff;color:#243c44;border:1px solid #dce6e7;border-radius:14px;box-shadow:0 4px 18px #182c3540;font-weight:650;font-size:14px}
+.map-results-toggle span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-results-toggle .map-chevron-open{transform:rotate(180deg)}
+.map-visible-list{position:absolute;pointer-events:auto;left:0;right:0;bottom:56px;max-height:min(48dvh,420px);overflow:auto;overscroll-behavior:contain;background:#fff;border:1px solid #dce6e7;border-radius:18px;padding:5px 7px;box-shadow:0 5px 25px #182c3533;z-index:19}
+.map-visible-list>p{font-size:14px;color:var(--muted);padding:18px 12px}
+.map-visible-row{width:100%;display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;align-items:center;text-align:left;min-height:64px;padding:8px 10px;border-bottom:1px solid var(--line);border-radius:10px}
+.map-visible-row:last-child{border-bottom:none}
+.map-visible-row:active{background:#eef3f5}
+.map-visible-row strong{display:block;font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-visible-row small{display:block;font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-visible-symbol{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#e2ebef;color:#31536b;font-weight:700;font-size:12px}
+.map-visible-more{display:block;padding:12px;font-size:12px}
+@media(min-width:900px){.map-results-dock{max-width:350px}.map-visible-list{max-height:min(60dvh,500px)}}
