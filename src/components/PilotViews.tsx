@@ -7,6 +7,7 @@ import {useBackLayer} from '../hooks/useBackLayer';
 const ProductPrices=lazy(()=>import('./ProductPrices').then(m=>({default:m.ProductPrices})));
 import {FeatureSheet} from './FeatureSheet';
 import {TransitArrivals} from './TransitArrivals';
+import {TransitRouteView} from './TransitRouteView';
 import {coveredBy,requestBounds} from '../services/map-viewport';
 const MapView=lazy(()=>import('./MapView').then(m=>({default:m.MapView})));
 
@@ -23,7 +24,7 @@ function TransitStopsView({location,search}:{location:Coordinates|null;search:st
  const inCoverage=!!location&&location.lat>=35.5&&location.lat<=38&&location.lng>=29&&location.lng<=33;
  const origin=inCoverage?location!:ANTALYA_CENTER;
  const scope=`${origin.lat.toFixed(3)}:${origin.lng.toFixed(3)}`;
- const [selected,setSelected]=useState<Stop|null>(null),[map,setMap]=useState(false),[route,setRoute]=useState<{code:string;direction:number}|null>(null);
+ const [selected,setSelected]=useState<Stop|null>(null),[map,setMap]=useState(false),[route,setRoute]=useState<{code:string;direction:number;vehicleId?:string}|null>(null);
  const [bounds,setBounds]=useState<Bounds|null>(null);
  const timer=useRef<ReturnType<typeof setTimeout>>();
  const term=search.trim();
@@ -35,8 +36,6 @@ function TransitStopsView({location,search}:{location:Coordinates|null;search:st
  const params=new URLSearchParams({lat:String(origin.lat),lng:String(origin.lng)});
  if(term)params.set('q',term);else if(map)params.set('bounds',bbox);
  const stops=useQuery({queryKey:['transit-stops-compact',scope,term,term?'search':map?bbox:'nearby'],queryFn:({signal})=>get<StopResponse>(`/api/transit?${params}`,signal),staleTime:300000,retry:0});
- const selectedCoords=new URLSearchParams({lat:String(selected?.lat??origin.lat),lng:String(selected?.lng??origin.lng)});
- const path=useQuery({queryKey:['transit-route',route?.code,route?.direction],queryFn:({signal})=>get<{name:string;stops:Stop[]}>(`/api/transit?action=route&code=${encodeURIComponent(route!.code)}&direction=${route!.direction}&${selectedCoords}`,signal),enabled:!!route,staleTime:3600000,retry:0});
  const filtered=stops.data?.stops||[];
  const toPlace=(s:Stop):Place=>({id:`transit:${s.id}`,name:s.name,category:'transit',lat:s.lat,lng:s.lng,address:`Durak ${s.id} · ${s.routes.join(', ')}`,distanceM:inCoverage?s.distanceM:undefined,source:'Antalyakart / Kentkart'});
  const places=useMemo(()=>filtered.map(toPlace),[stops.data,inCoverage]);
@@ -45,8 +44,9 @@ function TransitStopsView({location,search}:{location:Coordinates|null;search:st
   <div className="pilot-title"><span className="service-region">Antalya</span><button onClick={()=>setMap(!map)}><MapPin size={17}/>{map?'Liste':'Harita'}</button></div>
   {stops.isError&&<Retry onClick={()=>void stops.refetch()}/>} {stops.isPending&&<small role="status">Duraklar yükleniyor…</small>}
   {map?<div className="pilot-map"><Suspense fallback={<p>Yükleniyor…</p>}><MapView memoryKey={`transit:${scope}`} selectionScope={`transit:${scope}`} location={inCoverage?location:null} initialCenter={origin} places={places} picking={false} onPick={()=>{}} onPlaceOpen={p=>{const stop=filtered.find(s=>p.id===`transit:${s.id}`);if(stop)setSelected(stop);}} onViewportChange={moved} loading={stops.isFetching} autoFitKey={term||undefined}/></Suspense></div>:<div className="stop-list">{!stops.isPending&&!stops.isError&&!filtered.length&&<p role={stops.data?.partial?'status':undefined}>{stops.data?.partial?'Veri eksik':'Eşleşme yok'}</p>}{filtered.map(s=><button className="stop-row" key={s.id} onClick={()=>setSelected(s)}><MapPin size={18}/><span><strong>{s.name}</strong><small>{s.id}{!term&&inCoverage?` · ${s.distanceM} m`:''}{s.routes.length>0?` · ${s.routes.join(' · ')}`:''}</small></span></button>)}</div>}
-  <FeatureSheet open={!!selected} title={selected?.name||'Durak'} onClose={()=>{setSelected(null);setRoute(null);}}>{selected&&<div className="compact-stop-detail"><small>{selected.id}</small><TransitArrivals stop={toPlace(selected)} onRoute={(code,direction)=>setRoute({code,direction})}/></div>}</FeatureSheet>
-  <FeatureSheet open={!!route} title={route?.code||'Hat'} onClose={()=>setRoute(null)}>{route&&<><p className="route-name">{path.data?.name}</p><div className="pharmacy-filter">{[0,1].map(direction=><button key={direction} aria-pressed={route.direction===direction} onClick={()=>setRoute({...route,direction})}>{direction===0?'Gidiş':'Dönüş'}</button>)}</div>{path.isPending&&<p role="status">Yükleniyor…</p>}{path.isError&&<Retry onClick={()=>void path.refetch()}/>}<ol className="route-stops">{path.data?.stops.map(s=><li key={s.id}>{s.name}<small>{s.id}</small></li>)}</ol></>}</FeatureSheet>
+  <FeatureSheet open={!!selected} title={route?.code||selected?.name||'Durak'} onClose={()=>{if(route)setRoute(null);else setSelected(null);}} closeLabel={route?'Otobüs listesine dön':undefined} back={!!route}>
+   {selected&&(route?<TransitRouteView key={route.code+':'+route.direction+':'+(route.vehicleId||'')} stop={selected} code={route.code} direction={route.direction} vehicleId={route.vehicleId} onBack={()=>setRoute(null)} onDirectionChange={direction=>setRoute({code:route.code,direction})}/>:<div className="compact-stop-detail"><small>{selected.id}</small><TransitArrivals stop={toPlace(selected)} onRoute={(code,direction,vehicleId)=>setRoute({code,direction,vehicleId})}/></div>)}
+  </FeatureSheet>
  </section>;
 }
 export function TransitView({location,search}:{location:Coordinates|null;search:string}){return <TransitStopsView location={location} search={search}/>;}
