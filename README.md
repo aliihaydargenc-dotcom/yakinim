@@ -1,10 +1,10 @@
 # Yakınım — React/Vite uygulaması
 
-**Geliştirilmiş karşılaştırma paketi · 10 Ekim 2026**
+**Aktif Vercel/React projesi · Ekim 2026**
 
 Yakınım; konuma göre yer keşfi, harita, nöbetçi eczane, market fiyatları, Antalya toplu ulaşımı, etkinlikler, kesintiler, balıkçılık, haber, radyo ve oyun modülleri içeren mobil öncelikli web uygulamasıdır. Bu paket mevcut mimari ve veri kaynakları korunarak iyileştirilmiştir; yeni ücretli servis veya API anahtarı gerektiren bağımlılık eklenmemiştir.
 
-**Önemli:** Bu inceleme ortamında npm paketleri indirilemediği için tam `npm run build` ve gerçek cihaz testi **doğrulanamadı**. Kaynak yapısı Vercel/Vite dağıtımına uygun hazırlanmıştır; yayın öncesi aşağıdaki kontroller zorunludur. Teknik ayrıntılar `ANALIZ.md`, `DEGISIKLIKLER.md` ve `TEST-SONUCLARI.md` dosyalarında yer alır.
+**Üretim:** https://yakinim.vercel.app. Bu depo aktif React/Vite uygulamasıdır. `main` Vercel üretimini tetikler; geliştirmeleri ayrı dalda ve taslak PR'da hazırlayın. Her otomatik kontrolün başarılı olduğuna yalnızca GitHub Actions sonucu ile karar verin. Fiziksel telefon testleri kullanıcı tarafından yapılır. Tarihsel teknik inceleme için `ANALIZ.md`, `DEGISIKLIKLER.md` ve `TEST-SONUCLARI.md` dosyalarına bakın.
 
 ## Aktif mimari
 
@@ -61,4 +61,4 @@ Yerel ZIP'e `node_modules`, oluşturulmuş `dist` veya gizli anahtar koyulmamı�
 - Market fiyatı kapsama ve son 48 saat kaydıyla, durak bilgileri Antalya kataloguyla, balıkçılık meteoroloji model verisiyle sınırlıdır. Etkinlik ve kesinti sonuçları kaynakta bulunabilen ilanlardan oluşur; eksiksiz kayıt garantisi verilmez.
 - PWA `public/sw.js` yalnızca uygulama kabuğunu ve kendi statik varlıklarını saklar; `/api/*`, GPS verisi ve üçüncü taraf harita kareleri önbelleğe alınmaz. **Offline modda canlı modüller çalışmaz.** Gerçek tarayıcıda PWA kurulum/yenileme testi bu ortamda yapılamamıştır.
 
-Eski kaynaklar veya kapsamlı ileride yapılabilecek teknik düzenlemeler için `ANALIZ.md` dosyasındaki öncelik planına bakın. Bu teslimat orijinal GitHub/Vercel üretim dağıtımını değiştirmez.
+Eski kaynaklar veya kapsamlı ileride yapılabilecek teknik düzenlemeler için `ANALIZ.md` dosyasındaki öncelik planına bakın. Bu belgeler önceki karşılaştırma çalışmasından kalmıştır; güncel yayın davranışını GitHub/Vercel üzerinden doğrulayın.
