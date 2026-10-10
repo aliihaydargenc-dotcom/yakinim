@@ -198,7 +198,7 @@ test('games fit the mobile width, blocks start full height and new games respond
 test('radio media actions publish metadata, disconnect on pause and stop without closing app',async({page})=>{
  await page.addInitScript(()=>{
   const actions:Record<string,MediaSessionActionHandler|null>={};
-  navigator.mediaSession.setActionHandler=(action,handler)=>{actions[action]=handler;};
+  Object.defineProperty(navigator,'mediaSession',{configurable:true,value:{metadata:null,playbackState:'none',setActionHandler:(action:MediaSessionAction,handler:MediaSessionActionHandler|null)=>{actions[action]=handler;}}});
   (window as any).mediaActions=actions;
   HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};
   HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};
@@ -217,7 +217,7 @@ test('radio media actions publish metadata, disconnect on pause and stop without
 test('notification switches stations in both directions and the radio map stays within viewport',async({page})=>{
  await page.setViewportSize({width:360,height:640});
  await page.addInitScript(()=>{
-  const actions:Record<string,MediaSessionActionHandler|null>={};navigator.mediaSession.setActionHandler=(a,h)=>{actions[a]=h;};(window as any).mediaActions=actions;
+  const actions:Record<string,MediaSessionActionHandler|null>={};Object.defineProperty(navigator,'mediaSession',{configurable:true,value:{metadata:null,playbackState:'none',setActionHandler:(a:MediaSessionAction,h:MediaSessionActionHandler|null)=>{actions[a]=h;}}});(window as any).mediaActions=actions;
   HTMLMediaElement.prototype.play=function(){this.dispatchEvent(new Event('playing'));return Promise.resolve();};HTMLMediaElement.prototype.pause=function(){this.dispatchEvent(new Event('pause'));};HTMLMediaElement.prototype.load=function(){};
  });
  await page.route('**/api/radio?**',r=>r.fulfill({json:{stations:[1,2,3].map(n=>({id:String(n),name:`Radyo ${n}`,streamUrl:`https://radio.example/${n}`,codec:'MP3'}))}}));

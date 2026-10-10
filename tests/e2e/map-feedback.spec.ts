@@ -14,24 +14,26 @@ async function setup(page:Page){
  await page.getByRole('button',{name:'Harita',exact:true}).click();
  await expect(page.locator('.stable-place-marker button')).toHaveCount(elements.length);
  await expect(page.locator('.map-loading-indicator')).toHaveCount(0);
+ await expect.poll(()=>page.locator('.category-rail').evaluate(rail=>{const b=rail.querySelector('[aria-pressed=true]')!.getBoundingClientRect(),r=rail.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1;})).toBe(true);
 }
+
 for(const outcome of ['success','error'] as const){
  test(`veterinary map shows refresh with retained markers until both sources settle: ${outcome}`,async({page})=>{
-  let hold=false,requests=0,releaseArea=()=>{},releaseSupplement=()=>{};
+  let hold=false,areaRequests=0,supplementRequests=0,releaseArea=()=>{},releaseSupplement=()=>{};
   const areaGate=new Promise<void>(r=>releaseArea=r),supplementGate=new Promise<void>(r=>releaseSupplement=r);
-  await page.route('**/api/viewport?**',async r=>{if(hold){requests++;await areaGate;}return outcome==='error'&&hold?r.fulfill({status:503,json:{error:'Unavailable'}}):r.fulfill({json:{elements}});});
-  await page.route('**/api/overture?**',async r=>{if(hold&&!new URL(r.request().url()).searchParams.has('category')){requests++;await supplementGate;}return outcome==='error'&&hold?r.fulfill({status:503,json:{error:'Unavailable'}}):r.fulfill({json:{places:[]}});});
+  await page.route('**/api/viewport?**',async r=>{if(hold){areaRequests++;await areaGate;}return outcome==='error'&&hold?r.fulfill({status:503,json:{error:'Unavailable'}}):r.fulfill({json:{elements}});});
+  await page.route('**/api/overture?**',async r=>{if(hold&&!new URL(r.request().url()).searchParams.has('category')){supplementRequests++;await supplementGate;}return outcome==='error'&&hold?r.fulfill({status:503,json:{error:'Unavailable'}}):r.fulfill({json:{places:[]}});});
   await setup(page);hold=true;
   const canvas=page.locator('.maplibregl-canvas'),box=await canvas.boundingBox();if(!box)throw Error('Map missing');
   await page.mouse.move(box.x+box.width*.85,box.y+box.height*.4);await page.mouse.down();await page.mouse.move(box.x+box.width*.15,box.y+box.height*.4,{steps:16});await page.mouse.up();
   try{
    await expect(page.getByRole('status')).toHaveText('Güncelleniyor…');
    await expect(page.locator('.map-stage')).toHaveAttribute('aria-busy','true');
-   await expect.poll(()=>requests).toBeGreaterThan(0);
+   await expect.poll(()=>areaRequests).toBeGreaterThan(0);
    await expect(page.locator('.map-stage')).toHaveAttribute('data-place-count',String(elements.length));
    const ring=await page.locator('.map-loader-ring').evaluate(el=>{const s=getComputedStyle(el);return{width:el.getBoundingClientRect().width,animation:s.animationName};});
    expect(ring.width).toBeGreaterThanOrEqual(16);expect(ring.animation).toBe('map-refresh-spin');
-   await expect.poll(()=>requests).toBe(2);
+   await expect.poll(()=>supplementRequests).toBeGreaterThan(0);
    await page.emulateMedia({reducedMotion:'reduce'});
    expect(await page.locator('.map-loader-ring').evaluate(el=>getComputedStyle(el).animationName)).toBe('none');
    releaseArea();await page.waitForTimeout(150);
@@ -65,4 +67,17 @@ test('dense mobile pins retain touch targets, readable labels and selected name'
  await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
  await page.screenshot({path:test.info().outputPath('map-labels.png')});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('category sheets and map details work without secure-context randomUUID',async({page})=>{
+ await page.addInitScript(()=>Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true}));
+ await page.route('**/api/viewport?**',r=>r.fulfill({json:{elements}}));
+ await page.route('**/api/overture?**',r=>r.fulfill({json:{places:[]}}));
+ await setup(page);
+ await page.getByRole('button',{name:'Veteriner Kliniği 1',exact:true}).click();
+ await expect(page.locator('.map-place-sheet')).toContainText('Veteriner Kliniği 1');
+ await page.goBack();await expect(page.locator('.map-place-sheet')).toHaveCount(0);
+ await expect(page.locator('.map-stage')).toBeVisible();
+ await page.goBack();await expect(page.locator('.map-stage')).toHaveCount(0);
+ await expect(page.locator('.place-row')).toHaveCount(elements.length);
 });

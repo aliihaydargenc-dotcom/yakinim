@@ -5,6 +5,7 @@ const layers:Layer[]=[];
 const waiting:Array<()=>void>=[];
 let installed=false;
 let goingBack=false;
+let nextLayerId=0;
 function drain(){
  const top=layers.at(-1);
  if(!goingBack&&top&&!top.active&&history.state?.yakinimLayer===top.token){
@@ -29,7 +30,10 @@ export function useBackLayer(open:boolean,onClose:()=>void){
  const close=useRef(onClose);close.current=onClose;
  useEffect(()=>{
   if(!open)return;
-  const layer:Layer={token:crypto.randomUUID(),active:true,close:()=>close.current()};
+  // History identifiers are not credentials. HTTP device-test origins do not
+  // expose randomUUID, so retain uniqueness without requiring a secure context.
+  const token=globalThis.crypto?.randomUUID?.() ?? `layer-${Date.now().toString(36)}-${++nextLayerId}`;
+  const layer:Layer={token,active:true,close:()=>close.current()};
   let attached=false;
   const push=()=>{
    if(!layer.active)return;
