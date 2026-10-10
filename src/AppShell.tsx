@@ -20,7 +20,7 @@ export default function AppShell(){
  const appVisible=tab==='explore'||tab==='map'||tab==='services'&&!!service||tab==='more'&&!!media;
  const unresolved=savedIds.filter(id=>!savedPlaces.some(p=>p.id===id));
  const navigation=(variant:string)=><nav className={`shell-nav shell-nav--${variant}`} aria-label="Ana menü">{tabs.map(({id,label,Icon})=><button key={id} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={22}/><span>{label}</span></button>)}</nav>;
- return <div className={`shell-app ${playing?'shell-playing':''}`}>
+ return <div data-tab={tab} className={`shell-app ${playing?'shell-playing':''}`}>
   <aside className="shell-sidebar"><div className="shell-brand"><span><MapPin size={23}/></span>yakınım<span className="shell-period">.</span></div>{navigation('desktop')}<div className="shell-sidebar-note">Yakındaki yerler ve şehir hizmetleri.<br/>Konumunu sen seç.</div></aside>
   <div className="shell-body">
    {(!appVisible||tab==='more')&&<header className="shell-header"><strong className="brand-lockup"><span className="brand-mark"><MapPin size={22}/></span>yakınım<span className="brand-period">.</span></strong></header>}
