@@ -22,10 +22,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium webkit
       - name: Test unified map on iOS and Android
-        run: npx playwright test tests/e2e/unified-mobile.spec.ts --reporter=line
+        run: npx playwright test tests/e2e/unified-mobile.spec.ts --config=playwright.extended.config.ts --reporter=line --retries=0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
