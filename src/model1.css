@@ -14,13 +14,15 @@
 .content-screen.game-screen{padding-left:0;padding-right:0}.game-screen .game-heading{padding-left:12px;padding-right:12px}
 
 /* Place buttons are stable DOM markers, independent of map tile refreshes. */
-.stable-place-marker{width:28px;height:28px;z-index:2}
+.stable-place-marker{width:44px;height:44px;z-index:2}
 .stable-place-marker[hidden]{display:none}
-.stable-place-marker button{position:relative;display:block;width:28px;height:28px;padding:0;border:0;background:transparent;cursor:pointer;color:#51404d}
-.stable-place-marker button::before{content:"";position:absolute;left:9px;top:9px;width:10px;height:10px;border-radius:50%;background:#79576d;border:1.5px solid white;box-shadow:0 1px 3px #0002}
-.stable-place-marker button[aria-pressed=true]::before{box-shadow:0 0 0 5px #79576d33}
-.stable-place-marker button:focus-visible{outline:2px solid #79576d;border-radius:50%}
-.stable-place-name{position:absolute;top:28px;left:50%;transform:translateX(-50%);width:max-content;max-width:140px;font-size:11px;line-height:14px;font-weight:500;text-align:center;text-shadow:-1px -1px 2px white,1px 1px 2px white,-1px 1px 2px white,1px -1px 2px white;pointer-events:auto}
+.stable-place-marker button{position:relative;display:block;width:44px;height:44px;min-height:44px;padding:0;border:0;background:transparent;cursor:pointer;color:#342532;overflow:visible}
+.stable-place-marker button::before{content:"";position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:#623e55;border:3px solid #fff;box-shadow:0 2px 10px #281d2b55}
+.stable-place-marker button::after{content:"";position:absolute;left:50%;top:50%;width:7px;height:7px;transform:translate(-50%,-50%);border-radius:50%;background:#fff}
+.stable-place-marker button[aria-pressed=true]::before{background:#49283f;box-shadow:0 0 0 5px #79576d50,0 3px 12px #281d2b66}
+.stable-place-marker button:focus-visible{outline:3px solid #79576d;outline-offset:1px;border-radius:50%}
+.stable-place-name{position:absolute;top:42px;left:50%;transform:translateX(-50%);width:max-content;max-width:176px;padding:5px 8px;border:1px solid #6f536b30;border-radius:8px;background:#fffffffa;color:#342532;font-size:13px;line-height:17px;font-weight:600;text-align:center;overflow-wrap:anywhere;box-shadow:0 2px 9px #24182a29;pointer-events:none}
+.stable-place-marker button[aria-pressed=true] .stable-place-name{border-color:#79576d99;box-shadow:0 3px 12px #24182a38}
 
 .user-marker{pointer-events:none;width:40px;height:40px;display:grid;place-items:center;background:white;border:3px solid white;border-radius:13px;box-shadow:0 0 0 5px #2d2b2d24,0 2px 10px #2d2b2d40;z-index:4}
 .user-marker img{display:block;width:32px;height:32px;border-radius:9px}
