@@ -53,7 +53,7 @@ function Retry({onClick}:{onClick:()=>void}){return <div className="pilot-error"
 export function EventsView({search,location}:{search:string;location:Coordinates|null}){
  const [chosenCity,setChosenCity]=useState<string|null>(null);
  useEffect(()=>setChosenCity(null),[location?.lat,location?.lng]);
- const region=useQuery({queryKey:['event-region',location?.lat.toFixed(2),location?.lng.toFixed(2)],queryFn:({signal})=>get<{province:string}>(`/api/location?lat=${location!.lat}&lng=${location!.lng}`,signal),enabled:!!location&&chosenCity===null,staleTime:86400000,retry:0});
+ const region=useQuery({queryKey:['event-region-v2',location?.lat.toFixed(4),location?.lng.toFixed(4)],queryFn:({signal})=>get<{province:string}>(`/api/location?v=2&lat=${location!.lat.toFixed(4)}&lng=${location!.lng.toFixed(4)}`,signal),enabled:!!location&&chosenCity===null,staleTime:86400000,retry:0});
  const normalize=(v:string)=>v.toLocaleLowerCase('tr').replace(/\s+ili$/,'').trim();
  const city=chosenCity??eventCities.find(c=>normalize(c.name)===normalize(region.data?.province||''))?.id??'all';
  const events=useQuery({queryKey:['events',city],queryFn:({signal})=>get<{items:Event[];coverage:string;fetchedAt:string;partial:boolean}>(`/api/events?city=${city}`,signal),enabled:chosenCity!==null||!location||region.isFetched,staleTime:300000,refetchInterval:300000,retry:1});
