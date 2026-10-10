@@ -19,7 +19,7 @@ const LABEL_LAYER = "nearby-place-short-labels";
 const SELECTED_LAYER = "nearby-place-selected-halo";
 const HIT_LAYER = "nearby-place-touch-targets";
 
-export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,selectionScope,initialCenter,focusTarget,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;selectionScope?:string;initialCenter?:Coordinates;focusTarget?:{key:string;position:Coordinates};onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
+export function MapView({ location, places, picking, onPick, onViewportChange, loading = false, loadingText = "Yükleniyor", onPlaceOpen, memoryKey,trafficTiles,onTrafficState,autoFitKey,enableList=false,dataError,selectionScope,initialCenter,focusTarget,onSavePlace,savedPlaceIds=[] }: { location: Coordinates | null; places: Place[]; picking: boolean; onPick: (coords: Coordinates) => void; onViewportChange: (coords: Coordinates, bounds: ViewportBounds) => void; loading?: boolean; loadingText?: string; onPlaceOpen?: (place: Place) => void; memoryKey?: string;trafficTiles?:string;onTrafficState?:(state:'loading'|'ready'|'error')=>void;autoFitKey?:string;enableList?:boolean;dataError?:string;selectionScope?:string;initialCenter?:Coordinates;focusTarget?:{key:string;position:Coordinates};onSavePlace?:(place:Place)=>void;savedPlaceIds?:string[] }) {
   const sheetRef=useRef<HTMLDivElement|null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -33,7 +33,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
   const onViewportChangeRef = useRef(onViewportChange);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(()=>memoryKey?cameras.get(memoryKey)?.selected??null:null);
   useBackLayer(!!selectedPlace,()=>setSelectedPlace(null));
-  useEffect(()=>{setSelectedPlace(null);setSheetLevel("peek");},[selectionScope]);
+  const previousScope=useRef(selectionScope);
+  useEffect(()=>{if(previousScope.current===selectionScope)return;previousScope.current=selectionScope;setSelectedPlace(null);setSheetLevel("peek");},[selectionScope]);
   const selectedRef = useRef<Place | null>(null);
   const [visiblePlaces,setVisiblePlaces]=useState<Place[]>([]);
   const [sheetLevel,setSheetLevel]=useState<"peek"|"half"|"full">("peek");
@@ -49,11 +50,10 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
     const bounds=map.getBounds(),center=map.getCenter();
     const candidates=placesRef.current.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
     const inView=candidates.filter(p=>bounds.contains([p.lng,p.lat]));
-    // Preserve nearby candidates while a viewport request or camera animation settles.
-    // The selected row will focus the map on its actual coordinates.
-    const results=(inView.length?inView:candidates).sort((a,b)=>
-      Math.hypot(a.lat-center.lat,a.lng-center.lng)-Math.hypot(b.lat-center.lat,b.lng-center.lng)).slice(0,60);
-    setVisiblePlaces(previous=>previous.length===results.length&&previous.every((p,i)=>p.id===results[i].id&&p.name===results[i].name)?previous:results);
+    // The sheet describes the visible map, including while retained pins survive a refresh.
+    const results=inView.sort((a,b)=>
+      Math.hypot(a.lat-center.lat,a.lng-center.lng)-Math.hypot(b.lat-center.lat,b.lng-center.lng));
+    setVisiblePlaces(results);
   };
 
   placesRef.current = places;
@@ -273,9 +273,9 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
         suppressTap.current=true;
         setSheetLevel(level=>difference>0?(level==='peek'?'half':'full'):(level==='full'?'half':'peek'));
       }}>
-        <button type="button" className="map-sheet-toggle" aria-expanded={sheetLevel!=='peek'} onClick={()=>{if(suppressTap.current){suppressTap.current=false;return;}setSheetLevel(level=>level==='peek'?'half':level==='half'?'full':'half');}}>
+        <button type="button" className="map-sheet-toggle" aria-expanded={sheetLevel!=='peek'} aria-controls="map-sheet-content" onClick={()=>{if(suppressTap.current){suppressTap.current=false;return;}setSheetLevel(level=>level==='peek'?'half':level==='half'?'full':'half');}}>
           <span className="map-sheet-grabber" aria-hidden="true"/>
-          {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Çevredeki yerler</strong><small>{visiblePlaces.length} sonuç</small></span>}
+          {selectedPlace?<span className="map-sheet-summary"><strong>{selectedPlace.name}</strong><small>{categoryLabel(selectedPlace.category)}</small></span>:<span className="map-sheet-summary"><strong>Haritadaki yerler</strong><small>{loading?'Güncelleniyor…':`${visiblePlaces.length} kayıt · Listeyi aç`}</small></span>}
           {sheetLevel==='full'?<ChevronDown size={20}/>:<ChevronUp size={20}/>}
         </button>
         {selectedPlace&&<button type="button" className="map-sheet-close" aria-label="Yer kartını kapat" onClick={()=>{setSelectedPlace(null);setSheetLevel('half');}}><X size={20}/></button>}
@@ -283,8 +283,8 @@ export function MapView({ location, places, picking, onPick, onViewportChange, l
       <div className="map-sheet-content" id="map-sheet-content">
         {selectedPlace?<MapPlaceSheet place={selectedPlace} onOpen={onPlaceOpen?()=>onPlaceOpen(selectedPlace):undefined} onClose={()=>{setSelectedPlace(null);setSheetLevel('half');}} onSave={onSavePlace?()=>onSavePlace(selectedPlace):undefined} saved={savedPlaceIds.includes(selectedPlace.id)}/>:
           <div className="map-sheet-place-list" aria-label="Görünen yerler">
-            {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':'Bu alanda yer bulunamadı.'}</p>:
-              visiblePlaces.slice(0,36).map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
+            {!visiblePlaces.length?<p className="map-sheet-empty">{loading?'Yerler yükleniyor…':dataError||'Bu harita alanı için kayıt bulunamadı. Veriler tüm yerleri kapsamayabilir.'}</p>:
+              visiblePlaces.map(place=><button type="button" className="map-place-chip" key={place.id} onClick={()=>{
                 setSelectedPlace(place);setSheetLevel('half');
                 const map=mapRef.current;if(map){const pos=map.project([place.lng,place.lat]);if(pos.y>map.getContainer().clientHeight-200)map.easeTo({center:[place.lng,place.lat],offset:[0,-110],duration:220});}
               }}><span className="map-chip-symbol">{place.category==='transit'?<BusFront size={18}/>:<MapPin size={17}/>}</span><span className="map-sheet-place-copy"><strong>{place.name}</strong><small>{categoryLabel(place.category)}{place.distanceM!==undefined?' · '+distanceLabel(place.distanceM):''}</small></span></button>)}
@@ -348,7 +348,7 @@ function MapPlaceSheet({ place, onClose, onOpen, onSave, saved=false }: { place:
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   return <aside className="map-place-sheet" aria-label={`${place.name} detayları`}>
     <div className="map-place-heading">
-      <div><p>{categoryLabel(place.category)}{place.distanceM ? ` · ${distanceLabel(place.distanceM)}` : ""}</p><strong>{place.name}</strong></div>
+      <div><p>{categoryLabel(place.category)}{place.distanceM!==undefined&&Number.isFinite(place.distanceM) ? ` · ${distanceLabel(place.distanceM)} · kuş uçuşu` : ""}</p><strong>{place.name}</strong></div>
       <button type="button" onClick={onClose} aria-label="Yer kartını kapat"><X size={18} /></button>
     </div>
     {place.category==='transit'?<TransitArrivals stop={place}/>:<><p className="map-place-address">{place.address}</p><PlaceFacts place={place}/>{place.source&&<p className="map-place-address">{place.source==="legacy-fallback"?"Eczane Adresi · alternatif, resmî olmayan kaynak":place.source}{place.queryDate&&` · ${place.queryDate}`}</p>}</>}

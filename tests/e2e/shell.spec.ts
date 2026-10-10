@@ -17,7 +17,7 @@ test('four tabs, services, more and a single traffic map without third-party emb
  await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Hizmetler'})).toBeVisible();
  await expect(page.locator('.shell-service-grid>button')).toHaveCount(4);
- await page.getByRole('button',{name:/^Trafik Haritadaki/}).click();
+ await page.getByRole('button',{name:/^Trafik /}).click();
  await expect(page.getByRole('heading',{name:'Yol ve trafik'})).toBeVisible();
  await expect(page.locator('iframe[title="Canlı trafik haritası"]')).toHaveCount(0);
  await expect(page.getByText('Bu görünüm yol haritasıdır.',{exact:false})).toBeVisible();
@@ -29,10 +29,10 @@ test('four tabs, services, more and a single traffic map without third-party emb
 test('saved place survives reload and can be removed',async({page})=>{
  await page.addInitScript(()=>{if(!localStorage.getItem('yakinim:v2:last-location'))localStorage.setItem('yakinim:v2:last-location',JSON.stringify({lat:36.884,lng:30.704,mode:'manual',savedAt:Date.now()}));});
  await page.goto('/');
- await expect(page.locator('.map-stage')).toBeVisible();
- await page.locator('.map-sheet-toggle').click();
- await page.locator('.map-place-chip').filter({hasText:'Kaydedilen Market'}).click();
+ await expect(page.locator('.place-row')).toContainText('Kaydedilen Market');
+ await page.locator('.place-row').filter({hasText:'Kaydedilen Market'}).click();
  await page.getByRole('button',{name:'Yeri kaydet',exact:true}).click();
+ await page.getByRole('button',{name:'Kapat',exact:true}).click();
  await mobileNav(page).getByRole('button',{name:'Kaydedilen',exact:true}).click();
  await expect(page.locator('.shell-saved-place')).toContainText('Kaydedilen Market');
  await page.reload();
@@ -63,7 +63,7 @@ test('Istanbul traffic shows real index scope, zero, stale and failed-source sta
  let state='fresh';
  await page.route('**/api/traffic?**',r=>r.fulfill(state==='error'?{status:503,json:{error:'traffic_unavailable'}}:{json:{available:true,index:state==='fresh'?0:null,observedAt:new Date().toISOString(),fresh:state==='fresh',source:'İBB Ulaşım Yönetim Merkezi',sourceUrl:'https://api.ibb.gov.tr/tkmservices/api/TrafficData/v1/TrafficIndexHistory/1/5M',licenseUrl:'https://data.ibb.gov.tr/license'}}));
  await page.goto('/');
- await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik Haritadaki/}).click();
+ await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik /}).click();
  await expect(page.locator('.traffic-index-value')).toHaveText('0/ 100');
  await expect(page.locator('.traffic-index-card')).toContainText('Şehir geneli ölçümdür');
  state='stale';await page.getByRole('button',{name:'Trafik verisini yenile'}).click();await expect(page.locator('.traffic-index-value')).toHaveCount(0);await expect(page.getByText('Kaynak güncel değil; canlı endeks gösterilmiyor.')).toBeVisible();
@@ -78,7 +78,7 @@ test('road traffic loads native tiles in Antalya and removes the layer on servic
   if(new URL(r.request().url()).searchParams.get('action')==='tile'){tiles++;return r.fulfill({contentType:'image/png',body:png});}
   return r.fulfill(fail?{status:503,json:{error:'traffic_unavailable'}}:{json:{available:true,scope:'road',tiles:'/api/traffic?action=tile&z={z}&x={x}&y={y}',source:'TomTom Traffic'}});
  });
- await page.goto('/');await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik Haritadaki/}).click();
+ await page.goto('/');await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik /}).click();
  await expect(page.getByText('TomTom yol trafiği · 2 dakikada bir yenilenir.')).toBeVisible();expect(tiles).toBeGreaterThan(0);
  await expect(page.locator('.traffic-map iframe')).toHaveCount(0);await expect(page.locator('.traffic-index-card')).toHaveCount(0);
  fail=true;await page.getByRole('button',{name:'Trafik verisini yenile'}).click();await expect(page.getByRole('alert')).toContainText('Trafik kaynağına ulaşılamadı');await expect(page.getByText('Bu görünüm yol haritasıdır.',{exact:false})).toBeVisible();
@@ -97,6 +97,6 @@ test('events switch cities and never turn an unverified date into a show time',a
 
 test('failed road traffic tiles show an error while the base map remains usable',async({page})=>{
  await page.route('**/api/traffic?**',r=>new URL(r.request().url()).searchParams.get('action')==='tile'?r.fulfill({status:502,json:{error:'traffic_unavailable'}}):r.fulfill({json:{available:true,scope:'road',tiles:'/api/traffic?action=tile&z={z}&x={x}&y={y}'}}));
- await page.goto('/?preview');await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik Haritadaki/}).click();
+ await page.goto('/?preview');await mobileNav(page).getByRole('button',{name:'Hizmetler',exact:true}).click();await page.getByRole('button',{name:/^Trafik /}).click();
  await expect(page.getByText('Trafik katmanı alınamadı. Yol haritası kullanılabilir.')).toBeVisible();await expect(page.getByText('TomTom yol trafiği · 2 dakikada bir yenilenir.')).toHaveCount(0);await expect(page.locator('.traffic-map canvas')).toBeVisible();
 });

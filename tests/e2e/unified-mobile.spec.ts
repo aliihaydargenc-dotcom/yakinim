@@ -10,9 +10,11 @@ test.beforeEach(async({page})=>{
  await page.addInitScript(c=>localStorage.setItem('yakinim:v2:last-location',JSON.stringify({...c,mode:'manual',savedAt:Date.now()})),loc);
 });
 const nav=(page:Page)=>page.locator('.shell-nav--mobile');
-test('mobile launches into one continuous map, expands and selects from the same sheet',async({page})=>{
+test('mobile opens a readable list and offers an explicit map sheet',async({page})=>{
  await page.goto('/');
  await expect(nav(page).getByRole('button')).toHaveCount(4);
+ await expect(page.locator('.place-row')).toContainText('Mobil Market');
+ await page.getByRole('button',{name:'Harita',exact:true}).click();
  await expect(page.locator('.map-stage')).toBeVisible();
  await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-level','peek');
  await expect(page.getByRole('textbox',{name:'Yer ara'})).toBeVisible();
@@ -26,20 +28,12 @@ test('mobile launches into one continuous map, expands and selects from the same
  await nav(page).getByRole('button',{name:'Kaydedilen'}).click();
  await expect(page.locator('.shell-saved-place')).toContainText('Mobil Market');
  await nav(page).getByRole('button',{name:'Keşfet'}).click();
- await expect(page.locator('.map-stage')).toBeVisible();
+ await expect(page.locator('.place-row')).toContainText('Mobil Market');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test('transit service enters the very same map and opens arrivals without navigation',async({page})=>{
- await page.goto('/');
- await nav(page).getByRole('button',{name:'Hizmetler'}).click();
- await page.getByRole('button',{name:/Toplu ulaşım/}).click();
- await expect(nav(page).getByRole('button',{name:'Keşfet'})).toHaveAttribute('aria-current','page');
- await expect(page.locator('.map-stage')).toBeVisible();
- await expect(page.locator('.category-rail').getByRole('button',{name:'Duraklar'})).toHaveAttribute('aria-pressed','true');
- await page.locator('.map-sheet-toggle').click();
- await page.locator('.map-place-chip').filter({hasText:'KONYAALTI DURAK'}).click();
- await expect(page.locator('.map-place-sheet')).toContainText('KONYAALTI DURAK');
- await expect(page.locator('.map-bus-item')).toContainText('4 dk');
- await page.locator('.map-sheet-close').click();
- await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-selected','false');
+test('transit stays in services and exposes list, map and arrivals',async({page})=>{
+ await page.goto('/');await nav(page).getByRole('button',{name:'Hizmetler'}).click();await page.getByRole('button',{name:/Toplu ulaşım/}).click();
+ await expect(nav(page).getByRole('button',{name:'Hizmetler'})).toHaveAttribute('aria-current','page');await expect(page.locator('.stop-row')).toContainText('KONYAALTI DURAK');
+ await page.getByRole('button',{name:'Harita',exact:true}).click();await expect(page.locator('.map-stage')).toBeVisible();await page.locator('.map-sheet-toggle').click();await page.locator('.map-place-chip').filter({hasText:'KONYAALTI DURAK'}).click();
+ await expect(page.locator('.map-place-sheet')).toContainText('KONYAALTI DURAK');await expect(page.locator('.map-bus-item')).toContainText('4 dk');await page.locator('.map-sheet-close').click();await expect(page.locator('.map-unified-sheet')).toHaveAttribute('data-selected','false');
 });
